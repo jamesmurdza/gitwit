@@ -203,7 +203,7 @@ export function SidebarContent({
     <div
       className={cn(
         "h-full transition-all duration-300 delay-75 overflow-hidden",
-        hideSidebar ? "w-0" : "w-56",
+        hideSidebar ? "w-0" : "flex-auto",
         !isActive && !hideSidebar && "hidden",
         className
       )}

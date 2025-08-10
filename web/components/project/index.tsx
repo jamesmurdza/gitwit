@@ -1,6 +1,11 @@
 "use client"
 
 import { useEditorShortcuts } from "@/components/project/hooks/useEditorShortcuts"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
 import { Sandbox, User } from "@/lib/types"
 import ChangesAlert from "./alerts/changes-alert"
 import ProjectLayout from "./project-layout"
@@ -19,16 +24,21 @@ export default function Project({
   useEditorShortcuts()
 
   return (
-    <div className="flex max-h-full overflow-hidden">
+    <div className="max-h-full overflow-hidden w-full h-full">
       <ChangesAlert />
-      {/* Sidebar */}
-      <Sidebar userId={sandboxData.userId} />
-      {/* Main Project Layout */}
-      <ProjectLayout
-        isOwner={isOwner}
-        projectName={sandboxData.name}
-        projectType={sandboxData.type}
-      />
+      <ResizablePanelGroup direction="horizontal">
+        <ResizablePanel defaultSize={20} minSize={22} className="h-full">
+          <Sidebar userId={sandboxData.userId} />
+        </ResizablePanel>
+        <ResizableHandle />
+        <ResizablePanel defaultSize={80} minSize={40} className="h-full">
+          <ProjectLayout
+            isOwner={isOwner}
+            projectName={sandboxData.name}
+            projectType={sandboxData.type}
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   )
 }

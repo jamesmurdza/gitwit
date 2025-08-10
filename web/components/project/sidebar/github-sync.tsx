@@ -12,7 +12,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { useChangedFilesOptimistic } from "@/hooks/useChangedFilesOptimistic"
 import { useGitHubLoadingStates } from "@/hooks/useGitHubLoadingStates"
@@ -392,13 +391,13 @@ export function GitHubSync({ userId }: { userId: string }) {
               Connect your project to GitHub to ensure your code is secure,
               backed up, and accessible from any location.
             </p>
-            <div className="flex items-center justify-between bg-muted/50 px-2 py-1 rounded-sm">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between bg-muted/50 px-2 py-1 rounded-sm min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
                 <GithubUserButton {...githubUser} />
-                <div>
+                <div className="min-w-0">
                   <a
                     href={`${githubUser.html_url}/${repoStatus?.repo?.name}`}
-                    className="text-xs font-medium hover:underline"
+                    className="text-xs font-medium hover:underline truncate inline-block max-w-full align-bottom"
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -410,7 +409,7 @@ export function GitHubSync({ userId }: { userId: string }) {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="smIcon" className="size-6">
@@ -467,7 +466,7 @@ export function GitHubSync({ userId }: { userId: string }) {
             </div>
 
             {/* Pull button */}
-            <div className="flex gap-1 mt-2">
+            <div className="flex gap-1 mt-2 min-w-0">
               <Button
                 variant="outline"
                 size="xs"
@@ -554,9 +553,9 @@ export function GitHubSync({ userId }: { userId: string }) {
   }, [githubUser, resetGithubLogin])
 
   return (
-    <ScrollArea className="flex-grow overflow-auto px-2 pt-0 pb-4 relative">
-      <div className="flex flex-col gap-3 w-full pt-2">
-        <div className="flex items-center justify-between w-full">
+    <div className="styled-scrollbar hover-scrollbar flex-grow overflow-auto px-2 pt-0 pb-4 relative min-w-0">
+      <div className="flex flex-col gap-3 w-full pt-2 min-w-0">
+        <div className="flex items-center justify-between w-full min-w-0">
           <h2 className="font-medium">Sync to GitHub</h2>
         </div>
         {content}
@@ -572,7 +571,7 @@ export function GitHubSync({ userId }: { userId: string }) {
         open={showConflictModal}
         pendingPull={isResolvingConflicts}
       />
-    </ScrollArea>
+    </div>
   )
 }
 
