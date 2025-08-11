@@ -68,7 +68,7 @@ const SidebarFolder = memo((props: TFolder) => {
           disabled={isDeletingFolder}
           onClick={() => setIsOpen((prev) => !prev)}
           className={cn(
-            "rounded-sm w-full flex items-center h-7 px-1 transition-colors hover:bg-secondary cursor-pointer"
+            "rounded-sm w-full flex items-center h-7 px-1 transition-colors hover:bg-secondary cursor-pointer min-w-0"
           )}
         >
           <ChevronRight
@@ -89,11 +89,11 @@ const SidebarFolder = memo((props: TFolder) => {
               Deleting...
             </div>
           ) : (
-            <form>
+            <form className="flex-1 min-w-0">
               <input
                 ref={inputRef}
                 disabled
-                className={`pointer-events-none bg-transparent transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring rounded-sm w-full`}
+                className={`pointer-events-none bg-transparent transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring rounded-sm w-full truncate`}
                 defaultValue={props.name}
               />
             </form>

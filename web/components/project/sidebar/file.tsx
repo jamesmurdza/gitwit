@@ -93,7 +93,7 @@ const SidebarFile = memo((props: TFile) => {
         onMouseLeave={handleMouseLeave}
         data-dragging={isDragging}
         className={
-          "data-[dragging=true]:opacity-50 data-[dragging=true]:hover:!bg-background data-[state=open]:bg-secondary/50 w-full flex items-center h-7 px-1 hover:bg-secondary rounded-sm cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          "data-[dragging=true]:opacity-50 data-[dragging=true]:hover:!bg-background data-[state=open]:bg-secondary/50 w-full flex items-center h-7 px-1 hover:bg-secondary rounded-sm cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-w-0"
         }
       >
         <Image
@@ -112,6 +112,7 @@ const SidebarFile = memo((props: TFile) => {
           </>
         ) : (
           <form
+            className="flex-1 min-w-0"
             onSubmit={(e) => {
               e.preventDefault()
               handleRename()
@@ -119,7 +120,7 @@ const SidebarFile = memo((props: TFile) => {
           >
             <input
               ref={inputRef}
-              className={`bg-transparent transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring rounded-sm w-full ${
+              className={`bg-transparent transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring rounded-sm w-full truncate ${
                 editing ? "" : "pointer-events-none"
               }`}
               disabled={!editing}

@@ -1,7 +1,6 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useEditorLayout } from "@/context/EditorLayoutContext"
 import type { Sandbox } from "@/lib/types"
@@ -70,11 +69,19 @@ function RootFolder() {
       return false
     },
   })
+
+  const setRefs = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      ;(droppableRef as unknown as (node: HTMLDivElement | null) => void)(node)
+    },
+    [droppableRef]
+  )
+
   return (
-    <ScrollArea
-      ref={droppableRef}
+    <div
+      ref={setRefs}
       data-isdrop={isDropTarget}
-      className="flex-grow overflow-auto px-2 pt-0 pb-4 relative data-[isdrop=true]:bg-secondary/50 data-[isdrop=true]:rounded-sm data-[isdrop=true]:overflow-hidden"
+      className="styled-scrollbar hover-scrollbar flex-grow overflow-auto px-2 pt-0 pb-4 relative data-[isdrop=true]:bg-secondary/50 data-[isdrop=true]:rounded-sm data-[isdrop=true]:overflow-hidden min-w-0"
     >
       <div className="flex w-full items-center justify-between h-8 pb-1 isolate z-10 sticky pt-2 top-0 bg-background">
         <h2 className="font-medium">Explorer</h2>
@@ -95,7 +102,7 @@ function RootFolder() {
           </button>
         </div>
       </div>
-      <div className="rounded-sm w-full mt-1 flex flex-col">
+      <div className="rounded-sm w-full mt-1 flex flex-col min-w-0">
         {isLoadingFileTree ? (
           <div className="w-full flex flex-col justify-center">
             {new Array(6).fill(0).map((_, i) => (
@@ -123,7 +130,7 @@ function RootFolder() {
           </>
         )}
       </div>
-    </ScrollArea>
+    </div>
   )
 }
 

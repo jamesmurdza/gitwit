@@ -240,12 +240,13 @@
 
 .styled-scrollbar {
   --scrollbar-bg: hsl(var(--background));
-  --scrollbar-thumb: hsl(var(--muted-foreground));
-  --scrollbar-thumb-hover: hsl(var(--foreground));
+  --scrollbar-thumb: hsl(var(--border));
+  --scrollbar-thumb-hover: hsl(var(--muted-foreground));
 }
 
 .styled-scrollbar::-webkit-scrollbar {
-  width: 12px;
+  width: 8px;
+  height: 8px;
 }
 
 .styled-scrollbar::-webkit-scrollbar-track {
@@ -255,12 +256,19 @@
 
 .styled-scrollbar::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb);
-  border-radius: 0.5rem;
-  border: 3px solid var(--scrollbar-bg);
+  border-radius: 0.375rem;
+  border: 2px solid var(--scrollbar-bg);
 }
 
 .styled-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-thumb-hover);
+}
+
+/* Hide scrollbar arrows/buttons */
+.styled-scrollbar::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+  display: none !important;
 }
 
 /* For Firefox */
@@ -272,9 +280,36 @@
 @media (prefers-color-scheme: dark) {
   .styled-scrollbar {
     --scrollbar-bg: hsl(var(--background));
-    --scrollbar-thumb: hsl(var(--muted-foreground));
-    --scrollbar-thumb-hover: hsl(var(--foreground));
+    --scrollbar-thumb: hsl(var(--border));
+    --scrollbar-thumb-hover: hsl(var(--muted-foreground));
   }
+}
+
+/* Show scrollbars only on hover (no layout shift) */
+/* Reserve scrollbar space at all times, but make it transparent until hover */
+.hover-scrollbar {
+  /* Firefox */
+  scrollbar-width: thin; /* reserve space */
+  scrollbar-color: transparent transparent; /* hide visually by default */
+}
+
+.hover-scrollbar:hover {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-bg); /* show on hover */
+}
+
+/* WebKit */
+.hover-scrollbar::-webkit-scrollbar {
+  width: 8px; /* reserve space */
+  height: 8px;
+}
+
+.hover-scrollbar:not(:hover)::-webkit-scrollbar-thumb {
+  background-color: transparent; /* hide visually */
+  border-color: transparent;
+}
+
+.hover-scrollbar:not(:hover)::-webkit-scrollbar-track {
+  background: transparent; /* hide visually */
 }
 
 .hljs-light {
