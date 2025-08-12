@@ -204,11 +204,11 @@ e2b sandbox spawn TEMPLATENAME
 cd project
 ```
 
-You will see a URL in the form of `https://xxxxxxxxxxxxxxxxxxx.e2b-staging.com`.
+You will see a URL in the form of `https://xxxxxxxxxxxxxxxxxxx.e2b.dev`.
 
 Now, run the command to start your development server.
 
-To see the running server, visit the public url `https://<PORT>-xxxxxxxxxxxxxxxxxxx.e2b-staging.com`.
+To see the running server, visit the public url `https://<PORT>-xxxxxxxxxxxxxxxxxxx.e2b.dev`.
 
 If you've done this and it works, let us know and we'll add your template to GitWit! Please reach out to us [on Discord](https://discord.gitwit.dev/) with any questions or to submit your working template.
 
