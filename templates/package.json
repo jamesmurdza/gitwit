@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "deploy": "sh deploy.sh"
+    "deploy": "node deploy.js"
   },
   "exports": {
     ".": "./dist/index.js",
@@ -15,14 +15,16 @@
     "./nextjs": "./nextjs",
     "./reactjs": "./reactjs",
     "./streamlit": "./streamlit",
-    "./vanillajs": "./vanillajs"
+    "./vanillajs": "./vanillajs",
+    "./php": "./php"
   },
   "files": [
     "dist",
     "nextjs",
     "reactjs",
     "streamlit",
-    "vanillajs"
+    "vanillajs",
+    "php"
   ],
   "devDependencies": {
     "typescript": "^5.8.3",
