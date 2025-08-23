@@ -31,7 +31,11 @@ export const AIRequestSchema = z.object({
     projectId: z.string().optional(),
     templateType: z.string().optional(),
     activeFile: z.string().optional(),
-    files: z.array(z.any()).optional(),
+    fileTree: z.array(z.any()).optional(),
+    /**
+     * Combined content from selected files (code, files, images)
+     */
+    contextContent: z.string().optional(),
   }),
   mode: z.enum(["chat", "edit", "merge"]).default("chat"),
 })
