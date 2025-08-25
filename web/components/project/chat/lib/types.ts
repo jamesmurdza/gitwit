@@ -3,43 +3,27 @@ import { TemplateConfig } from "@gitwit/templates"
 import * as monaco from "monaco-editor"
 import { Socket } from "socket.io-client"
 
-// Allowed file types for context tabs
-export const ALLOWED_FILE_TYPES = {
-  // Text files
-  "text/plain": true,
-  "text/markdown": true,
-  "text/csv": true,
-  // Code files
-  "application/json": true,
-  "text/javascript": true,
-  "text/typescript": true,
-  "text/html": true,
-  "text/css": true,
-  // Documents
-  "application/pdf": true,
-  // Images
-  "image/jpeg": true,
-  "image/png": true,
-  "image/gif": true,
-  "image/webp": true,
-  "image/svg+xml": true,
-} as const
-
 // Message interface
 export interface Message {
   role: "user" | "assistant"
   content: string
-  context?: string
+  context?: ContextTab[]
 }
 
 // Context tab interface
-export interface ContextTab {
-  id: string
-  type: "file" | "code" | "image"
-  name: string
-  content: string
-  lineRange?: { start: number; end: number }
-}
+export type ContextTab =
+  | {
+      id: string
+      type: "file" | "image"
+      name: string
+      content: string
+    }
+  | {
+      id: string
+      type: "code"
+      name: string
+      lineRange?: { start: number; end: number }
+    }
 
 // AIChat props interface
 export interface AIChatProps {

@@ -1,17 +1,18 @@
 "use server"
 
+import { TFile, TFolder } from "@/lib/types"
 import { currentUser } from "@clerk/nextjs/server"
 import { AIClient, createAIClient, createAIProvider } from "@gitwit/ai"
 import { StreamHandler, defaultTools } from "@gitwit/ai/utils"
 import { createStreamableValue } from "ai/rsc"
-import { TIERS } from "../../lib/tiers"
 
 export async function streamChat(
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>,
   context?: {
     templateType?: string
     activeFileContent?: string
-    files?: any[]
+    fileTree?: (TFile | TFolder)[]
+    contextContent?: string
     projectName?: string
     isEditMode?: boolean
   }
@@ -25,7 +26,6 @@ export async function streamChat(
 
   ;(async () => {
     try {
-
       const aiClient = await createAIClient({
         userId: user.id,
         projectId: context?.projectName,
@@ -42,7 +42,8 @@ export async function streamChat(
           projectId: context?.projectName,
           templateType: context?.templateType,
           activeFile: context?.activeFileContent,
-          files: context?.files,
+          fileTree: context?.fileTree,
+          contextContent: context?.contextContent,
         },
         stream: true,
       })

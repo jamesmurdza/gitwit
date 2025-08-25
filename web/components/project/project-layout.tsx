@@ -8,7 +8,6 @@ import {
 import { useEditorLayout } from "@/context/EditorLayoutContext"
 import { fileRouter } from "@/lib/api"
 import { defaultEditorOptions } from "@/lib/monaco/config"
-import { TFile } from "@/lib/types"
 import { processFileType, sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import Editor from "@monaco-editor/react"
@@ -19,9 +18,10 @@ import { useParams } from "next/navigation"
 import { useCallback, useRef, useState } from "react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import Tab from "../ui/tab"
-import AIChat from "./ai-chat"
 import AIEditElements from "./ai-edit/ai-edit-elements"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
+import { AIChat } from "./chat"
+import { ChatProvider } from "./chat/providers/chat-provider"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
 import { useEditorSocket } from "./hooks/useEditorSocket"
 import { useMonacoEditor } from "./hooks/useMonacoEditor"
@@ -147,164 +147,158 @@ export default function ProjectLayout({
     setDraft(activeTab.id, content ?? "")
   }
   return (
-    <ResizablePanelGroup
-      direction={isHorizontalLayout ? "horizontal" : "vertical"}
+    <ChatProvider
+      {...{
+        fileTree,
+        activeFileContent,
+        projectName,
+        projectType,
+      }}
     >
-      <ResizablePanel defaultSize={isAIChatOpen ? 80 : 100} minSize={50}>
-        <ResizablePanelGroup
-          direction={isHorizontalLayout ? "vertical" : "horizontal"}
-        >
-          {/* Editor Panel */}
-          <ResizablePanel
-            className="p-2 flex flex-col"
-            maxSize={80}
-            minSize={30}
-            defaultSize={70}
-            ref={editorPanelRef}
+      <ResizablePanelGroup
+        direction={isHorizontalLayout ? "horizontal" : "vertical"}
+      >
+        <ResizablePanel defaultSize={isAIChatOpen ? 80 : 100} minSize={50}>
+          <ResizablePanelGroup
+            direction={isHorizontalLayout ? "vertical" : "horizontal"}
           >
-            {/* Tabs */}
-            <div className="pb-2 w-full flex gap-2 overflow-x-auto tab-scroll">
-              {tabs.map((tab) => (
-                <Tab
-                  key={tab.id}
-                  saved={tab.saved}
-                  selected={activeTab?.id === tab.id}
-                  onClick={() => setActiveTab(tab)}
-                  onClose={() => removeTab(tab)}
-                >
-                  {tab.name}
-                </Tab>
-              ))}
-            </div>
-
-            {/* Monaco Editor Container */}
-            <div
-              ref={editorContainerRef}
-              className="grow w-full overflow-hidden rounded-md relative"
+            {/* Editor Panel */}
+            <ResizablePanel
+              className="p-2 flex flex-col"
+              maxSize={80}
+              minSize={30}
+              defaultSize={70}
+              ref={editorPanelRef}
             >
-              {!activeTab?.id ? (
-                <div className="w-full h-full flex items-center justify-center text-xl font-medium text-muted-foreground/50 select-none">
-                  <FileJson className="w-6 h-6 mr-3" />
-                  No file selected.
-                </div>
-              ) : (
-                <>
-                  <Editor
-                    height="100%"
-                    language={editorLanguage}
-                    beforeMount={handleEditorWillMount}
-                    onMount={handleEditorMount}
-                    path={activeTab.id}
-                    onChange={updateActiveFileContent}
-                    theme={theme === "light" ? "vs" : "vs-dark"}
-                    options={defaultEditorOptions}
-                    value={activeFileContent}
-                  />
-                  <AIEditElements
-                    editorRef={editorRef}
-                    cursorLine={cursorLine}
-                    isSelected={isSelected}
-                    showSuggestion={showSuggestion}
-                    generate={generate}
-                    setGenerate={setGenerate}
-                    generateRef={generateRef}
-                    suggestionRef={suggestionRef}
-                    generateWidgetRef={generateWidgetRef}
-                    handleAiEdit={handleAiEdit}
-                    tabs={tabs}
-                    activeFileId={activeTab.id}
-                    editorLanguage={editorLanguage}
-                  />
-                </>
-              )}
-            </div>
-          </ResizablePanel>
+              {/* Tabs */}
+              <div className="pb-2 w-full flex gap-2 overflow-x-auto tab-scroll">
+                {tabs.map((tab) => (
+                  <Tab
+                    key={tab.id}
+                    saved={tab.saved}
+                    selected={activeTab?.id === tab.id}
+                    onClick={() => setActiveTab(tab)}
+                    onClose={() => removeTab(tab)}
+                  >
+                    {tab.name}
+                  </Tab>
+                ))}
+              </div>
 
-          <ResizableHandle />
-
-          {/* Preview & Terminal Panel */}
-          <ResizablePanel defaultSize={30}>
-            <ResizablePanelGroup
-              direction={
-                isAIChatOpen && isHorizontalLayout
-                  ? "horizontal"
-                  : isAIChatOpen
-                  ? "vertical"
-                  : isHorizontalLayout
-                  ? "horizontal"
-                  : "vertical"
-              }
-            >
-              {/* Preview Panel */}
-              <ResizablePanel
-                ref={previewPanelRef}
-                defaultSize={isPreviewCollapsed ? 4 : 20}
-                minSize={25}
-                collapsedSize={isHorizontalLayout ? 20 : 4}
-                className="p-2 flex flex-col gap-2"
-                collapsible
-                onCollapse={() => setIsPreviewCollapsed(true)}
-                onExpand={() => setIsPreviewCollapsed(false)}
+              {/* Monaco Editor Container */}
+              <div
+                ref={editorContainerRef}
+                className="grow w-full overflow-hidden rounded-md relative"
               >
-                <PreviewWindow
-                  open={togglePreviewPanel}
-                  collapsed={isPreviewCollapsed}
-                  src={previewURL}
-                  ref={previewWindowRef}
-                  toggleLayout={toggleLayout}
-                  isHorizontal={isHorizontalLayout}
-                  isAIChatOpen={isAIChatOpen}
-                />
-              </ResizablePanel>
-
-              <ResizableHandle />
-
-              {/* Terminal Panel */}
-              <ResizablePanel
-                defaultSize={50}
-                minSize={20}
-                className="p-2 flex flex-col"
-              >
-                {isOwner ? (
-                  <Terminals />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-lg font-medium text-muted-foreground/50 select-none">
-                    <TerminalSquare className="w-4 h-4 mr-2" />
-                    No terminal access.
+                {!activeTab?.id ? (
+                  <div className="w-full h-full flex items-center justify-center text-xl font-medium text-muted-foreground/50 select-none">
+                    <FileJson className="w-6 h-6 mr-3" />
+                    No file selected.
                   </div>
+                ) : (
+                  <>
+                    <Editor
+                      height="100%"
+                      language={editorLanguage}
+                      beforeMount={handleEditorWillMount}
+                      onMount={handleEditorMount}
+                      path={activeTab.id}
+                      onChange={updateActiveFileContent}
+                      theme={theme === "light" ? "vs" : "vs-dark"}
+                      options={defaultEditorOptions}
+                      value={activeFileContent}
+                    />
+                    <AIEditElements
+                      editorRef={editorRef}
+                      cursorLine={cursorLine}
+                      isSelected={isSelected}
+                      showSuggestion={showSuggestion}
+                      generate={generate}
+                      setGenerate={setGenerate}
+                      generateRef={generateRef}
+                      suggestionRef={suggestionRef}
+                      generateWidgetRef={generateWidgetRef}
+                      handleAiEdit={handleAiEdit}
+                      tabs={tabs}
+                      activeFileId={activeTab.id}
+                      editorLanguage={editorLanguage}
+                    />
+                  </>
                 )}
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </ResizablePanel>
+              </div>
+            </ResizablePanel>
 
-      {/* AI Chat Panel */}
-      {isAIChatOpen && (
-        <>
-          <ResizableHandle />
-          <ResizablePanel defaultSize={30} minSize={15}>
-            <AIChat
-              activeFileContent={activeFileContent}
-              activeFileName={activeTab?.name || "No file selected"}
-              onClose={toggleAIChat}
-              editorRef={{ current: editorRef }}
-              lastCopiedRangeRef={lastCopiedRangeRef}
-              templateType={projectType}
-              projectName={projectName}
-              handleApplyCode={handleApplyCodeWithDecorations}
-              mergeDecorationsCollection={mergeDecorationsCollection}
-              setMergeDecorationsCollection={setMergeDecorationsCollection}
-              selectFile={setActiveTab}
-              tabs={tabs}
-              projectId={projectId}
-              files={fileTree as TFile[]}
-            />
-          </ResizablePanel>
-        </>
-      )}
-      {/* Session Timeout Dialog */}
-      <SessionTimeoutDialog isOwner={isOwner} />
-    </ResizablePanelGroup>
+            <ResizableHandle />
+
+            {/* Preview & Terminal Panel */}
+            <ResizablePanel defaultSize={30}>
+              <ResizablePanelGroup
+                direction={
+                  isAIChatOpen && isHorizontalLayout
+                    ? "horizontal"
+                    : isAIChatOpen
+                    ? "vertical"
+                    : isHorizontalLayout
+                    ? "horizontal"
+                    : "vertical"
+                }
+              >
+                {/* Preview Panel */}
+                <ResizablePanel
+                  ref={previewPanelRef}
+                  defaultSize={isPreviewCollapsed ? 4 : 20}
+                  minSize={25}
+                  collapsedSize={isHorizontalLayout ? 20 : 4}
+                  className="p-2 flex flex-col gap-2"
+                  collapsible
+                  onCollapse={() => setIsPreviewCollapsed(true)}
+                  onExpand={() => setIsPreviewCollapsed(false)}
+                >
+                  <PreviewWindow
+                    open={togglePreviewPanel}
+                    collapsed={isPreviewCollapsed}
+                    src={previewURL}
+                    ref={previewWindowRef}
+                    toggleLayout={toggleLayout}
+                    isHorizontal={isHorizontalLayout}
+                    isAIChatOpen={isAIChatOpen}
+                  />
+                </ResizablePanel>
+
+                <ResizableHandle />
+
+                {/* Terminal Panel */}
+                <ResizablePanel
+                  defaultSize={50}
+                  minSize={20}
+                  className="p-2 flex flex-col"
+                >
+                  {isOwner ? (
+                    <Terminals />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-lg font-medium text-muted-foreground/50 select-none">
+                      <TerminalSquare className="w-4 h-4 mr-2" />
+                      No terminal access.
+                    </div>
+                  )}
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </ResizablePanel>
+
+        {/* AI Chat Panel */}
+        {isAIChatOpen && (
+          <>
+            <ResizableHandle />
+            <ResizablePanel defaultSize={30} minSize={15}>
+              <AIChat />
+            </ResizablePanel>
+          </>
+        )}
+        {/* Session Timeout Dialog */}
+        <SessionTimeoutDialog isOwner={isOwner} />
+      </ResizablePanelGroup>
+    </ChatProvider>
   )
 }

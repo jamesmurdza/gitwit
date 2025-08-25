@@ -21,7 +21,7 @@
     "db:studio": "npm run studio -w db",
     "db:studio:prod": "NODE_ENV=production npm run studio -w db",
     "dev:deps": "concurrently -k -n LIB,DB -c yellow,magenta \"npm run dev -w lib\" \"npm run dev -w db\"",
-    "dev": "npm run build:deps && concurrently -k -n WEB,SERVER -c blue,green \"npm run dev -w web\" \"npm run dev -w server\"",
+    "dev": "npm run build:deps && concurrently -k -n WEB,SERVER,AI -c blue,green,cyan \"npm run dev -w web\" \"npm run dev -w server\" \"npm run dev -w ai\"",
     "dev:web": "npm run build:deps && npm run dev -w web",
     "dev:server": "npm run build:deps && npm run dev -w server",
     "dev:watch": "concurrently -k -n LIB,DB,WEB,SERVER -c yellow,magenta,blue,green \"npm run dev -w lib\" \"npm run dev -w db\" \"npm run dev -w web\" \"npm run dev -w server\"",

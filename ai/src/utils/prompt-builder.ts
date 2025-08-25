@@ -72,6 +72,9 @@ ${JSON.stringify(templateConfig.scripts, null, 2)}
     if (context.activeFile) {
       prompt += `\n\nActive File Content:\n${context.activeFile}`
     }
+    if (context.contextContent) {
+      prompt += `\n\nAdditional Context(selected files):\n${context.contextContent}`
+    }
 
     prompt += `
 
