@@ -17,6 +17,7 @@ import { useEditorLayout } from "@/context/EditorLayoutContext"
 import { cn } from "@/lib/utils"
 import { Slot } from "@radix-ui/react-slot"
 import { type VariantProps } from "class-variance-authority"
+import { AnimatePresence, motion } from "framer-motion"
 import {
   BrainIcon,
   ChevronDown,
@@ -25,9 +26,14 @@ import {
   MinimizeIcon,
   SettingsIcon,
 } from "lucide-react"
-import { createContext, useCallback, useContext, useState } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react"
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom"
-
 // #region ContainerRoot
 interface ChatContainerContextValue {
   maximized: boolean
@@ -57,10 +63,59 @@ function ChatContainerRoot({
   ...props
 }: ChatContainerRootProps) {
   const [maximized, setMaximized] = useState(false)
-  const toggleMaximized = useCallback(() => setMaximized((prev) => !prev), [])
+  const toggleMaximized = useCallback(
+    () => document.startViewTransition(() => setMaximized((prev) => !prev)),
+    []
+  )
+  useEffect(() => {
+    // when escape is pressed, toggle preview maximize state
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key === "Escape" &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !(event.target as HTMLElement)?.matches(
+          "input, textarea, [contenteditable]"
+        )
+      ) {
+        document.startViewTransition(() => setMaximized(false))
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [])
+
   return (
     <ChatContainerContext.Provider value={{ maximized, toggleMaximized }}>
-      <div className={cn("flex flex-col h-full", className)} {...props}>
+      <AnimatePresence>
+        {maximized && (
+          <motion.div
+            key="preview"
+            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
+            exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            className="fixed inset-0 z-20 bg-background/10"
+            transition={{ duration: 0.3 }}
+            onClick={toggleMaximized}
+          />
+        )}
+      </AnimatePresence>
+      <div
+        className={cn(
+          "flex flex-col bg-background",
+          maximized
+            ? "fixed inset-4 z-50 rounded-lg shadow-[0_0_0_1px_hsl(var(--muted-foreground)_/_0.4)]"
+            : "h-full",
+          className
+        )}
+        style={{
+          viewTransitionName: "chat-container",
+        }}
+        {...props}
+      >
         {children}
       </div>
     </ChatContainerContext.Provider>
@@ -312,6 +367,10 @@ function ChatContainerSettings() {
 
 export function ChatContainerCollapse() {
   const { toggleAIChat } = useEditorLayout()
+  const { maximized } = useChatContainerContext()
+  if (maximized) {
+    return null
+  }
   return (
     <ChatContainerAction label="Collapse chat" onClick={toggleAIChat}>
       <FoldHorizontal size={16} />
