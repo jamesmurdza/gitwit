@@ -1,100 +1,150 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import React, { useEffect, useState } from "react"
-import { codeToHtml } from "shiki"
+import { AnimatePresence, motion } from "framer-motion"
+import { CheckIcon, CopyIcon } from "lucide-react"
+import {
+  type ComponentProps,
+  createContext,
+  type HTMLAttributes,
+  useContext,
+  useEffect,
+  useState,
+} from "react"
+import { type BundledLanguage, codeToHtml } from "shiki"
 
-export type CodeBlockProps = {
-  children?: React.ReactNode
-  className?: string
-} & React.HTMLProps<HTMLDivElement>
-
-function CodeBlock({ children, className, ...props }: CodeBlockProps) {
-  return (
-    <div
-      className={cn(
-        "not-prose flex w-full flex-col overflow-clip border",
-        "border-border bg-card text-card-foreground rounded-xl",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  )
+type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
+  code: string
+  language: BundledLanguage
 }
 
-export type CodeBlockCodeProps = {
+type CodeBlockContextType = {
   code: string
-  language?: string
-  theme?: string
-  className?: string
-} & React.HTMLProps<HTMLDivElement>
+}
 
-function CodeBlockCode({
+const CodeBlockContext = createContext<CodeBlockContextType>({
+  code: "",
+})
+
+export async function highlightCode(code: string, language: BundledLanguage) {
+  return await codeToHtml(code, {
+    lang: language,
+    themes: {
+      light: "github-light",
+      dark: "github-dark-default",
+    },
+  })
+}
+
+const CodeBlock = ({
   code,
-  language = "tsx",
-  theme = "github-light",
+  language,
   className,
+  children,
   ...props
-}: CodeBlockCodeProps) {
-  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
+}: CodeBlockProps) => {
+  const [html, setHtml] = useState<string>("")
 
   useEffect(() => {
-    async function highlight() {
-      if (!code) {
-        setHighlightedHtml("<pre><code></code></pre>")
-        return
+    let isMounted = true
+
+    highlightCode(code, language).then((result) => {
+      if (isMounted) {
+        setHtml(result)
       }
+    })
 
-      const html = await codeToHtml(code, {
-        lang: language,
-        themes: {
-          light: "github-light",
-          dark: "github-dark-default",
-        },
-      })
-      setHighlightedHtml(html)
+    return () => {
+      isMounted = false
     }
-    highlight()
-  }, [code, language, theme])
+  }, [code, language])
 
-  const classNames = cn(
-    "w-full text-[13px] [&>pre]:overflow-x-auto [&>pre]:px-4 [&>pre]:py-4 font-mono",
-    className
-  )
-
-  // SSR fallback: render plain code if not hydrated yet
-  return highlightedHtml ? (
-    <div
-      className={classNames}
-      dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-      {...props}
-    />
-  ) : (
-    <div className={classNames} {...props}>
-      <pre>
-        <code>{code}</code>
-      </pre>
-    </div>
+  return (
+    <CodeBlockContext.Provider value={{ code }}>
+      <div className="group relative">
+        <div
+          className={cn(
+            "overflow-clip my-4 h-auto rounded-lg border [&>pre]:p-4 [&>pre]:overflow-x-auto",
+            className
+          )}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
+          dangerouslySetInnerHTML={{ __html: html }}
+          {...props}
+        />
+        {children}
+      </div>
+    </CodeBlockContext.Provider>
   )
 }
 
-export type CodeBlockGroupProps = React.HTMLAttributes<HTMLDivElement>
-
-function CodeBlockGroup({
+export type CodeBlockCopyButtonProps = ComponentProps<"button"> & {
+  onCopy?: () => void
+  onError?: (error: Error) => void
+  timeout?: number
+}
+const CodeBlockCopyButton = ({
+  onCopy,
+  onError,
+  timeout = 2000,
   children,
   className,
   ...props
-}: CodeBlockGroupProps) {
+}: CodeBlockCopyButtonProps) => {
+  const [isCopied, setIsCopied] = useState(false)
+  const { code } = useContext(CodeBlockContext)
+
+  const copyToClipboard = async () => {
+    if (typeof window === "undefined" || !navigator?.clipboard?.writeText) {
+      onError?.(new Error("Clipboard API not available"))
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(code)
+      setIsCopied(true)
+      onCopy?.()
+      setTimeout(() => setIsCopied(false), timeout)
+    } catch (error) {
+      onError?.(error as Error)
+    }
+  }
+
   return (
-    <div
-      className={cn("flex items-center justify-between", className)}
+    <button
+      className={cn(
+        "absolute top-2 right-2 shrink-0 rounded-md size-7 flex items-center justify-center opacity-0 transition-all",
+        "hover:bg-secondary group-hover:opacity-100 active:scale-95",
+        className
+      )}
+      onClick={copyToClipboard}
+      type="button"
       {...props}
     >
-      {children}
-    </div>
+      <AnimatePresence initial={false} mode="popLayout">
+        {isCopied ? (
+          <motion.div
+            key="check"
+            initial={{ opacity: 0.4, scale: 0.9, filter: "blur(4px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0.4, scale: 0.9, filter: "blur(4px)" }}
+            transition={{ duration: 0.3 }}
+          >
+            <CheckIcon size={14} className="text-green-500" />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="copy"
+            initial={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
+            transition={{ duration: 0.3 }}
+          >
+            <CopyIcon size={14} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </button>
   )
 }
 
-export { CodeBlock, CodeBlockCode, CodeBlockGroup }
+export { CodeBlock, CodeBlockCopyButton }
