@@ -14,6 +14,8 @@ export const ALLOWED_FILE_TYPES = [
   "text/markdown",
   "text/csv",
   // Code files
+  "application/xml",
+  "application/toml",
   "application/json",
   "text/javascript",
   "text/typescript",
@@ -24,3 +26,15 @@ export const ALLOWED_FILE_TYPES = [
   // Images
   ...ALLOWED_IMAGE_TYPES,
 ] as const
+
+export const TEXT_LIKE_MIMES = new Set([
+  // text/* is handled by startsWith below, add non-text that are still editable:
+  "application/json",
+  "application/xml",
+  "application/toml",
+  "text/javascript",
+  "text/markdown",
+  "text/csv",
+  "image/svg+xml", // treat SVG as text (editable)
+  "text/typescript",
+])

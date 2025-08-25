@@ -56,7 +56,11 @@ import React, {
 } from "react"
 import { getIconForFile } from "vscode-icons-js"
 import { Button } from "../../../ui/button"
-import { ALLOWED_FILE_TYPES, ALLOWED_IMAGE_TYPES } from "../lib/constants"
+import {
+  ALLOWED_FILE_TYPES,
+  ALLOWED_IMAGE_TYPES,
+  TEXT_LIKE_MIMES,
+} from "../lib/constants"
 import { getAllFiles } from "../lib/utils"
 import { useChat } from "../providers/chat-provider"
 
@@ -391,8 +395,11 @@ function ChatInputContextMenu() {
           })
           setContextOpenMenu(false)
         }
-
-        reader.readAsText(file)
+        if (TEXT_LIKE_MIMES.has(file.type)) {
+          reader.readAsDataURL(file)
+        } else {
+          reader.readAsDataURL(file)
+        }
       }
     }
     fileInput.click()
@@ -417,7 +424,11 @@ function ChatInputContextMenu() {
           })
           setContextOpenMenu(false)
         }
-        reader.readAsDataURL(file)
+        if (TEXT_LIKE_MIMES.has(file.type)) {
+          reader.readAsDataURL(file)
+        } else {
+          reader.readAsDataURL(file)
+        }
       }
     }
     fileInput.click()
