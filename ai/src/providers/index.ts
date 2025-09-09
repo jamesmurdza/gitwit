@@ -1,10 +1,9 @@
-import { anthropic } from "@ai-sdk/anthropic"
-import { openai } from "@ai-sdk/openai"
+import { createAnthropic } from "@ai-sdk/anthropic"
+import { createOpenAI } from "@ai-sdk/openai"
 import { generateText, LanguageModel, streamText, Tool, tool } from "ai"
 import { z } from "zod"
 import { AIProviderConfig, AIRequest, AITool } from "../types"
 import { logger, StreamHandler } from "../utils"
-import { TIERS } from "@gitwit/web/lib/tiers"
 
 /**
  * AI provider class that handles communication with different AI services
@@ -69,20 +68,37 @@ export class AIProvider {
    *
    * @param config - Provider configuration object
    * @returns Initialized language model instance
-   * @throws {Error} When an unsupported provider is specified
+   * @throws {Error} When an unsupported provider is specified or API key is missing
    */
   private initializeModel(config: AIProviderConfig): LanguageModel {
     this.logger.debug("Initializing model", {
       provider: config.provider,
-      modelId: config.modelId || TIERS.FREE.anthropicModel,
+      modelId: config.modelId,
+      hasApiKey: !!config.apiKey,
     })
 
-    switch (config.provider) {
-      case "anthropic":
-        return anthropic(config.modelId || TIERS.FREE.anthropicModel)
+    // Default models for each provider
+    const DEFAULT_ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"
+    const DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
-      case "openai":
-        return openai(config.modelId || "gpt-4o-mini")
+    switch (config.provider) {
+      case "anthropic": {
+        const modelId = config.modelId || DEFAULT_ANTHROPIC_MODEL
+        const anthropicProvider = createAnthropic({
+          apiKey: config.apiKey || process.env.ANTHROPIC_API_KEY,
+          ...(config.baseURL && { baseURL: config.baseURL }),
+        })
+        return anthropicProvider(modelId)
+      }
+
+      case "openai": {
+        const modelId = config.modelId || DEFAULT_OPENAI_MODEL
+        const openaiProvider = createOpenAI({
+          apiKey: config.apiKey || process.env.OPENAI_API_KEY,
+          ...(config.baseURL && { baseURL: config.baseURL }),
+        })
+        return openaiProvider(modelId)
+      }
 
       default:
         throw new Error(`Unsupported provider: ${config.provider}`)
@@ -187,21 +203,28 @@ export class AIProvider {
 }
 
 /**
- * Factory function to create an AI provider with tools
- * Automatically detects the appropriate provider based on available API keys
+ * Factory function to create an AI provider
+ * Can use explicitly provided API keys or fall back to environment variables
  *
- * @param overrides - Optional configuration overrides
+ * @param overrides - Optional configuration overrides including API keys
  * @returns Configured AI provider instance
  *
  * @example
  * ```typescript
- * // Auto-detects provider from environment
- * const provider = createAIProvider()
+ * // Use explicit API key
+ * const provider = createAIProvider({
+ *   provider: "anthropic",
+ *   apiKey: "sk-ant-..."
+ * })
+ *
+ * // Auto-detect from environment
+ * const autoProvider = createAIProvider()
  *
  * // Override specific settings
  * const customProvider = createAIProvider({
  *   provider: "openai",
- *   modelId: "gpt-4"
+ *   modelId: "gpt-4",
+ *   apiKey: "sk-..."
  * })
  * ```
  */
@@ -213,21 +236,24 @@ export function createAIProvider(
     ...overrides,
   }
 
-  // Only auto-detect provider if not explicitly specified in overrides
-  if (!overrides?.provider) {
-    if (process.env.ANTHROPIC_API_KEY) {
-      config.provider = "anthropic"
-      config.apiKey = process.env.ANTHROPIC_API_KEY
-    } else if (process.env.OPENAI_API_KEY) {
-      config.provider = "openai"
-      config.apiKey = process.env.OPENAI_API_KEY
-    }
-  } else {
-    // Set the appropriate API key based on the explicitly chosen provider
-    if (overrides.provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
-      config.apiKey = process.env.ANTHROPIC_API_KEY
-    } else if (overrides.provider === "openai" && process.env.OPENAI_API_KEY) {
-      config.apiKey = process.env.OPENAI_API_KEY
+  // If no API key is explicitly provided, try to get from environment
+  if (!config.apiKey) {
+    // Auto-detect provider and API key from environment if not specified
+    if (!overrides?.provider) {
+      if (process.env.ANTHROPIC_API_KEY) {
+        config.provider = "anthropic"
+        config.apiKey = process.env.ANTHROPIC_API_KEY
+      } else if (process.env.OPENAI_API_KEY) {
+        config.provider = "openai"
+        config.apiKey = process.env.OPENAI_API_KEY
+      }
+    } else {
+      // Use environment API key for the specified provider
+      if (config.provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
+        config.apiKey = process.env.ANTHROPIC_API_KEY
+      } else if (config.provider === "openai" && process.env.OPENAI_API_KEY) {
+        config.apiKey = process.env.OPENAI_API_KEY
+      }
     }
   }
 

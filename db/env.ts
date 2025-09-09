@@ -9,6 +9,7 @@ export const env = {
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY as string,
   DATABASE_URL: process.env.DATABASE_URL as string,
+  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY as string,
   NODE_ENV:
     (process.env.NODE_ENV as "development" | "production" | "test") ||
     "development",

@@ -36,6 +36,7 @@
     "./services/TerminalManager": "./dist/services/TerminalManager.js",
     "./utils/clerk": "./dist/utils/clerk.js",
     "./utils/constants": "./dist/utils/constants.js",
+    "./utils/crypto": "./dist/utils/crypto.js",
     "./utils/lock": "./dist/utils/lock.js",
     "./utils/ratelimit": "./dist/utils/ratelimit.js",
     "./utils/types": "./dist/utils/types.js"

@@ -1,9 +1,16 @@
 import { db } from "@gitwit/db"
-import { TIERS } from "@gitwit/web/lib/tiers"
+import { env } from "@gitwit/db/env"
+import { decrypt } from "@gitwit/lib/utils/crypto"
 import { RateLimiter } from "../middleware/rate-limiter"
 import { UsageTracker } from "../middleware/usage-tracker"
 import { AIProvider, createAIProvider } from "../providers"
-import { AIRequest, AIRequestSchema, AITierConfig, AITool } from "../types"
+import {
+  AIProviderConfig,
+  AIRequest,
+  AIRequestSchema,
+  AITierConfig,
+  AITool,
+} from "../types"
 import { logger, PromptBuilder } from "../utils"
 
 /**
@@ -13,9 +20,14 @@ export interface AIClientConfig {
   userId: string
   projectId?: string
   provider?: AIProvider
+  providerConfig?: Partial<AIProviderConfig>
   tierConfig?: AITierConfig
   tools?: Record<string, AITool>
   disableTools?: boolean
+  userApiKeys?: {
+    anthropic?: string | null
+    openai?: string | null
+  }
 }
 
 /**
@@ -55,8 +67,28 @@ export class AIClient {
     this.toolsEnabled = !config.disableTools // Tools enabled by default, disabled if flag is set
     this.tools = this.toolsEnabled ? config.tools || {} : {}
 
-    // Pass tools to provider when creating it (empty if disabled)
-    this.provider = config.provider || createAIProvider({ tools: this.tools })
+    // Create provider with user API keys if available, otherwise fall back to service keys
+    if (config.provider) {
+      this.provider = config.provider
+    } else {
+      const providerConfig: Partial<AIProviderConfig> = {
+        tools: this.tools,
+        ...config.providerConfig,
+      }
+
+      // Use user's API key if available
+      if (config.userApiKeys) {
+        if (config.userApiKeys.anthropic) {
+          providerConfig.provider = "anthropic"
+          providerConfig.apiKey = config.userApiKeys.anthropic
+        } else if (config.userApiKeys.openai) {
+          providerConfig.provider = "openai"
+          providerConfig.apiKey = config.userApiKeys.openai
+        }
+      }
+
+      this.provider = createAIProvider(providerConfig)
+    }
 
     this.rateLimiter = new RateLimiter(config.userId)
     this.usageTracker = new UsageTracker(config.userId)
@@ -73,18 +105,21 @@ export class AIClient {
       tierConfig: config.tierConfig,
       toolCount: Object.keys(this.tools).length,
       toolsEnabled: this.toolsEnabled,
+      hasUserApiKeys: !!(
+        config.userApiKeys?.anthropic || config.userApiKeys?.openai
+      ),
     })
   }
 
   /**
-   * Factory method to create an AI client with user tier configuration
+   * Factory method to create an AI client with user tier configuration and API keys
    *
    * @param config - Configuration options for the AI client
    * @returns Promise that resolves to a configured AI client instance
    * @throws {Error} When user is not found in the database
    */
   static async create(config: AIClientConfig): Promise<AIClient> {
-    // Fetch user tier and configure accordingly
+    // Fetch user including their encrypted API keys
     const user = await db.query.user.findFirst({
       where: (users, { eq }) => eq(users.id, config.userId),
     })
@@ -93,12 +128,43 @@ export class AIClient {
       throw new Error("User not found")
     }
 
-    const tierConfig = (TIERS[user.tier as keyof typeof TIERS] ||
-      TIERS.FREE) as AITierConfig
+    // Get tier config with fallback to FREE tier
+    const DEFAULT_TIER_CONFIG: AITierConfig = {
+      generations: 10,
+      maxTokens: 4096,
+      model: "claude-3-5-sonnet-20241022",
+      anthropicModel: "claude-3-5-sonnet-20241022",
+      rateLimit: {
+        requests: 10,
+        window: 60,
+      },
+    }
+
+    const tierConfig = DEFAULT_TIER_CONFIG
+
+    // Decrypt user API keys if they exist
+    let userApiKeys: AIClientConfig["userApiKeys"] = undefined
+
+    if (env.ENCRYPTION_KEY) {
+      try {
+        userApiKeys = {
+          anthropic: user.encryptedAnthropicKey
+            ? decrypt(user.encryptedAnthropicKey, env.ENCRYPTION_KEY)
+            : null,
+          openai: user.encryptedOpenAIKey
+            ? decrypt(user.encryptedOpenAIKey, env.ENCRYPTION_KEY)
+            : null,
+        }
+      } catch (error) {
+        logger.error("Failed to decrypt user API keys", error)
+        // Continue without user API keys, will fall back to service keys
+      }
+    }
 
     return new AIClient({
       ...config,
       tierConfig,
+      userApiKeys,
     })
   }
 
@@ -212,8 +278,24 @@ export class AIClient {
     this.toolsEnabled = enabled
     this.tools = enabled ? this.config.tools || {} : {}
 
-    // Recreate provider with new tools configuration
-    this.provider = createAIProvider({ tools: this.tools })
+    // Recreate provider with new tools configuration and user API keys
+    const providerConfig: Partial<AIProviderConfig> = {
+      tools: this.tools,
+      ...this.config.providerConfig,
+    }
+
+    // Use user's API key if available
+    if (this.config.userApiKeys) {
+      if (this.config.userApiKeys.anthropic) {
+        providerConfig.provider = "anthropic"
+        providerConfig.apiKey = this.config.userApiKeys.anthropic
+      } else if (this.config.userApiKeys.openai) {
+        providerConfig.provider = "openai"
+        providerConfig.apiKey = this.config.userApiKeys.openai
+      }
+    }
+
+    this.provider = createAIProvider(providerConfig)
 
     this.logger.info("Tools toggled", {
       toolsEnabled: this.toolsEnabled,
@@ -241,6 +323,7 @@ export async function createAIClient(options: {
   userId: string
   projectId?: string
   provider?: AIProvider
+  providerConfig?: Partial<AIProviderConfig>
   tools?: Record<string, AITool>
   disableTools?: boolean
 }): Promise<AIClient> {

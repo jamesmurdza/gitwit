@@ -51,6 +51,9 @@ export const user = pgTable("user", {
   lastResetDate: timestamp("lastResetDate")
     .default(sql`CURRENT_TIMESTAMP`)
     .notNull(),
+  encryptedAnthropicKey: text("encryptedAnthropicKey"),
+  encryptedOpenAIKey: text("encryptedOpenAIKey"),
+  apiKeyIv: text("apiKeyIv"),
 })
 
 export type User = typeof user.$inferSelect

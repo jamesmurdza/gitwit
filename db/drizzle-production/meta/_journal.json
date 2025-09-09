@@ -15,6 +15,13 @@
       "when": 1753624289753,
       "tag": "0001_spicy_vertigo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1757294529124,
+      "tag": "0002_superb_sabra",
+      "breakpoints": true
     }
   ]
 }
