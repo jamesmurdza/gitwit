@@ -1,3 +1,4 @@
+import * as diff from "diff"
 import * as monaco from "monaco-editor"
 import { useCallback } from "react"
 
@@ -13,7 +14,8 @@ export interface UseCodeDifferReturn {
 }
 
 /**
- * Hook for handling code diff visualization and merging
+ * Hook for handling code diff visualization using Monaco Editor's built-in diff algorithm
+ * This provides the same sophisticated diff functionality as VS Code/Cursor IDE
  */
 export function useCodeDiffer({
   editorRef,
@@ -30,122 +32,79 @@ export function useCodeDiffer({
 
         // Store original content on model for potential restoration
       ;(model as any).originalContent = originalCode
+      console.log(
+        "Stored original content on model:",
+        originalCode.substring(0, 50) + "..."
+      )
 
-      const originalLines = originalCode.split("\n")
-      const mergedLines = mergedCode.split("\n")
-      const decorations: monaco.editor.IModelDeltaDecoration[] = []
+      // Build combined lines for diff view
       const combinedLines: string[] = []
+      const decorations: monaco.editor.IModelDeltaDecoration[] = []
 
-      let i = 0
-      let inDiffBlock = false
-      let diffBlockStart = 0
-      let originalBlock: string[] = []
-      let mergedBlock: string[] = []
+      let lineNumber = 1
 
-      // Process line-by-line diff
-      while (i < Math.max(originalLines.length, mergedLines.length)) {
-        if (originalLines[i] !== mergedLines[i]) {
-          if (!inDiffBlock) {
-            inDiffBlock = true
-            diffBlockStart = combinedLines.length
-            originalBlock = []
-            mergedBlock = []
-          }
+      console.log("originalCode", originalCode)
+      console.log("mergedCode", mergedCode)
+      // Process each diff part to create combined view
+      const diffResult = diff.diffLines(
+        originalCode.replace(/\r\n/g, "\n").replace(/\r/g, "\n"),
+        mergedCode.replace(/\r\n/g, "\n").replace(/\r/g, "\n"),
+        { ignoreWhitespace: false }
+      )
+      console.log("diffResult", diffResult)
 
-          if (i < originalLines.length) originalBlock.push(originalLines[i])
-          if (i < mergedLines.length) mergedBlock.push(mergedLines[i])
+      diffResult.forEach((part: any) => {
+        if (part.removed) {
+          // Add removed lines with red decoration
+          const removedLines = part.value
+            .split("\n")
+            .filter((line: string) => line !== "")
+          removedLines.forEach((line: string) => {
+            combinedLines.push(line)
+            decorations.push({
+              range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+              options: {
+                isWholeLine: true,
+                className: "removed-line-decoration",
+                glyphMarginClassName: "removed-line-glyph",
+                linesDecorationsClassName: "removed-line-number",
+                minimap: { color: "rgb(255, 0, 0, 0.2)", position: 2 },
+              },
+            })
+            lineNumber++
+          })
+        } else if (part.added) {
+          // Add added lines with green decoration
+          const addedLines = part.value
+            .split("\n")
+            .filter((line: string) => line !== "")
+          addedLines.forEach((line: string) => {
+            combinedLines.push(line)
+            decorations.push({
+              range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+              options: {
+                isWholeLine: true,
+                className: "added-line-decoration",
+                glyphMarginClassName: "added-line-glyph",
+                linesDecorationsClassName: "added-line-number",
+                minimap: { color: "rgb(0, 255, 0, 0.2)", position: 2 },
+              },
+            })
+            lineNumber++
+          })
         } else {
-          if (inDiffBlock) {
-            // Add the entire original block with deletion decoration
-            originalBlock.forEach((line) => {
-              combinedLines.push(line)
-              decorations.push({
-                range: new monaco.Range(
-                  combinedLines.length,
-                  1,
-                  combinedLines.length,
-                  1
-                ),
-                options: {
-                  isWholeLine: true,
-                  className: "removed-line-decoration",
-                  glyphMarginClassName: "removed-line-glyph",
-                  linesDecorationsClassName: "removed-line-number",
-                  minimap: { color: "rgb(255, 0, 0, 0.2)", position: 2 },
-                },
-              })
-            })
-
-            // Add the entire merged block with addition decoration
-            mergedBlock.forEach((line) => {
-              combinedLines.push(line)
-              decorations.push({
-                range: new monaco.Range(
-                  combinedLines.length,
-                  1,
-                  combinedLines.length,
-                  1
-                ),
-                options: {
-                  isWholeLine: true,
-                  className: "added-line-decoration",
-                  glyphMarginClassName: "added-line-glyph",
-                  linesDecorationsClassName: "added-line-number",
-                  minimap: { color: "rgb(0, 255, 0, 0.2)", position: 2 },
-                },
-              })
-            })
-
-            inDiffBlock = false
-          }
-
-          combinedLines.push(originalLines[i])
+          // Add unchanged lines
+          const unchangedLines = part.value
+            .split("\n")
+            .filter((line: string) => line !== "")
+          unchangedLines.forEach((line: string) => {
+            combinedLines.push(line)
+            lineNumber++
+          })
         }
-        i++
-      }
+      })
 
-      // Handle any remaining diff block at the end
-      if (inDiffBlock) {
-        originalBlock.forEach((line) => {
-          combinedLines.push(line)
-          decorations.push({
-            range: new monaco.Range(
-              combinedLines.length,
-              1,
-              combinedLines.length,
-              1
-            ),
-            options: {
-              isWholeLine: true,
-              className: "removed-line-decoration",
-              glyphMarginClassName: "removed-line-glyph",
-              linesDecorationsClassName: "removed-line-number",
-              minimap: { color: "rgb(255, 0, 0, 0.2)", position: 2 },
-            },
-          })
-        })
-
-        mergedBlock.forEach((line) => {
-          combinedLines.push(line)
-          decorations.push({
-            range: new monaco.Range(
-              combinedLines.length,
-              1,
-              combinedLines.length,
-              1
-            ),
-            options: {
-              isWholeLine: true,
-              className: "added-line-decoration",
-              glyphMarginClassName: "added-line-glyph",
-              linesDecorationsClassName: "added-line-number",
-              minimap: { color: "rgb(0, 255, 0, 0.2)", position: 2 },
-            },
-          })
-        })
-      }
-
-      // Apply the merged code to the editor
+      // Apply the combined diff view to the editor
       model.setValue(combinedLines.join("\n"))
 
       // Create and return decorations collection
