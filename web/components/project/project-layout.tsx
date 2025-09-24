@@ -146,6 +146,28 @@ export default function ProjectLayout({
     }
     setDraft(activeTab.id, content ?? "")
   }
+
+  // Handler for applying code from chat
+  const handleApplyCodeFromChat = useCallback(
+    (code: string, language?: string) => {
+      if (!activeTab) {
+        return
+      }
+      // Apply the diff view
+      const originalCode = activeFileContent
+      handleApplyCodeWithDecorations(code, originalCode)
+    },
+    [activeTab, activeFileContent, handleApplyCodeWithDecorations]
+  )
+
+  // Handler for rejecting code from chat
+  const handleRejectCodeFromChat = useCallback(() => {
+    // Clear any existing decorations
+    if (mergeDecorationsCollection) {
+      mergeDecorationsCollection.clear()
+      setMergeDecorationsCollection(undefined)
+    }
+  }, [mergeDecorationsCollection])
   return (
     <ChatProvider
       {...{
@@ -292,7 +314,10 @@ export default function ProjectLayout({
           <>
             <ResizableHandle />
             <ResizablePanel defaultSize={30} minSize={15}>
-              <AIChat />
+              <AIChat
+                onApplyCode={handleApplyCodeFromChat}
+                onRejectCode={handleRejectCodeFromChat}
+              />
             </ResizablePanel>
           </>
         )}

@@ -80,9 +80,10 @@ ${JSON.stringify(templateConfig.scripts, null, 2)}
 
 Please respond concisely. When providing code:
 1. Format it using triple backticks with the appropriate language identifier
-2. Always specify the complete file path relative to the project root
+2. CRITICAL: Always specify the complete file path relative to the project root
 3. For new files, add "(new file)" after the path
-4. Keep responses brief and to the point`
+4. Before any code block, include a line like "File: /path/to/file.ext" to indicate which file the code belongs to
+5. Keep responses brief and to the point`
 
     return prompt
   }
