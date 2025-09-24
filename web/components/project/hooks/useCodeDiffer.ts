@@ -40,6 +40,11 @@ export function useCodeDiffer({
       // Build combined lines for diff view
       const combinedLines: string[] = []
       const decorations: monaco.editor.IModelDeltaDecoration[] = []
+      const granularBlocks: Array<{
+        type: "added" | "removed"
+        start: number
+        end: number
+      }> = []
 
       let lineNumber = 1
 
@@ -59,6 +64,7 @@ export function useCodeDiffer({
           const removedLines = part.value
             .split("\n")
             .filter((line: string) => line !== "")
+          const blockStart = lineNumber
           removedLines.forEach((line: string) => {
             combinedLines.push(line)
             decorations.push({
@@ -73,11 +79,19 @@ export function useCodeDiffer({
             })
             lineNumber++
           })
+          const blockEnd = lineNumber - 1
+          if (blockEnd >= blockStart)
+            granularBlocks.push({
+              type: "removed",
+              start: blockStart,
+              end: blockEnd,
+            })
         } else if (part.added) {
           // Add added lines with green decoration
           const addedLines = part.value
             .split("\n")
             .filter((line: string) => line !== "")
+          const blockStart = lineNumber
           addedLines.forEach((line: string) => {
             combinedLines.push(line)
             decorations.push({
@@ -92,6 +106,13 @@ export function useCodeDiffer({
             })
             lineNumber++
           })
+          const blockEnd = lineNumber - 1
+          if (blockEnd >= blockStart)
+            granularBlocks.push({
+              type: "added",
+              start: blockStart,
+              end: blockEnd,
+            })
         } else {
           // Add unchanged lines
           const unchangedLines = part.value
@@ -109,6 +130,180 @@ export function useCodeDiffer({
 
       // Create and return decorations collection
       const newDecorations = editorRef.createDecorationsCollection(decorations)
+
+      // Store granular blocks on the model (for later if needed)
+      ;(model as any).granularBlocks = granularBlocks
+
+      // Add simple inline action widgets that show on hover for each block
+      granularBlocks.forEach((block, i) => {
+        const dom = document.createElement("div")
+        dom.style.display = "none"
+        dom.style.gap = "6px"
+        dom.style.alignItems = "center"
+        dom.style.position = "absolute"
+        dom.style.right = "8px"
+        dom.style.top = "-6px"
+        dom.style.padding = "2px 4px"
+        dom.style.borderRadius = "6px"
+        dom.style.background = "rgba(0,0,0,0.4)"
+        dom.style.backdropFilter = "blur(2px)"
+        dom.style.zIndex = "50"
+
+        const mkBtn = (
+          label: string,
+          color: string,
+          title: string,
+          onClick: () => void
+        ) => {
+          const b = document.createElement("button")
+          b.textContent = label
+          b.title = title
+          b.style.cursor = "pointer"
+          b.style.background = "transparent"
+          b.style.border = "1px solid " + color
+          b.style.color = color
+          b.style.borderRadius = "4px"
+          b.style.width = "22px"
+          b.style.height = "22px"
+          b.style.lineHeight = "20px"
+          b.style.fontSize = "13px"
+          b.style.pointerEvents = "auto"
+          b.onclick = onClick
+          return b
+        }
+
+        const removeLines = (start: number, end: number) => {
+          const startPos = { lineNumber: start, column: 1 }
+          const endPos = { lineNumber: end + 1, column: 1 }
+          model.applyEdits([
+            {
+              range: new monaco.Range(
+                startPos.lineNumber,
+                startPos.column,
+                endPos.lineNumber,
+                endPos.column
+              ),
+              text: "",
+            },
+          ])
+        }
+
+        const clearBlockDecorations = (start: number, end: number) => {
+          const ids: string[] = []
+          for (let ln = start; ln <= end; ln++) {
+            const decs = model.getLineDecorations(ln) || []
+            decs.forEach((d) => {
+              const cls = (d.options as any)?.className
+              if (
+                cls === "added-line-decoration" ||
+                cls === "removed-line-decoration"
+              ) {
+                ids.push(d.id)
+              }
+            })
+          }
+          if (ids.length > 0) {
+            model.deltaDecorations(ids, [])
+          }
+        }
+
+        const accept = mkBtn(
+          "✓",
+          block.type === "added" ? "#22c55e" : "#ef4444",
+          "Accept change",
+          () => {
+            // Diagnostic log for user
+            console.log("ACCEPT_BLOCK", {
+              type: block.type,
+              start: block.start,
+              end: block.end,
+            })
+            if (block.type === "removed") {
+              // Accept removal: delete shown removed lines
+              removeLines(block.start, block.end)
+            }
+            // Hide decorations for this block either way
+            clearBlockDecorations(block.start, block.end)
+            dom.remove()
+          }
+        )
+        const reject = mkBtn(
+          "✕",
+          block.type === "added" ? "#ef4444" : "#22c55e",
+          "Reject change",
+          () => {
+            // Diagnostic log for user
+            console.log("REJECT_BLOCK", {
+              type: block.type,
+              start: block.start,
+              end: block.end,
+            })
+            if (block.type === "added") {
+              // Reject addition: delete shown added lines
+              removeLines(block.start, block.end)
+            }
+            // Hide decorations for this block either way
+            clearBlockDecorations(block.start, block.end)
+            dom.remove()
+          }
+        )
+        dom.appendChild(accept)
+        dom.appendChild(reject)
+
+        const widget: monaco.editor.IContentWidget = {
+          getId: () => `diff-inline-actions-${i}-${block.start}-${block.end}`,
+          getDomNode: () => dom,
+          getPosition: () => ({
+            position: {
+              lineNumber: Math.min(block.start, model.getLineCount()),
+              column: model.getLineMaxColumn(
+                Math.min(block.start, model.getLineCount())
+              ),
+            },
+            preference: [monaco.editor.ContentWidgetPositionPreference.EXACT],
+          }),
+        }
+        editorRef.addContentWidget(widget)
+        let hovering = false
+        dom.addEventListener("mouseenter", () => {
+          hovering = true
+          dom.style.display = "flex"
+        })
+        dom.addEventListener("mouseleave", () => {
+          hovering = false
+          dom.style.display = "none"
+        })
+
+        editorRef.onMouseMove((e) => {
+          const el = (e.target.element as HTMLElement) || null
+          // Only this widget stays visible if pointer is over it
+          if (hovering || (el && dom.contains(el))) {
+            dom.style.display = "flex"
+            return
+          }
+
+          // If pointer is over other widget areas, hide this one
+          const overOtherWidget =
+            (e.target.type === monaco.editor.MouseTargetType.CONTENT_WIDGET ||
+              e.target.type === monaco.editor.MouseTargetType.OVERLAY_WIDGET) &&
+            !(el && dom.contains(el))
+          if (overOtherWidget) {
+            dom.style.display = "none"
+            return
+          }
+
+          const pos = e.target.position
+          if (!pos) {
+            dom.style.display = "none"
+            return
+          }
+          const ln = pos.lineNumber
+          dom.style.display =
+            ln >= block.start && ln <= block.end ? "flex" : "none"
+        })
+        editorRef.onMouseLeave(() => (dom.style.display = "none"))
+      })
+
       return newDecorations
     },
     [editorRef]
