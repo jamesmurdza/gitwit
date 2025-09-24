@@ -134,174 +134,233 @@ export function useCodeDiffer({
       // Store granular blocks on the model (for later if needed)
       ;(model as any).granularBlocks = granularBlocks
 
-      // Add simple inline action widgets that show on hover for each block
-      granularBlocks.forEach((block, i) => {
-        const dom = document.createElement("div")
+      // Single hover-driven widget that recomputes live ranges from decorations
+      const dom = document.createElement("div")
+      dom.style.display = "none"
+      dom.style.gap = "6px"
+      dom.style.alignItems = "center"
+      dom.style.position = "absolute"
+      dom.style.right = "8px"
+      dom.style.top = "-6px"
+      dom.style.padding = "2px 4px"
+      dom.style.borderRadius = "6px"
+      dom.style.background = "rgba(0,0,0,0.4)"
+      dom.style.backdropFilter = "blur(2px)"
+      dom.style.zIndex = "50"
+
+      const mkBtn = (
+        label: string,
+        color: string,
+        title: string,
+        onClick: () => void
+      ) => {
+        const b = document.createElement("button")
+        b.textContent = label
+        b.title = title
+        b.style.cursor = "pointer"
+        b.style.background = "transparent"
+        b.style.border = "1px solid " + color
+        b.style.color = color
+        b.style.borderRadius = "4px"
+        b.style.width = "22px"
+        b.style.height = "22px"
+        b.style.lineHeight = "20px"
+        b.style.fontSize = "13px"
+        b.style.pointerEvents = "auto"
+        b.onclick = onClick
+        return b
+      }
+
+      const removeLines = (start: number, end: number) => {
+        const startPos = { lineNumber: start, column: 1 }
+        const endPos = { lineNumber: end + 1, column: 1 }
+        model.applyEdits([
+          {
+            range: new monaco.Range(
+              startPos.lineNumber,
+              startPos.column,
+              endPos.lineNumber,
+              endPos.column
+            ),
+            text: "",
+          },
+        ])
+      }
+
+      const clearBlockDecorations = (start: number, end: number) => {
+        const ids: string[] = []
+        for (let ln = start; ln <= end; ln++) {
+          const decs = model.getLineDecorations(ln) || []
+          decs.forEach((d) => {
+            const cls = (d.options as any)?.className
+            if (
+              cls === "added-line-decoration" ||
+              cls === "removed-line-decoration"
+            ) {
+              ids.push(d.id)
+            }
+          })
+        }
+        if (ids.length > 0) {
+          model.deltaDecorations(ids, [])
+        }
+      }
+
+      const getLiveRange = (
+        type: "added" | "removed",
+        seed: number
+      ): { start: number; end: number } => {
+        const className =
+          type === "added" ? "added-line-decoration" : "removed-line-decoration"
+        const hasClass = (ln: number) => {
+          const decs = model.getLineDecorations(ln) || []
+          return decs.some((d) => (d.options as any)?.className === className)
+        }
+        if (!hasClass(seed)) return { start: seed, end: seed }
+        let s = seed
+        let e = seed
+        while (s > 1 && hasClass(s - 1)) s--
+        const max = model.getLineCount()
+        while (e < max && hasClass(e + 1)) e++
+        return { start: s, end: e }
+      }
+
+      const lineHasClass = (ln: number, cls: string) => {
+        const decs = model.getLineDecorations(ln) || []
+        return decs.some((d) => (d.options as any)?.className === cls)
+      }
+
+      const getModifyPartnerIfAny = (
+        range: { start: number; end: number },
+        type: "added" | "removed"
+      ): { start: number; end: number } | null => {
+        // If current is removed, partner is added right after; if current is added, partner is removed right before
+        if (type === "removed") {
+          const probeNext = range.end + 1
+          if (lineHasClass(probeNext, "added-line-decoration")) {
+            return getLiveRange("added", probeNext)
+          }
+        } else {
+          const probePrev = range.start - 1
+          if (
+            probePrev >= 1 &&
+            lineHasClass(probePrev, "removed-line-decoration")
+          ) {
+            return getLiveRange("removed", probePrev)
+          }
+        }
+        return null
+      }
+
+      type HoverState = {
+        type: "added" | "removed"
+        range: { start: number; end: number }
+        partner: { start: number; end: number } | null
+        anchorLine: number
+      } | null
+      let currentHover: HoverState = null
+
+      const accept = mkBtn("✓", "#22c55e", "Accept change", () => {
+        if (!currentHover) return
+        const { type, range, partner } = currentHover
+        console.log("ACCEPT_CHUNK", { type, range, partner })
+        if (type === "removed") {
+          removeLines(range.start, range.end)
+          clearBlockDecorations(range.start, range.end)
+          if (partner) clearBlockDecorations(partner.start, partner.end)
+        } else {
+          clearBlockDecorations(range.start, range.end)
+        }
         dom.style.display = "none"
-        dom.style.gap = "6px"
-        dom.style.alignItems = "center"
-        dom.style.position = "absolute"
-        dom.style.right = "8px"
-        dom.style.top = "-6px"
-        dom.style.padding = "2px 4px"
-        dom.style.borderRadius = "6px"
-        dom.style.background = "rgba(0,0,0,0.4)"
-        dom.style.backdropFilter = "blur(2px)"
-        dom.style.zIndex = "50"
-
-        const mkBtn = (
-          label: string,
-          color: string,
-          title: string,
-          onClick: () => void
-        ) => {
-          const b = document.createElement("button")
-          b.textContent = label
-          b.title = title
-          b.style.cursor = "pointer"
-          b.style.background = "transparent"
-          b.style.border = "1px solid " + color
-          b.style.color = color
-          b.style.borderRadius = "4px"
-          b.style.width = "22px"
-          b.style.height = "22px"
-          b.style.lineHeight = "20px"
-          b.style.fontSize = "13px"
-          b.style.pointerEvents = "auto"
-          b.onclick = onClick
-          return b
+      })
+      const reject = mkBtn("✕", "#ef4444", "Reject change", () => {
+        if (!currentHover) return
+        const { type, range, partner } = currentHover
+        console.log("REJECT_CHUNK", { type, range, partner })
+        if (type === "added") {
+          removeLines(range.start, range.end)
+          clearBlockDecorations(range.start, range.end)
+        } else {
+          clearBlockDecorations(range.start, range.end)
+          if (partner) clearBlockDecorations(partner.start, partner.end)
         }
+        dom.style.display = "none"
+      })
+      dom.appendChild(accept)
+      dom.appendChild(reject)
 
-        const removeLines = (start: number, end: number) => {
-          const startPos = { lineNumber: start, column: 1 }
-          const endPos = { lineNumber: end + 1, column: 1 }
-          model.applyEdits([
-            {
-              range: new monaco.Range(
-                startPos.lineNumber,
-                startPos.column,
-                endPos.lineNumber,
-                endPos.column
-              ),
-              text: "",
-            },
-          ])
-        }
-
-        const clearBlockDecorations = (start: number, end: number) => {
-          const ids: string[] = []
-          for (let ln = start; ln <= end; ln++) {
-            const decs = model.getLineDecorations(ln) || []
-            decs.forEach((d) => {
-              const cls = (d.options as any)?.className
-              if (
-                cls === "added-line-decoration" ||
-                cls === "removed-line-decoration"
-              ) {
-                ids.push(d.id)
+      const widget: monaco.editor.IContentWidget = {
+        getId: () => `diff-inline-actions-hover`,
+        getDomNode: () => dom,
+        getPosition: () => ({
+          position: currentHover
+            ? {
+                lineNumber: Math.min(
+                  currentHover.anchorLine,
+                  model.getLineCount()
+                ),
+                column: model.getLineMaxColumn(
+                  Math.min(currentHover.anchorLine, model.getLineCount())
+                ),
               }
-            })
-          }
-          if (ids.length > 0) {
-            model.deltaDecorations(ids, [])
-          }
-        }
+            : { lineNumber: 1, column: 1 },
+          preference: [monaco.editor.ContentWidgetPositionPreference.EXACT],
+        }),
+      }
+      editorRef.addContentWidget(widget)
 
-        const accept = mkBtn(
-          "✓",
-          block.type === "added" ? "#22c55e" : "#ef4444",
-          "Accept change",
-          () => {
-            // Diagnostic log for user
-            console.log("ACCEPT_BLOCK", {
-              type: block.type,
-              start: block.start,
-              end: block.end,
-            })
-            if (block.type === "removed") {
-              // Accept removal: delete shown removed lines
-              removeLines(block.start, block.end)
-            }
-            // Hide decorations for this block either way
-            clearBlockDecorations(block.start, block.end)
-            dom.remove()
-          }
-        )
-        const reject = mkBtn(
-          "✕",
-          block.type === "added" ? "#ef4444" : "#22c55e",
-          "Reject change",
-          () => {
-            // Diagnostic log for user
-            console.log("REJECT_BLOCK", {
-              type: block.type,
-              start: block.start,
-              end: block.end,
-            })
-            if (block.type === "added") {
-              // Reject addition: delete shown added lines
-              removeLines(block.start, block.end)
-            }
-            // Hide decorations for this block either way
-            clearBlockDecorations(block.start, block.end)
-            dom.remove()
-          }
-        )
-        dom.appendChild(accept)
-        dom.appendChild(reject)
+      let hovering = false
+      dom.addEventListener("mouseenter", () => {
+        hovering = true
+        dom.style.display = "flex"
+      })
+      dom.addEventListener("mouseleave", () => {
+        hovering = false
+        dom.style.display = "none"
+      })
 
-        const widget: monaco.editor.IContentWidget = {
-          getId: () => `diff-inline-actions-${i}-${block.start}-${block.end}`,
-          getDomNode: () => dom,
-          getPosition: () => ({
-            position: {
-              lineNumber: Math.min(block.start, model.getLineCount()),
-              column: model.getLineMaxColumn(
-                Math.min(block.start, model.getLineCount())
-              ),
-            },
-            preference: [monaco.editor.ContentWidgetPositionPreference.EXACT],
-          }),
-        }
-        editorRef.addContentWidget(widget)
-        let hovering = false
-        dom.addEventListener("mouseenter", () => {
-          hovering = true
-          dom.style.display = "flex"
-        })
-        dom.addEventListener("mouseleave", () => {
-          hovering = false
+      const updateHoverFromLine = (ln: number) => {
+        const isAdded = lineHasClass(ln, "added-line-decoration")
+        const isRemoved = lineHasClass(ln, "removed-line-decoration")
+        if (!isAdded && !isRemoved) {
+          currentHover = null
           dom.style.display = "none"
-        })
+          return
+        }
+        const type: "added" | "removed" = isAdded ? "added" : "removed"
+        const range = getLiveRange(type, ln)
+        const partner = getModifyPartnerIfAny(range, type)
+        // Modification pair: only show when hovering the red portion
+        if (type === "added" && partner) {
+          currentHover = null
+          dom.style.display = "none"
+          return
+        }
+        // For modifications (red+green pair), always anchor the widget to the red block
+        const anchorLine =
+          type === "added" && partner ? partner.start : range.start
+        currentHover = { type, range, partner, anchorLine }
+        dom.style.display = "flex"
+        editorRef.layoutContentWidget(widget)
+      }
 
-        editorRef.onMouseMove((e) => {
-          const el = (e.target.element as HTMLElement) || null
-          // Only this widget stays visible if pointer is over it
-          if (hovering || (el && dom.contains(el))) {
-            dom.style.display = "flex"
-            return
-          }
-
-          // If pointer is over other widget areas, hide this one
-          const overOtherWidget =
-            (e.target.type === monaco.editor.MouseTargetType.CONTENT_WIDGET ||
-              e.target.type === monaco.editor.MouseTargetType.OVERLAY_WIDGET) &&
-            !(el && dom.contains(el))
-          if (overOtherWidget) {
-            dom.style.display = "none"
-            return
-          }
-
-          const pos = e.target.position
-          if (!pos) {
-            dom.style.display = "none"
-            return
-          }
-          const ln = pos.lineNumber
-          dom.style.display =
-            ln >= block.start && ln <= block.end ? "flex" : "none"
-        })
-        editorRef.onMouseLeave(() => (dom.style.display = "none"))
+      editorRef.onMouseMove((e) => {
+        const el = (e.target.element as HTMLElement) || null
+        if (hovering || (el && dom.contains(el))) {
+          dom.style.display = "flex"
+          return
+        }
+        const pos = e.target.position
+        if (!pos) {
+          currentHover = null
+          dom.style.display = "none"
+          return
+        }
+        updateHoverFromLine(pos.lineNumber)
+      })
+      editorRef.onMouseLeave(() => {
+        currentHover = null
+        dom.style.display = "none"
       })
 
       return newDecorations
