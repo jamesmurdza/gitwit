@@ -32,10 +32,6 @@ export function useCodeDiffer({
 
         // Store original content on model for potential restoration
       ;(model as any).originalContent = originalCode
-      console.log(
-        "Stored original content on model:",
-        originalCode.substring(0, 50) + "..."
-      )
 
       // Build combined lines for diff view
       // Preserve original model EOL style to avoid phantom last-line changes
@@ -54,15 +50,12 @@ export function useCodeDiffer({
 
       let lineNumber = 1
 
-      console.log("originalCode", originalCode)
-      console.log("mergedCode", mergedCode)
       // Process each diff part to create combined view
       const diffResult = diff.diffLines(
         originalCode.replace(/\r\n/g, "\n").replace(/\r/g, "\n"),
         mergedCode.replace(/\r\n/g, "\n").replace(/\r/g, "\n"),
         { ignoreWhitespace: false }
       )
-      console.log("diffResult", diffResult)
 
       diffResult.forEach((part: any) => {
         if (part.removed) {
@@ -432,11 +425,6 @@ export function useCodeDiffer({
             const safeAnchor = Math.min(anchorLine, model.getLineCount())
             const liveRange = getLiveRange(type, safeAnchor)
             const livePartner = getModifyPartnerIfAny(liveRange, type)
-            console.log("ACCEPT_BLOCK", {
-              type,
-              range: liveRange,
-              partner: livePartner,
-            })
             if (type === "removed") {
               // Clear decorations first to avoid stale ids after text mutation
               clearBlockDecorations(liveRange.start, liveRange.end)
@@ -460,11 +448,6 @@ export function useCodeDiffer({
             const safeAnchor = Math.min(anchorLine, model.getLineCount())
             const liveRange = getLiveRange(type, safeAnchor)
             const livePartner = getModifyPartnerIfAny(liveRange, type)
-            console.log("REJECT_BLOCK", {
-              type,
-              range: liveRange,
-              partner: livePartner,
-            })
             // Remove this widget first to avoid layout jitter for neighbors
             removeWidget()
             if (type === "added") {
