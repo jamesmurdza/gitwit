@@ -31,9 +31,8 @@ export const Markdown = ({ className, ...props }: MarkdownProps) => {
   const filePattern =
     /(?:^|\s)([a-zA-Z0-9._\/-]+\.(?:html|js|ts|tsx|jsx|css|scss|sass|less|json|md|txt|py|java|cpp|c|h|php|rb|go|rs|swift|kt|dart|vue|svelte))(?:\s|$)/i
   const firstMatch = markdownText.match(filePattern)
-  const firstIntendedFile = firstMatch
-    ? firstMatch[1].replace(/^\.\//, "").replace(/^\//, "")
-    : null
+  // Keep the AI-provided path as-is (no stripping). Trust relative path from response.
+  const firstIntendedFile = firstMatch ? firstMatch[1].trim() : null
 
   // Keep a ref if you still want it elsewhere
   currentIntendedFileRef.current = firstIntendedFile
