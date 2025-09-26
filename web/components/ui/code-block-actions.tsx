@@ -53,7 +53,7 @@ export function CodeBlockActions({
     if (!intendedFile) return false
     const normalized = normalizePath(intendedFile)
     return isActiveForPath(normalized)
-  }, [isForCurrentFile, intendedFile, normalizePath, isActiveForPath])
+  }, [isForCurrentFile, intendedFile, isActiveForPath])
 
   const handleApply = () => {
     if (isApplied || isRejected) return

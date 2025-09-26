@@ -1,6 +1,6 @@
 import * as diff from "diff"
 import * as monaco from "monaco-editor"
-import { useCallback } from "react"
+import { useCallback, useEffect } from "react"
 
 export interface UseCodeDifferProps {
   editorRef: monaco.editor.IStandaloneCodeEditor | null
@@ -335,7 +335,11 @@ export function useCodeDiffer({
         if (store && Array.isArray(store)) {
           for (const w of [...store]) {
             try {
-              editorRef.removeContentWidget(w)
+              if (w) {
+                editorRef.removeContentWidget(w)
+              } else {
+                continue
+              }
             } catch {}
           }
         }
@@ -351,6 +355,9 @@ export function useCodeDiffer({
         ;(editorRef as any).diffBlockWidgets = []
         ;(editorRef as any).diffBlockWidgetAnchors = []
       }
+
+      // Expose cleanup function for unmount callers
+      ;(editorRef as any).cleanupDiffWidgets = cleanupAllWidgets
 
       // Build widgets from live decoration ranges so they survive edits
       const buildAllWidgetsFromDecorations = () => {
@@ -523,6 +530,18 @@ export function useCodeDiffer({
     },
     [editorRef]
   )
+
+  // Cleanup on unmount: remove any lingering widgets and anchors
+  useEffect(() => {
+    return () => {
+      try {
+        const cleanup = (editorRef as any)?.cleanupDiffWidgets as
+          | (() => void)
+          | undefined
+        if (cleanup) cleanup()
+      } catch {}
+    }
+  }, [editorRef])
 
   return {
     handleApplyCode,
