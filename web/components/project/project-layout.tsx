@@ -8,6 +8,7 @@ import {
 import { useEditorLayout } from "@/context/EditorLayoutContext"
 import { fileRouter } from "@/lib/api"
 import { defaultEditorOptions } from "@/lib/monaco/config"
+import { TTab } from "@/lib/types"
 import { processFileType, sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import Editor from "@monaco-editor/react"
@@ -125,7 +126,12 @@ export default function ProjectLayout({
   })
 
   // Code diff and merge logic
-  const { handleApplyCode } = useCodeDiffer({
+  const {
+    handleApplyCode,
+    hasActiveWidgets,
+    acceptAllChanges,
+    forceClearAllDecorations,
+  } = useCodeDiffer({
     editorRef: editorRef || null,
   })
 
@@ -168,6 +174,24 @@ export default function ProjectLayout({
       setMergeDecorationsCollection(undefined)
     }
   }, [mergeDecorationsCollection])
+
+  // Enhanced setActiveTab that handles widget acceptance before switching
+  const handleSetActiveTab = useCallback((tab: TTab) => {
+    // Check if there are active widgets (accept/reject buttons)
+    if (hasActiveWidgets()) {
+      try {
+        // Accept all pending changes before switching
+        acceptAllChanges()
+      } catch (error) {
+        console.warn("Failed to accept changes, force clearing:", error)
+        // Fallback: force clear all decorations
+        forceClearAllDecorations()
+      }
+    }
+    // Switch to the new tab
+    setActiveTab(tab)
+  }, [])
+
   return (
     <ChatProvider
       {...{
@@ -199,7 +223,7 @@ export default function ProjectLayout({
                     key={tab.id}
                     saved={tab.saved}
                     selected={activeTab?.id === tab.id}
-                    onClick={() => setActiveTab(tab)}
+                    onClick={() => handleSetActiveTab(tab)}
                     onClose={() => removeTab(tab)}
                   >
                     {tab.name}

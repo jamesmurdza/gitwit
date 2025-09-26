@@ -12,6 +12,7 @@ export function createDiffButton(options: WidgetOptions): HTMLButtonElement {
 
   button.title = options.title
   button.setAttribute("aria-label", options.title)
+  button.setAttribute("data-action", options.kind)
 
   applyButtonStyles(button, options.color)
 

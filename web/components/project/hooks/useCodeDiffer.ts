@@ -12,6 +12,9 @@ export interface UseCodeDifferReturn {
     mergedCode: string,
     originalCode: string
   ) => monaco.editor.IEditorDecorationsCollection | null
+  hasActiveWidgets: () => boolean
+  acceptAllChanges: () => void
+  forceClearAllDecorations: () => void
 }
 
 /**
@@ -115,5 +118,10 @@ export function useCodeDiffer({
 
   return {
     handleApplyCode,
+    hasActiveWidgets: () =>
+      widgetManagerRef.current?.hasActiveWidgets() ?? false,
+    acceptAllChanges: () => widgetManagerRef.current?.acceptAllChanges(),
+    forceClearAllDecorations: () =>
+      widgetManagerRef.current?.forceClearAllDecorations(),
   }
 }
