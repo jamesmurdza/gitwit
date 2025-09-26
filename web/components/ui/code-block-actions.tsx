@@ -44,6 +44,23 @@ export function CodeBlockActions({
     latestApplyRef.current = onApply ?? onApplyCode
   }, [onApply, onApplyCode])
 
+  // Defer apply until after tab switch by tracking intent instead of timing hacks
+  const pendingApplyRef = useRef<{
+    code: string
+    targetId: string
+  } | null>(null)
+
+  // When activeTab switches to the intended target, apply once and clear intent
+  useEffect(() => {
+    const pending = pendingApplyRef.current
+    if (!pending) return
+    const matches = activeTab && pathMatchesTab(pending.targetId, activeTab)
+    if (matches) {
+      const codeToApply = pending.code
+      pendingApplyRef.current = null
+      latestApplyRef.current?.(codeToApply)
+    }
+  }, [activeTab?.id, activeTab?.name])
   const isActiveForPath = useMemo(
     () => (path: string) => pathMatchesTab(path, activeTab),
     [activeTab?.id, activeTab?.name]
@@ -83,12 +100,9 @@ export function CodeBlockActions({
           type: "file",
           saved: true,
         }
+        // Record intent and switch tabs; an effect will run when activeTab updates
+        pendingApplyRef.current = { code, targetId: resolvedId }
         setActiveTab(resolvedTab)
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            latestApplyRef.current?.(code)
-          })
-        })
         return
       }
     }
