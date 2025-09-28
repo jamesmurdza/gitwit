@@ -54,5 +54,4 @@ export interface AIProviderConfig {
   region?: string
   modelId?: string
   baseURL?: string
-  tools?: Record<string, AITool>
 }

@@ -36,6 +36,10 @@ export async function streamChat(
         fileName: context?.fileName,
         tools: defaultTools,
         disableTools: context?.isEditMode,
+        providerConfig: {
+          provider: "anthropic",
+          modelId: "claude-sonnet-4-20250514",
+        },
       })
 
       const response = await aiClient.chat({

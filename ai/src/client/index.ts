@@ -52,8 +52,11 @@ export class AIClient {
     // Create provider with tools
     this.provider = createAIProvider({ 
       ...config.providerConfig,
-      tools: this.tools,
     })
+
+    if (this.toolsEnabled && Object.keys(this.tools).length > 0) {
+      this.provider.setTools(this.tools)
+    }
 
     this.promptBuilder = new PromptBuilder()
 
@@ -176,8 +179,11 @@ export class AIClient {
     // Recreate provider with new tools configuration
     this.provider = createAIProvider({ 
       ...this.config.providerConfig,
-      tools: this.tools,
     })
+
+    if (this.toolsEnabled && Object.keys(this.tools).length > 0) {
+      this.provider.setTools(this.tools)
+    }
 
     this.logger.info("Tools toggled", {
       toolsEnabled: this.toolsEnabled,

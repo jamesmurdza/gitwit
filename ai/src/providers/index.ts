@@ -36,12 +36,17 @@ export class AIProvider {
 
     this.model = this.initializeModel(config)
 
-    // Convert AITool definitions to Vercel AI SDK tool format
-    if (config.tools) {
-      this.tools = this.convertTools(config.tools)
-    }
-
     this.logger.info("AI Provider initialized", {
+      toolCount: Object.keys(this.tools).length,
+    })
+  }
+
+  /**
+   * Set tools for this provider instance
+   */
+  setTools(aiTools: Record<string, AITool>): void {
+    this.tools = this.convertTools(aiTools)
+    this.logger.info("Tools updated", {
       toolCount: Object.keys(this.tools).length,
     })
   }
