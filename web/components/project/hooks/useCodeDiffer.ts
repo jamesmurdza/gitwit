@@ -1,5 +1,7 @@
 import * as monaco from "monaco-editor"
-import { useCallback } from "react"
+import { useCallback, useEffect, useRef } from "react"
+import { calculateDiff } from "./lib/diff-calculator"
+import { WidgetManager } from "./lib/widget-manager"
 
 export interface UseCodeDifferProps {
   editorRef: monaco.editor.IStandaloneCodeEditor | null
@@ -10,20 +12,44 @@ export interface UseCodeDifferReturn {
     mergedCode: string,
     originalCode: string
   ) => monaco.editor.IEditorDecorationsCollection | null
+  hasActiveWidgets: () => boolean
+  acceptAllChanges: () => void
+  forceClearAllDecorations: () => void
 }
 
 /**
- * Hook for handling code diff visualization and merging
+ * Hook for handling code diff visualization using Monaco Editor's built-in diff algorithm
+ *
+ * This hook provides sophisticated diff functionality similar to VS Code/Cursor IDE:
+ * - Calculates differences between original and merged code
+ * - Creates visual diff view with color-coded decorations
+ * - Manages interactive accept/reject buttons for each diff block
+ * - Handles cleanup of widgets and decorations on unmount
+ *
+ * @param props - Configuration object
+ * @param props.editorRef - Reference to the Monaco editor instance
+ * @returns Object containing the handleApplyCode function
+ *
  */
 export function useCodeDiffer({
   editorRef,
 }: UseCodeDifferProps): UseCodeDifferReturn {
+  const widgetManagerRef = useRef<WidgetManager | null>(null)
+
+  /**
+   * Applies a diff view to the Monaco editor with interactive accept/reject buttons
+   *
+   * @param mergedCode - The new code content to compare against
+   * @param originalCode - The original code content
+   * @returns Monaco decorations collection for the diff view, or null if editor is not available
+   */
   const handleApplyCode = useCallback(
     (
       mergedCode: string,
       originalCode: string
     ): monaco.editor.IEditorDecorationsCollection | null => {
       if (!editorRef) return null
+
       const model = editorRef.getModel()
       if (!model)
         return null
@@ -31,131 +57,71 @@ export function useCodeDiffer({
         // Store original content on model for potential restoration
       ;(model as any).originalContent = originalCode
 
-      const originalLines = originalCode.split("\n")
-      const mergedLines = mergedCode.split("\n")
-      const decorations: monaco.editor.IModelDeltaDecoration[] = []
-      const combinedLines: string[] = []
+      const originalModelEOL = model.getEOL()
+      const eolSequence =
+        originalModelEOL === "\r\n"
+          ? monaco.editor.EndOfLineSequence.CRLF
+          : monaco.editor.EndOfLineSequence.LF
 
-      let i = 0
-      let inDiffBlock = false
-      let diffBlockStart = 0
-      let originalBlock: string[] = []
-      let mergedBlock: string[] = []
+      // Calculate diff using the modular diff calculator
+      const diffResult = calculateDiff(originalCode, mergedCode, {
+        ignoreWhitespace: false,
+      })
 
-      // Process line-by-line diff
-      while (i < Math.max(originalLines.length, mergedLines.length)) {
-        if (originalLines[i] !== mergedLines[i]) {
-          if (!inDiffBlock) {
-            inDiffBlock = true
-            diffBlockStart = combinedLines.length
-            originalBlock = []
-            mergedBlock = []
-          }
-
-          if (i < originalLines.length) originalBlock.push(originalLines[i])
-          if (i < mergedLines.length) mergedBlock.push(mergedLines[i])
-        } else {
-          if (inDiffBlock) {
-            // Add the entire original block with deletion decoration
-            originalBlock.forEach((line) => {
-              combinedLines.push(line)
-              decorations.push({
-                range: new monaco.Range(
-                  combinedLines.length,
-                  1,
-                  combinedLines.length,
-                  1
-                ),
-                options: {
-                  isWholeLine: true,
-                  className: "removed-line-decoration",
-                  glyphMarginClassName: "removed-line-glyph",
-                  linesDecorationsClassName: "removed-line-number",
-                  minimap: { color: "rgb(255, 0, 0, 0.2)", position: 2 },
-                },
-              })
-            })
-
-            // Add the entire merged block with addition decoration
-            mergedBlock.forEach((line) => {
-              combinedLines.push(line)
-              decorations.push({
-                range: new monaco.Range(
-                  combinedLines.length,
-                  1,
-                  combinedLines.length,
-                  1
-                ),
-                options: {
-                  isWholeLine: true,
-                  className: "added-line-decoration",
-                  glyphMarginClassName: "added-line-glyph",
-                  linesDecorationsClassName: "added-line-number",
-                  minimap: { color: "rgb(0, 255, 0, 0.2)", position: 2 },
-                },
-              })
-            })
-
-            inDiffBlock = false
-          }
-
-          combinedLines.push(originalLines[i])
-        }
-        i++
-      }
-
-      // Handle any remaining diff block at the end
-      if (inDiffBlock) {
-        originalBlock.forEach((line) => {
-          combinedLines.push(line)
-          decorations.push({
-            range: new monaco.Range(
-              combinedLines.length,
-              1,
-              combinedLines.length,
-              1
-            ),
-            options: {
-              isWholeLine: true,
-              className: "removed-line-decoration",
-              glyphMarginClassName: "removed-line-glyph",
-              linesDecorationsClassName: "removed-line-number",
-              minimap: { color: "rgb(255, 0, 0, 0.2)", position: 2 },
-            },
-          })
-        })
-
-        mergedBlock.forEach((line) => {
-          combinedLines.push(line)
-          decorations.push({
-            range: new monaco.Range(
-              combinedLines.length,
-              1,
-              combinedLines.length,
-              1
-            ),
-            options: {
-              isWholeLine: true,
-              className: "added-line-decoration",
-              glyphMarginClassName: "added-line-glyph",
-              linesDecorationsClassName: "added-line-number",
-              minimap: { color: "rgb(0, 255, 0, 0.2)", position: 2 },
-            },
-          })
-        })
-      }
-
-      // Apply the merged code to the editor
-      model.setValue(combinedLines.join("\n"))
+      // Apply the combined diff view to the editor
+      model.setValue(diffResult.combinedLines.join("\n"))
+      // Reapply original EOL style so the last line does not appear changed on CRLF files
+      model.setEOL(eolSequence)
 
       // Create and return decorations collection
-      const newDecorations = editorRef.createDecorationsCollection(decorations)
+      const newDecorations = editorRef.createDecorationsCollection(
+        diffResult.decorations
+      )
+
+      ;(model as any).granularBlocks = diffResult.granularBlocks
+
+      // Always create a new widget manager for each diff application
+      // This ensures it's bound to the current model
+      if (widgetManagerRef.current) {
+        widgetManagerRef.current.cleanupAllWidgets()
+      }
+      widgetManagerRef.current = new WidgetManager(editorRef, model)
+
+      // Build all widgets from the new decorations
+      widgetManagerRef.current.buildAllWidgetsFromDecorations()
+
       return newDecorations
     },
     [editorRef]
   )
 
+  /**
+   * Cleanup effect: removes all widgets and decorations when component unmounts
+   */
+  useEffect(() => {
+    return () => {
+      try {
+        if (widgetManagerRef.current) {
+          widgetManagerRef.current.cleanupAllWidgets()
+          widgetManagerRef.current = null
+        }
+
+        const cleanup = (editorRef as any)?.cleanupDiffWidgets as
+          | (() => void)
+          | undefined
+        if (cleanup) cleanup()
+      } catch (error) {
+        console.warn("Failed to cleanup diff widgets:", error)
+      }
+    }
+  }, [editorRef])
+
   return {
     handleApplyCode,
+    hasActiveWidgets: () =>
+      widgetManagerRef.current?.hasActiveWidgets() ?? false,
+    acceptAllChanges: () => widgetManagerRef.current?.acceptAllChanges(),
+    forceClearAllDecorations: () =>
+      widgetManagerRef.current?.forceClearAllDecorations(),
   }
 }

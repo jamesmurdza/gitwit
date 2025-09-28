@@ -27,7 +27,12 @@ import { ContextTab } from "./components/context-tab"
 import { Message, MessageContent } from "./components/message"
 import { useChat } from "./providers/chat-provider"
 
-export const AIChat = React.memo(() => {
+type AIChatProps = {
+  onApplyCode?: (code: string, language?: string) => void
+  onRejectCode?: () => void
+}
+
+function AIChatBase({ onApplyCode, onRejectCode }: AIChatProps) {
   return (
     <ChatContainerRoot>
       <ChatContainerHeader>
@@ -38,12 +43,25 @@ export const AIChat = React.memo(() => {
           <ChatContainerCollapse />
         </ChatContainerActions>
       </ChatContainerHeader>
-      <MainChatContent />
+      <MainChatContent onApplyCode={onApplyCode} onRejectCode={onRejectCode} />
       <MainChatInput />
     </ChatContainerRoot>
   )
-})
-function MainChatContent() {
+}
+
+export const AIChat = React.memo(
+  AIChatBase,
+  (prev, next) =>
+    prev.onApplyCode === next.onApplyCode &&
+    prev.onRejectCode === next.onRejectCode
+)
+function MainChatContent({
+  onApplyCode,
+  onRejectCode,
+}: {
+  onApplyCode?: (code: string, language?: string) => void
+  onRejectCode?: () => void
+}) {
   const { messages, isLoading } = useChat()
   const isEmpty = messages.length === 0
 
@@ -55,7 +73,13 @@ function MainChatContent() {
       <ChatContainerContent className="px-2 py-4  overflow-x-hidden">
         {messages.map((message, i) => {
           return (
-            <Message role={message.role} context={message.context} key={i}>
+            <Message
+              role={message.role}
+              context={message.context}
+              key={i}
+              onApplyCode={onApplyCode}
+              onRejectCode={onRejectCode}
+            >
               <MessageContent>{message.content}</MessageContent>
             </Message>
           )
