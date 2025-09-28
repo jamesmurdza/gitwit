@@ -91,7 +91,6 @@ function ChatProvider({
         projectId,
         projectName,
         fileName: activeFileName,
-        isEditMode: false,
       })
       const assistantMessage: Message = { role: "assistant", content: "" }
       setMessages([...updatedMessages, assistantMessage])

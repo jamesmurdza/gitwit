@@ -1,10 +1,9 @@
 "use client"
 
-import { streamChat } from "@/app/actions/ai"
+import { processEdit } from "@/app/actions/ai"
 import { cn } from "@/lib/utils"
 import { useRouter } from "@bprogress/next/app"
 import { Editor } from "@monaco-editor/react"
-import { readStreamableValue } from "ai/rsc"
 import { Check, Loader2, RotateCw, Sparkles, X } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -46,7 +45,13 @@ export function GenerateWidget({
       <div ref={generateRef} />
       {/* Generate Widget */}
       <div className={cn(show && "z-50 p-1")} ref={generateWidgetRef}>
-        {show ? <GenerateInput {...inputProps} projectId={projectId} projectName={projectName} /> : null}
+        {show ? (
+          <GenerateInput
+            {...inputProps}
+            projectId={projectId}
+            projectName={projectName}
+          />
+        ) : null}
       </div>
     </>
   )
@@ -93,7 +98,7 @@ function GenerateInput({
       const selectedCode = data.code
       const instruction = regenerate ? currentPrompt : input
 
-      const { output } = await streamChat(
+      const result = await processEdit(
         [{ role: "user", content: instruction }],
         {
           templateType: "code",
@@ -101,18 +106,11 @@ function GenerateInput({
           fileName: data.fileName,
           projectId: projectId,
           projectName: projectName,
-          isEditMode: true,
         }
       )
 
-      let result = ""
-
-      for await (const chunk of readStreamableValue(output)) {
-        result += chunk
-      }
-
       // Clean up any potential markdown or explanation text
-      const cleanedResult = result
+      const cleanedResult = result.content
         .replace(/```[\w-]*\n?/g, "") // Remove code fence markers
         .replace(/^[\s\n]*/, "") // Remove leading whitespace/newlines
         .replace(/[\s\n]*$/, "") // Remove trailing whitespace/newlines

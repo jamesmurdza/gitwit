@@ -1,6 +1,14 @@
 import { z } from "zod"
 
 /**
+ * Message interface for AI conversations
+ */
+export interface AIMessage {
+  role: "user" | "assistant" | "system"
+  content: string
+}
+
+/**
  * Tool definition interface for AI function calling
  */
 export interface AITool {
@@ -20,7 +28,7 @@ export const AIRequestSchema = z.object({
       role: z.enum(["user", "assistant", "system"]),
       content: z.string(),
     })
-  ),
+  ) satisfies z.ZodType<AIMessage[]>,
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional().default(0.7),
   maxTokens: z.number().positive().optional(),
@@ -32,7 +40,7 @@ export const AIRequestSchema = z.object({
     projectName: z.string().optional(),
     fileName: z.string().optional(),
     templateType: z.string().optional(),
-    activeFile: z.string().optional(),
+    activeFileContent: z.string().optional(),
     fileTree: z.array(z.any()).optional(),
     templateConfigs: z.record(z.any()).optional(),
     /**
