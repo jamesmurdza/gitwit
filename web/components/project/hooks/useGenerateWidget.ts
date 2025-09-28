@@ -13,6 +13,8 @@ export interface UseGenerateWidgetProps {
   tabs: TTab[]
   activeFileId: string
   editorLanguage: string
+  projectId: string
+  projectName: string
 }
 
 export interface UseGenerateWidgetReturn {
@@ -43,6 +45,8 @@ export function useGenerateWidget({
   tabs,
   activeFileId,
   editorLanguage,
+  projectId,
+  projectName,
 }: UseGenerateWidgetProps): UseGenerateWidgetReturn {
   // Handle expanding the generate widget
   const handleExpand = useCallback(() => {
@@ -147,6 +151,8 @@ export function useGenerateWidget({
       fileName: currentFileName,
       code: currentCode,
       line: generate.line,
+      projectId,
+      projectName,
     },
     editor: {
       language: editorLanguage,

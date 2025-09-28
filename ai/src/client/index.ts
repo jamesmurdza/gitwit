@@ -1,9 +1,5 @@
-import { db } from "@gitwit/db"
-import { TIERS } from "@gitwit/web/lib/tiers"
-import { RateLimiter } from "../middleware/rate-limiter"
-import { UsageTracker } from "../middleware/usage-tracker"
 import { AIProvider, createAIProvider } from "../providers"
-import { AIRequest, AIRequestSchema, AITierConfig, AITool } from "../types"
+import { AIProviderConfig, AIRequest, AIRequestSchema, AITool } from "../types"
 import { logger, PromptBuilder } from "../utils"
 
 /**
@@ -12,8 +8,9 @@ import { logger, PromptBuilder } from "../utils"
 export interface AIClientConfig {
   userId: string
   projectId?: string
-  provider?: AIProvider
-  tierConfig?: AITierConfig
+  projectName?: string
+  fileName?: string
+  providerConfig?: Partial<AIProviderConfig>
   tools?: Record<string, AITool>
   disableTools?: boolean
 }
@@ -37,14 +34,11 @@ export interface AIClientConfig {
  */
 export class AIClient {
   private provider: AIProvider
-  private rateLimiter: RateLimiter
-  private usageTracker: UsageTracker
   private promptBuilder: PromptBuilder
   private config: AIClientConfig
   private logger: typeof logger
   private tools: Record<string, AITool> = {}
   private toolsEnabled: boolean
-
   /**
    * Creates a new AI client instance
    *
@@ -55,22 +49,24 @@ export class AIClient {
     this.toolsEnabled = !config.disableTools // Tools enabled by default, disabled if flag is set
     this.tools = this.toolsEnabled ? config.tools || {} : {}
 
-    // Pass tools to provider when creating it (empty if disabled)
-    this.provider = config.provider || createAIProvider({ tools: this.tools })
+    // Create provider with tools
+    this.provider = createAIProvider({ 
+      ...config.providerConfig,
+      tools: this.tools,
+    })
 
-    this.rateLimiter = new RateLimiter(config.userId)
-    this.usageTracker = new UsageTracker(config.userId)
     this.promptBuilder = new PromptBuilder()
 
     // Create logger with context
     this.logger = logger.child({
       userId: config.userId,
       projectId: config.projectId,
+      projectName: config.projectName,
+      fileName: config.fileName,
     })
 
     this.logger.info("AI Client initialized", {
       provider: this.provider.constructor.name,
-      tierConfig: config.tierConfig,
       toolCount: Object.keys(this.tools).length,
       toolsEnabled: this.toolsEnabled,
     })
@@ -84,21 +80,8 @@ export class AIClient {
    * @throws {Error} When user is not found in the database
    */
   static async create(config: AIClientConfig): Promise<AIClient> {
-    // Fetch user tier and configure accordingly
-    const user = await db.query.user.findFirst({
-      where: (users, { eq }) => eq(users.id, config.userId),
-    })
-
-    if (!user) {
-      throw new Error("User not found")
-    }
-
-    const tierConfig = (TIERS[user.tier as keyof typeof TIERS] ||
-      TIERS.FREE) as AITierConfig
-
     return new AIClient({
       ...config,
-      tierConfig,
     })
   }
 
@@ -126,17 +109,11 @@ export class AIClient {
         context: {
           userId: this.config.userId,
           projectId: this.config.projectId,
+          projectName: this.config.projectName,
+          fileName: this.config.fileName,
           ...request.context,
         },
       })
-
-      // Check rate limits
-      await this.rateLimiter.checkLimit()
-      this.logger.debug("Rate limit check passed")
-
-      // Check usage limits
-      await this.usageTracker.checkUsage()
-      this.logger.debug("Usage limit check passed")
 
       // Build system prompt based on mode
       const systemPrompt = this.promptBuilder.build(validatedRequest)
@@ -153,9 +130,6 @@ export class AIClient {
       const response = validatedRequest.stream
         ? await this.provider.generateStream(validatedRequest)
         : await this.provider.generate(validatedRequest)
-
-      // Track usage
-      await this.usageTracker.increment()
 
       const duration = Date.now() - startTime
       this.logger.info("Chat request completed", {
@@ -191,19 +165,6 @@ export class AIClient {
   }
 
   /**
-   * Processes a merge request by setting the mode to "merge" and calling the chat method
-   *
-   * @param request - Partial AI request object for code merging
-   * @returns Promise that resolves to an HTTP Response containing the AI's merge suggestions
-   */
-  async merge(request: Partial<AIRequest>): Promise<Response> {
-    return this.chat({
-      ...request,
-      mode: "merge",
-    })
-  }
-
-  /**
    * Toggle tools on or off for this client instance
    *
    * @param enabled - Whether to enable or disable tools
@@ -213,7 +174,10 @@ export class AIClient {
     this.tools = enabled ? this.config.tools || {} : {}
 
     // Recreate provider with new tools configuration
-    this.provider = createAIProvider({ tools: this.tools })
+    this.provider = createAIProvider({ 
+      ...this.config.providerConfig,
+      tools: this.tools,
+    })
 
     this.logger.info("Tools toggled", {
       toolsEnabled: this.toolsEnabled,
@@ -240,7 +204,9 @@ export class AIClient {
 export async function createAIClient(options: {
   userId: string
   projectId?: string
-  provider?: AIProvider
+  projectName?: string
+  fileName?: string
+  providerConfig?: Partial<AIProviderConfig>
   tools?: Record<string, AITool>
   disableTools?: boolean
 }): Promise<AIClient> {

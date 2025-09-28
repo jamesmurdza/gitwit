@@ -1,5 +1,5 @@
+import { AITool } from "@gitwit/ai"
 import { z } from "zod"
-import { AITool } from "../types"
 
 interface SerperResponse {
   organic?: Array<{
@@ -68,9 +68,6 @@ export const webSearchTool: AITool = {
   },
 }
 
-/**
- * Default tools collection
- */
 export const defaultTools = {
   webSearch: webSearchTool,
 }

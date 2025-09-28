@@ -21,6 +21,8 @@ interface GenerateInputProps {
   editor: {
     language: string
   }
+  projectId: string
+  projectName: string
   onExpand: () => void
   onAccept: (code: string) => void
   onClose: () => void
@@ -34,6 +36,8 @@ export function GenerateWidget({
   generateRef,
   generateWidgetRef,
   show,
+  projectId,
+  projectName,
   ...inputProps
 }: GenerateWidgetProps) {
   return (
@@ -42,7 +46,7 @@ export function GenerateWidget({
       <div ref={generateRef} />
       {/* Generate Widget */}
       <div className={cn(show && "z-50 p-1")} ref={generateWidgetRef}>
-        {show ? <GenerateInput {...inputProps} /> : null}
+        {show ? <GenerateInput {...inputProps} projectId={projectId} projectName={projectName} /> : null}
       </div>
     </>
   )
@@ -55,6 +59,8 @@ function GenerateInput({
   onExpand,
   onAccept,
   onClose,
+  projectId,
+  projectName,
 }: GenerateInputProps) {
   const { resolvedTheme: theme } = useTheme()
   const router = useRouter()
@@ -92,7 +98,9 @@ function GenerateInput({
         {
           templateType: "code",
           activeFileContent: selectedCode,
-          projectName: data.fileName,
+          fileName: data.fileName,
+          projectId: projectId,
+          projectName: projectName,
           isEditMode: true,
         }
       )

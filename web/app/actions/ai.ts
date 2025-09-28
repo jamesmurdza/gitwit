@@ -1,9 +1,9 @@
 "use server"
 
+import { defaultTools } from "@/lib/ai/tools"
 import { TFile, TFolder } from "@/lib/types"
 import { currentUser } from "@clerk/nextjs/server"
-import { AIClient, createAIClient, createAIProvider } from "@gitwit/ai"
-import { StreamHandler, defaultTools } from "@gitwit/ai/utils"
+import { StreamHandler, createAIClient } from "@gitwit/ai"
 import { createStreamableValue } from "ai/rsc"
 
 export async function streamChat(
@@ -13,7 +13,9 @@ export async function streamChat(
     activeFileContent?: string
     fileTree?: (TFile | TFolder)[]
     contextContent?: string
+    projectId?: string
     projectName?: string
+    fileName?: string
     isEditMode?: boolean
   }
 ) {
@@ -28,7 +30,9 @@ export async function streamChat(
     try {
       const aiClient = await createAIClient({
         userId: user.id,
-        projectId: context?.projectName,
+        projectId: context?.projectId,
+        projectName: context?.projectName,
+        fileName: context?.fileName,
         tools: defaultTools,
         disableTools: context?.isEditMode,
       })
@@ -39,7 +43,9 @@ export async function streamChat(
         maxSteps: 3,
         context: {
           userId: user.id,
-          projectId: context?.projectName,
+          projectId: context?.projectId,
+          projectName: context?.projectName,
+          fileName: context?.fileName,
           templateType: context?.templateType,
           activeFile: context?.activeFileContent,
           fileTree: context?.fileTree,
@@ -61,58 +67,4 @@ export async function streamChat(
   })()
 
   return { output: stream.value }
-}
-
-export async function merge(
-  originalCode: string,
-  newCode: string,
-  fileName?: string,
-  context?: {
-    templateType?: string
-    projectName?: string
-  }
-): Promise<string> {
-  const user = await currentUser()
-  if (!user) {
-    throw new Error("Unauthorized")
-  }
-
-  try {
-    const openaiProvider = createAIProvider({
-      provider: "openai",
-      modelId: "gpt-4o-mini",
-    })
-
-    // Create AI client with OpenAI provider
-    const aiClient = await AIClient.create({
-      userId: user.id,
-      projectId: context?.projectName,
-      provider: openaiProvider,
-    })
-
-    const mergedCode = `Original file (${
-      fileName || "unknown"
-    }):\n${originalCode}\n\nNew code to merge:\n${newCode}`
-
-    const response = await aiClient.merge({
-      messages: [
-        {
-          role: "user",
-          content: mergedCode,
-        },
-      ],
-      context: {
-        userId: user.id,
-        projectId: context?.projectName,
-        templateType: context?.templateType,
-        activeFile: fileName,
-      },
-      stream: false,
-    })
-
-    const responseData = await response.json()
-    return responseData.content || ""
-  } catch (error) {
-    throw error
-  }
 }

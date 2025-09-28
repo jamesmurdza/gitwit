@@ -29,6 +29,8 @@ export const AIRequestSchema = z.object({
   context: z.object({
     userId: z.string(),
     projectId: z.string().optional(),
+    projectName: z.string().optional(),
+    fileName: z.string().optional(),
     templateType: z.string().optional(),
     activeFile: z.string().optional(),
     fileTree: z.array(z.any()).optional(),
@@ -37,30 +39,10 @@ export const AIRequestSchema = z.object({
      */
     contextContent: z.string().optional(),
   }),
-  mode: z.enum(["chat", "edit", "merge"]).default("chat"),
+  mode: z.enum(["chat", "edit"]).default("chat"),
 })
 
 export type AIRequest = z.infer<typeof AIRequestSchema>
-
-/**
- * Response interface for streaming AI responses
- */
-export interface AIStreamResponse {
-  stream: ReadableStream
-  headers?: Record<string, string>
-}
-
-/**
- * Response interface for complete AI responses
- */
-export interface AICompletionResponse {
-  content: string
-  usage?: {
-    promptTokens: number
-    completionTokens: number
-    totalTokens: number
-  }
-}
 
 /**
  * Configuration interface for AI provider setup
@@ -72,21 +54,4 @@ export interface AIProviderConfig {
   modelId?: string
   baseURL?: string
   tools?: Record<string, AITool>
-}
-
-/**
- * Configuration interface for user tier settings
- * Defines limits and capabilities for different subscription tiers
- */
-export interface AITierConfig {
-  generations: number
-  maxTokens: number
-  model: string
-  anthropicModel: string
-  rateLimit?: {
-    /** Number of requests allowed */
-    requests: number
-    /** Time window in seconds */
-    window: number
-  }
 }
