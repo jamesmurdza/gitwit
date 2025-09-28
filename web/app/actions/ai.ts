@@ -5,6 +5,7 @@ import { TFile, TFolder } from "@/lib/types"
 import { currentUser } from "@clerk/nextjs/server"
 import { StreamHandler, createAIClient } from "@gitwit/ai"
 import { createStreamableValue } from "ai/rsc"
+import { templateConfigs } from "@gitwit/templates"
 
 export async function streamChat(
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>,
@@ -50,6 +51,7 @@ export async function streamChat(
           activeFile: context?.activeFileContent,
           fileTree: context?.fileTree,
           contextContent: context?.contextContent,
+          templateConfigs: templateConfigs,
         },
         stream: true,
       })

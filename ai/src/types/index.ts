@@ -34,6 +34,7 @@ export const AIRequestSchema = z.object({
     templateType: z.string().optional(),
     activeFile: z.string().optional(),
     fileTree: z.array(z.any()).optional(),
+    templateConfigs: z.record(z.any()).optional(),
     /**
      * Combined content from selected files (code, files, images)
      */

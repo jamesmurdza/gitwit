@@ -42,9 +42,29 @@ export class PromptBuilder {
    */
   private buildChatPrompt(request: AIRequest): string {
     const { context } = request
+    const templateConfig = context.templateType && context.templateConfigs
+      ? context.templateConfigs[context.templateType]
+      : null
+    
     let prompt = `You are an intelligent programming assistant for a ${
       context.templateType || "web"
     } project.`
+
+    if (templateConfig) {
+      prompt += `
+      
+Project Template: ${templateConfig.name}
+
+Conventions:
+${templateConfig.conventions.join("\n")}
+
+Dependencies:
+${JSON.stringify(templateConfig.dependencies, null, 2)}
+
+Scripts:
+${JSON.stringify(templateConfig.scripts, null, 2)}
+`
+    }
 
     if (context.activeFile) {
       prompt += `\n\nActive File Content:\n${context.activeFile}`
