@@ -45,7 +45,7 @@ npm install
 Install and start Postgres:
 
 ```sh
-brew install postgres
+brew install postgresql
 brew services start postgresql
 ```
 
@@ -53,10 +53,10 @@ Create a database:
 
 ```sh
 psql postgres -c "CREATE DATABASE gitwit;"
-# psql postgres -U  postgres -c "CREATE DATABASE gitwit;"
+# psql postgres -U  postgres -c "CREATE DATABASE gitwit;"  # Use this if the above fails
 ```
 
-Initialize the database schema:
+Initialize the database schema (run from project directory):
 
 ```
 npm run db:generate
