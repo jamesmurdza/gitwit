@@ -197,6 +197,7 @@ export default function ProjectLayout({
       {...{
         fileTree,
         activeFileContent,
+        activeFileName: activeTab?.name ?? "",
         projectName,
         projectType,
       }}
@@ -268,6 +269,8 @@ export default function ProjectLayout({
                       tabs={tabs}
                       activeFileId={activeTab.id}
                       editorLanguage={editorLanguage}
+                      projectId={projectId}
+                      projectName={projectName}
                     />
                   </>
                 )}

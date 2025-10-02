@@ -1,10 +1,9 @@
 "use client"
 
-import { streamChat } from "@/app/actions/ai"
+import { processEdit } from "@/app/actions/ai"
 import { cn } from "@/lib/utils"
 import { useRouter } from "@bprogress/next/app"
 import { Editor } from "@monaco-editor/react"
-import { readStreamableValue } from "ai/rsc"
 import { Check, Loader2, RotateCw, Sparkles, X } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -21,6 +20,8 @@ interface GenerateInputProps {
   editor: {
     language: string
   }
+  projectId: string
+  projectName: string
   onExpand: () => void
   onAccept: (code: string) => void
   onClose: () => void
@@ -34,6 +35,8 @@ export function GenerateWidget({
   generateRef,
   generateWidgetRef,
   show,
+  projectId,
+  projectName,
   ...inputProps
 }: GenerateWidgetProps) {
   return (
@@ -42,7 +45,13 @@ export function GenerateWidget({
       <div ref={generateRef} />
       {/* Generate Widget */}
       <div className={cn(show && "z-50 p-1")} ref={generateWidgetRef}>
-        {show ? <GenerateInput {...inputProps} /> : null}
+        {show ? (
+          <GenerateInput
+            {...inputProps}
+            projectId={projectId}
+            projectName={projectName}
+          />
+        ) : null}
       </div>
     </>
   )
@@ -55,6 +64,8 @@ function GenerateInput({
   onExpand,
   onAccept,
   onClose,
+  projectId,
+  projectName,
 }: GenerateInputProps) {
   const { resolvedTheme: theme } = useTheme()
   const router = useRouter()
@@ -87,24 +98,19 @@ function GenerateInput({
       const selectedCode = data.code
       const instruction = regenerate ? currentPrompt : input
 
-      const { output } = await streamChat(
+      const result = await processEdit(
         [{ role: "user", content: instruction }],
         {
           templateType: "code",
           activeFileContent: selectedCode,
-          projectName: data.fileName,
-          isEditMode: true,
+          fileName: data.fileName,
+          projectId: projectId,
+          projectName: projectName,
         }
       )
 
-      let result = ""
-
-      for await (const chunk of readStreamableValue(output)) {
-        result += chunk
-      }
-
       // Clean up any potential markdown or explanation text
-      const cleanedResult = result
+      const cleanedResult = result.content
         .replace(/```[\w-]*\n?/g, "") // Remove code fence markers
         .replace(/^[\s\n]*/, "") // Remove leading whitespace/newlines
         .replace(/[\s\n]*$/, "") // Remove trailing whitespace/newlines

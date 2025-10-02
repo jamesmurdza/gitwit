@@ -4,7 +4,6 @@ import { generateText, LanguageModel, streamText, Tool, tool } from "ai"
 import { z } from "zod"
 import { AIProviderConfig, AIRequest, AITool } from "../types"
 import { logger, StreamHandler } from "../utils"
-import { TIERS } from "@gitwit/web/lib/tiers"
 
 /**
  * AI provider class that handles communication with different AI services
@@ -37,12 +36,17 @@ export class AIProvider {
 
     this.model = this.initializeModel(config)
 
-    // Convert AITool definitions to Vercel AI SDK tool format
-    if (config.tools) {
-      this.tools = this.convertTools(config.tools)
-    }
-
     this.logger.info("AI Provider initialized", {
+      toolCount: Object.keys(this.tools).length,
+    })
+  }
+
+  /**
+   * Set tools for this provider instance
+   */
+  setTools(aiTools: Record<string, AITool>): void {
+    this.tools = this.convertTools(aiTools)
+    this.logger.info("Tools updated", {
       toolCount: Object.keys(this.tools).length,
     })
   }
@@ -74,16 +78,14 @@ export class AIProvider {
   private initializeModel(config: AIProviderConfig): LanguageModel {
     this.logger.debug("Initializing model", {
       provider: config.provider,
-      modelId: config.modelId || TIERS.FREE.anthropicModel,
+      modelId: config.modelId,
     })
 
     switch (config.provider) {
       case "anthropic":
-        return anthropic(config.modelId || TIERS.FREE.anthropicModel)
-
+        return anthropic(config.modelId!)
       case "openai":
-        return openai(config.modelId || "gpt-4o-mini")
-
+        return openai(config.modelId!)
       default:
         throw new Error(`Unsupported provider: ${config.provider}`)
     }
@@ -195,13 +197,15 @@ export class AIProvider {
  *
  * @example
  * ```typescript
- * // Auto-detects provider from environment
- * const provider = createAIProvider()
+ * // For direct provider usage (not with AIClient)
+ * const provider = createAIProvider({ provider: "openai", modelId: "gpt-4" })
+ * const response = await provider.generate(request)
  *
- * // Override specific settings
- * const customProvider = createAIProvider({
- *   provider: "openai",
- *   modelId: "gpt-4"
+ * // For use with AIClient, use providerConfig instead:
+ * const client = createAIClient({
+ *   userId: "123",
+ *   providerConfig: { provider: "openai", modelId: "gpt-4" },
+ *   tools: myTools
  * })
  * ```
  */
@@ -210,6 +214,7 @@ export function createAIProvider(
 ): AIProvider {
   const config: AIProviderConfig = {
     provider: "anthropic",
+    modelId: "claude-sonnet-4-20250514",
     ...overrides,
   }
 
