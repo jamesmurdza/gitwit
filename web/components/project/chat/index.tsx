@@ -69,7 +69,7 @@ function MainChatContent({
     return <ChatContainerEmpty />
   }
   return (
-    <ChatScrollContainer className="flex-1 relative max-w-4xl mx-auto">
+    <ChatScrollContainer className="flex-1 relative w-full">
       <ChatContainerContent className="px-2 py-4  overflow-x-hidden">
         {messages.map((message, i) => {
           return (
@@ -126,7 +126,7 @@ function MainChatInput() {
         onValueChange={handleValueChange}
         isLoading={isGenerating || isLoading}
         onSubmit={handleSubmit}
-        className="w-full max-w-4xl mx-auto"
+        className="w-full"
       >
         <ChatContexts />
         <ChatInputTextarea placeholder="Ask me anything..." />

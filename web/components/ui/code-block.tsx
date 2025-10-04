@@ -64,7 +64,7 @@ const CodeBlock = ({
       <div className="group relative">
         <div
           className={cn(
-            "overflow-clip my-4 h-auto rounded-lg border [&>pre]:p-4 [&>pre]:overflow-x-auto",
+            "overflow-x-auto my-4 h-auto rounded-lg border [&>pre]:p-4 [&>pre]:overflow-x-auto [&>pre]:min-w-0",
             className
           )}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
