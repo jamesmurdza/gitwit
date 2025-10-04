@@ -140,13 +140,17 @@ export function useCodeDiffer({
     }
   }, [editorRef])
 
-  return {
-    handleApplyCode,
-    hasActiveWidgets: () =>
-      widgetManagerRef.current?.hasActiveWidgets() ?? false,
-    forceClearAllDecorations: () =>
-      widgetManagerRef.current?.forceClearAllDecorations(),
-    getUnresolvedSnapshot: (fileId: string) => {
+  // Memoize functions to prevent unnecessary re-renders
+  const hasActiveWidgets = useCallback(() => {
+    return widgetManagerRef.current?.hasActiveWidgets() ?? false
+  }, [])
+
+  const forceClearAllDecorations = useCallback(() => {
+    widgetManagerRef.current?.forceClearAllDecorations()
+  }, [])
+
+  const getUnresolvedSnapshot = useCallback(
+    (fileId: string) => {
       if (!editorRef) return null
       const model = editorRef.getModel()
       if (!model) return null
@@ -196,7 +200,11 @@ export function useCodeDiffer({
         unresolvedBlocks: unresolved,
       }
     },
-    restoreFromSnapshot: (session: DiffSession) => {
+    [editorRef]
+  )
+
+  const restoreFromSnapshot = useCallback(
+    (session: DiffSession) => {
       if (!editorRef) return
       const model = editorRef.getModel()
       if (!model) return
@@ -260,10 +268,21 @@ export function useCodeDiffer({
       )
       widgetManagerRef.current.buildAllWidgetsFromDecorations()
     },
-    clearVisuals: () => {
-      // Suppress session clearing when we intentionally clear visuals on tab switch
-      suppressZeroNotifyRef.current = true
-      widgetManagerRef.current?.forceClearAllDecorations()
-    },
+    [editorRef]
+  )
+
+  const clearVisuals = useCallback(() => {
+    // Suppress session clearing when we intentionally clear visuals on tab switch
+    suppressZeroNotifyRef.current = true
+    widgetManagerRef.current?.forceClearAllDecorations()
+  }, [])
+
+  return {
+    handleApplyCode,
+    hasActiveWidgets,
+    forceClearAllDecorations,
+    getUnresolvedSnapshot,
+    restoreFromSnapshot,
+    clearVisuals,
   }
 }
