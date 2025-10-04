@@ -1,5 +1,7 @@
+import { DiffSession, LineRange } from "@/lib/types"
 import * as monaco from "monaco-editor"
 import { useCallback, useEffect, useRef } from "react"
+import { DecorationManager } from "./lib/decoration-manager"
 import { calculateDiff } from "./lib/diff-calculator"
 import { WidgetManager } from "./lib/widget-manager"
 
@@ -13,8 +15,10 @@ export interface UseCodeDifferReturn {
     originalCode: string
   ) => monaco.editor.IEditorDecorationsCollection | null
   hasActiveWidgets: () => boolean
-  acceptAllChanges: () => void
   forceClearAllDecorations: () => void
+  getUnresolvedSnapshot: (fileId: string) => DiffSession | null
+  restoreFromSnapshot: (session: DiffSession) => void
+  clearVisuals: () => void
 }
 
 /**
@@ -35,6 +39,8 @@ export function useCodeDiffer({
   editorRef,
 }: UseCodeDifferProps): UseCodeDifferReturn {
   const widgetManagerRef = useRef<WidgetManager | null>(null)
+  const lastWidgetCountRef = useRef<number>(0)
+  const suppressZeroNotifyRef = useRef<boolean>(false)
 
   /**
    * Applies a diff view to the Monaco editor with interactive accept/reject buttons
@@ -56,6 +62,7 @@ export function useCodeDiffer({
 
         // Store original content on model for potential restoration
       ;(model as any).originalContent = originalCode
+      ;(model as any).mergedContent = mergedCode
 
       const originalModelEOL = model.getEOL()
       const eolSequence =
@@ -85,7 +92,24 @@ export function useCodeDiffer({
       if (widgetManagerRef.current) {
         widgetManagerRef.current.cleanupAllWidgets()
       }
-      widgetManagerRef.current = new WidgetManager(editorRef, model)
+      widgetManagerRef.current = new WidgetManager(
+        editorRef,
+        model,
+        (count) => {
+          lastWidgetCountRef.current = count
+          if (count === 0) {
+            if (suppressZeroNotifyRef.current) {
+              suppressZeroNotifyRef.current = false
+              return
+            }
+            try {
+              // No unresolved diffs left; clear any saved session for this file
+              const fileId = model.uri.path || model.uri.toString()
+              ;(window as any).__clearDiffSession?.(fileId)
+            } catch {}
+          }
+        }
+      )
 
       // Build all widgets from the new decorations
       widgetManagerRef.current.buildAllWidgetsFromDecorations()
@@ -120,8 +144,126 @@ export function useCodeDiffer({
     handleApplyCode,
     hasActiveWidgets: () =>
       widgetManagerRef.current?.hasActiveWidgets() ?? false,
-    acceptAllChanges: () => widgetManagerRef.current?.acceptAllChanges(),
     forceClearAllDecorations: () =>
       widgetManagerRef.current?.forceClearAllDecorations(),
+    getUnresolvedSnapshot: (fileId: string) => {
+      if (!editorRef) return null
+      const model = editorRef.getModel()
+      if (!model) return null
+      const decorationManager = new DecorationManager(model)
+      const maxLines = model.getLineCount()
+      const unresolved: {
+        type: "added" | "removed"
+        start: number
+        end: number
+      }[] = []
+
+      const seenAnchors = new Set<number>()
+      for (let line = 1; line <= maxLines; line++) {
+        const isRemoved = decorationManager.lineHasClass(
+          line,
+          "removed-line-decoration"
+        )
+        const isAdded = decorationManager.lineHasClass(
+          line,
+          "added-line-decoration"
+        )
+        if (!isRemoved && !isAdded) continue
+        const type: "added" | "removed" = isRemoved ? "removed" : "added"
+        const range: LineRange = decorationManager.getLiveRange(type, line)
+        const anchor = range.end
+        if (seenAnchors.has(anchor)) {
+          line = range.end
+          continue
+        }
+        seenAnchors.add(anchor)
+        unresolved.push({ type, start: range.start, end: range.end })
+        line = range.end
+      }
+
+      const eolStr = model.getEOL()
+      const eol: "LF" | "CRLF" = eolStr === "\r\n" ? "CRLF" : "LF"
+      const originalCode = (model as any).originalContent ?? ""
+      const mergedCode = (model as any).mergedContent ?? ""
+      const combinedText = model.getValue()
+
+      return {
+        fileId,
+        originalCode,
+        mergedCode,
+        combinedText,
+        eol,
+        unresolvedBlocks: unresolved,
+      }
+    },
+    restoreFromSnapshot: (session: DiffSession) => {
+      if (!editorRef) return
+      const model = editorRef.getModel()
+      if (!model) return
+      // Set combined text and EOL exactly as before
+      model.setValue(session.combinedText)
+      model.setEOL(
+        session.eol === "CRLF"
+          ? monaco.editor.EndOfLineSequence.CRLF
+          : monaco.editor.EndOfLineSequence.LF
+      )
+      ;(model as any).originalContent = session.originalCode
+      ;(model as any).mergedContent = session.mergedCode
+
+      // Recreate diff decorations only for unresolved blocks
+      const decorations: monaco.editor.IModelDeltaDecoration[] = []
+      for (const block of session.unresolvedBlocks) {
+        for (let line = block.start; line <= block.end; line++) {
+          decorations.push({
+            range: new monaco.Range(line, 1, line, 1),
+            options: {
+              isWholeLine: true,
+              className:
+                block.type === "added"
+                  ? "added-line-decoration"
+                  : "removed-line-decoration",
+              glyphMarginClassName:
+                block.type === "added"
+                  ? "added-line-glyph"
+                  : "removed-line-glyph",
+              linesDecorationsClassName:
+                block.type === "added"
+                  ? "added-line-number"
+                  : "removed-line-number",
+            },
+          })
+        }
+      }
+
+      editorRef.createDecorationsCollection(decorations)
+
+      // Rebuild widgets for current decorations
+      if (widgetManagerRef.current) {
+        widgetManagerRef.current.cleanupAllWidgets()
+      }
+      widgetManagerRef.current = new WidgetManager(
+        editorRef,
+        model,
+        (count) => {
+          lastWidgetCountRef.current = count
+          if (count === 0) {
+            if (suppressZeroNotifyRef.current) {
+              suppressZeroNotifyRef.current = false
+              return
+            }
+            try {
+              const fileId = model.uri.path || model.uri.toString()
+              ;(window as any).__clearDiffSession?.(fileId)
+            } catch {}
+          }
+        }
+      )
+      widgetManagerRef.current.buildAllWidgetsFromDecorations()
+    },
+    clearVisuals: () => {
+      // Suppress session clearing when we intentionally clear visuals on tab switch
+      suppressZeroNotifyRef.current = true
+      widgetManagerRef.current?.forceClearAllDecorations()
+    },
   }
 }
