@@ -14,6 +14,7 @@ export class WidgetManager {
   private widgets: monaco.editor.IContentWidget[] = []
   private anchorDecorations: string[] = []
   private decorationManager: DecorationManager
+  private onWidgetsChanged?: (count: number) => void
 
   /**
    * Creates a new WidgetManager instance
@@ -23,9 +24,11 @@ export class WidgetManager {
    */
   constructor(
     private editorRef: monaco.editor.IStandaloneCodeEditor,
-    private model: monaco.editor.ITextModel
+    private model: monaco.editor.ITextModel,
+    onWidgetsChanged?: (count: number) => void
   ) {
     this.decorationManager = new DecorationManager(model)
+    this.onWidgetsChanged = onWidgetsChanged
     this.attachCleanupToEditor()
   }
 
@@ -53,6 +56,7 @@ export class WidgetManager {
 
     this.widgets = []
     this.anchorDecorations = []
+    this.onWidgetsChanged?.(0)
   }
 
   /**
@@ -107,6 +111,7 @@ export class WidgetManager {
 
     this.widgets = newWidgets
     this.anchorDecorations = newAnchorDecorations
+    this.onWidgetsChanged?.(this.widgets.length)
   }
 
   /**
@@ -192,7 +197,6 @@ export class WidgetManager {
         }
         this.decorationManager.removeLines(liveRange)
       } else {
-        console.log("added")
         this.decorationManager.clearBlockDecorations(liveRange)
       }
 
@@ -306,94 +310,6 @@ export class WidgetManager {
    */
   hasActiveWidgets(): boolean {
     return this.widgets.length > 0
-  }
-
-  /**
-   * Accepts all pending changes by directly manipulating decorations and model
-   */
-  acceptAllChanges(): void {
-    try {
-      // Get all current decorations and process them directly
-      const maxLines = this.model.getLineCount()
-      const processedAnchors = new Set<number>()
-
-      for (let lineNumber = 1; lineNumber <= maxLines; lineNumber++) {
-        const isRemoved = this.decorationManager.lineHasClass(
-          lineNumber,
-          "removed-line-decoration"
-        )
-        const isAdded = this.decorationManager.lineHasClass(
-          lineNumber,
-          "added-line-decoration"
-        )
-
-        if (!isRemoved && !isAdded) continue
-
-        const type: "added" | "removed" = isRemoved ? "removed" : "added"
-        const range = this.decorationManager.getLiveRange(type, lineNumber)
-        const partner = this.decorationManager.getModificationPartner(
-          range,
-          type
-        )
-
-        // For modification pairs, only process the red (removed) block
-        if (type === "added" && partner) {
-          lineNumber = range.end
-          continue
-        }
-
-        // Prevent duplicate processing for the same contiguous block
-        const anchorLine = range.end
-        if (processedAnchors.has(anchorLine)) {
-          lineNumber = range.end
-          continue
-        }
-        processedAnchors.add(anchorLine)
-
-        // Accept the change by clearing decorations and applying the change
-        if (type === "removed") {
-          this.decorationManager.clearBlockDecorations(range)
-          if (partner) {
-            this.decorationManager.clearBlockDecorations(partner)
-          }
-          this.decorationManager.removeLines(range)
-        } else {
-          this.decorationManager.clearBlockDecorations(range)
-        }
-
-        lineNumber = range.end
-      }
-
-      // Clean up all widgets and rebuild
-      this.cleanupAllWidgets()
-    } catch (error) {
-      console.warn("Failed to accept all changes:", error)
-      // Fallback: try to click remaining buttons
-      this.fallbackAcceptAllChanges()
-    }
-  }
-
-  /**
-   * Fallback method that tries to click accept buttons
-   */
-  private fallbackAcceptAllChanges(): void {
-    const widgetsToProcess = [...this.widgets]
-
-    widgetsToProcess.forEach((widget) => {
-      try {
-        const widgetElement = widget.getDomNode?.()
-        if (widgetElement) {
-          const acceptButton = widgetElement.querySelector(
-            '[data-action="accept"]'
-          ) as HTMLButtonElement
-          if (acceptButton) {
-            acceptButton.click()
-          }
-        }
-      } catch (error) {
-        console.warn("Failed to accept widget change:", error)
-      }
-    })
   }
 
   /**
