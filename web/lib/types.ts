@@ -145,6 +145,16 @@ export interface DiffResult {
   granularBlocks: DiffBlock[]
 }
 
+// Persisted unresolved diff session for a file
+export interface DiffSession {
+  fileId: string
+  originalCode: string
+  mergedCode: string
+  combinedText: string
+  eol: "LF" | "CRLF"
+  unresolvedBlocks: { type: "added" | "removed"; start: number; end: number }[]
+}
+
 // Widget creation options
 
 export interface WidgetOptions {

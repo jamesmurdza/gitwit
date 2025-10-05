@@ -1,4 +1,4 @@
-import { TTab } from "@/lib/types"
+import { DiffSession, TTab } from "@/lib/types"
 import { StateCreator } from ".."
 
 interface EditorSlice {
@@ -9,6 +9,15 @@ interface EditorSlice {
   unsavedAlert: boolean
   toBeRemovedTab?: TTab
   drafts: Record<string, string>
+  diffSessions: Record<string, DiffSession>
+  editorRef: any
+  diffFunctions: {
+    hasActiveWidgets: () => boolean
+    getUnresolvedSnapshot: (fileId: string) => any
+    restoreFromSnapshot: (session: any) => void
+    clearVisuals: () => void
+    forceClearAllDecorations: () => void
+  } | null
 
   // Actions
   setTabs: (tabs: TTab[] | ((previousTabs: TTab[]) => TTab[])) => void
@@ -20,6 +29,17 @@ interface EditorSlice {
   setDraft: (fileId: string, content: string) => void
   clearDraft: (fileId: string) => void
   getDraft: (fileId: string) => string | undefined
+  saveDiffSession: (fileId: string, session: DiffSession) => void
+  getDiffSession: (fileId: string) => DiffSession | undefined
+  clearDiffSession: (fileId: string) => void
+  setEditorRef: (ref: any) => void
+  setDiffFunctions: (functions: {
+    hasActiveWidgets: () => boolean
+    getUnresolvedSnapshot: (fileId: string) => any
+    restoreFromSnapshot: (session: any) => void
+    clearVisuals: () => void
+    forceClearAllDecorations: () => void
+  }) => void
 }
 
 const createEditorSlice: StateCreator<EditorSlice> = (set, get) => ({
@@ -28,6 +48,9 @@ const createEditorSlice: StateCreator<EditorSlice> = (set, get) => ({
   activeTabContent: "",
   unsavedAlert: false,
   drafts: {},
+  diffSessions: {},
+  editorRef: null,
+  diffFunctions: null,
   // #endregion
 
   //   #region Actions
@@ -41,9 +64,10 @@ const createEditorSlice: StateCreator<EditorSlice> = (set, get) => ({
   },
   setActiveTab: (tabOrUpdater) => {
     set((state) => {
-      const newActiveTab = typeof tabOrUpdater === "function"
-        ? tabOrUpdater(state.activeTab)
-        : tabOrUpdater
+      const newActiveTab =
+        typeof tabOrUpdater === "function"
+          ? tabOrUpdater(state.activeTab)
+          : tabOrUpdater
 
       if (!newActiveTab) {
         return { activeTab: newActiveTab }
@@ -129,6 +153,21 @@ const createEditorSlice: StateCreator<EditorSlice> = (set, get) => ({
     }),
 
   getDraft: (fileId) => get().drafts[fileId],
+
+  saveDiffSession: (fileId, session) =>
+    set((state) => ({
+      diffSessions: { ...state.diffSessions, [fileId]: session },
+    })),
+  getDiffSession: (fileId) => get().diffSessions[fileId],
+  clearDiffSession: (fileId) =>
+    set((state) => {
+      const { [fileId]: _, ...rest } = state.diffSessions
+      return { diffSessions: rest }
+    }),
+
+  setEditorRef: (ref) => set({ editorRef: ref }),
+
+  setDiffFunctions: (functions) => set({ diffFunctions: functions }),
 
   //   #endregion
 })

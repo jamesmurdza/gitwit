@@ -16,7 +16,7 @@ import { FileJson, TerminalSquare } from "lucide-react"
 import * as monaco from "monaco-editor"
 import { useTheme } from "next-themes"
 import { useParams } from "next/navigation"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import Tab from "../ui/tab"
 import AIEditElements from "./ai-edit/ai-edit-elements"
@@ -24,6 +24,7 @@ import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
 import { ChatProvider } from "./chat/providers/chat-provider"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
+import { useDiffSessionManager } from "./hooks/useDiffSessionManager"
 import { useEditorSocket } from "./hooks/useEditorSocket"
 import { useMonacoEditor } from "./hooks/useMonacoEditor"
 import PreviewWindow from "./preview"
@@ -50,6 +51,10 @@ export default function ProjectLayout({
   const activeTab = useAppStore((s) => s.activeTab)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const removeTab = useAppStore((s) => s.removeTab)
+  const saveDiffSession = useAppStore((s) => s.saveDiffSession)
+  const getDiffSession = useAppStore((s) => s.getDiffSession)
+  const clearDiffSession = useAppStore((s) => s.clearDiffSession)
+  const setEditorRef = useAppStore((s) => s.setEditorRef)
   const draft = useAppStore((s) => s.drafts[activeTab?.id ?? ""])
   const setDraft = useAppStore((s) => s.setDraft)
   const editorLanguage = activeTab?.name
@@ -125,15 +130,53 @@ export default function ProjectLayout({
     setIsAIChatOpen,
   })
 
+  // Set editor ref in store so sidebar can access it
+  useEffect(() => {
+    if (editorRef) {
+      setEditorRef(editorRef)
+    }
+  }, [editorRef, setEditorRef])
+
   // Code diff and merge logic
   const {
     handleApplyCode,
     hasActiveWidgets,
-    acceptAllChanges,
     forceClearAllDecorations,
+    getUnresolvedSnapshot,
+    restoreFromSnapshot,
+    clearVisuals,
   } = useCodeDiffer({
     editorRef: editorRef || null,
   })
+
+  // Use the session manager for tab switching
+  const { handleSetActiveTab: handleSetActiveTabWithSession } =
+    useDiffSessionManager(
+      hasActiveWidgets,
+      getUnresolvedSnapshot,
+      restoreFromSnapshot,
+      clearVisuals,
+      forceClearAllDecorations
+    )
+
+  // Store diff functions so sidebar can use them
+  const setDiffFunctions = useAppStore((s) => s.setDiffFunctions)
+  useEffect(() => {
+    setDiffFunctions({
+      hasActiveWidgets,
+      getUnresolvedSnapshot,
+      restoreFromSnapshot,
+      clearVisuals,
+      forceClearAllDecorations,
+    })
+  }, [
+    hasActiveWidgets,
+    getUnresolvedSnapshot,
+    restoreFromSnapshot,
+    clearVisuals,
+    forceClearAllDecorations,
+    setDiffFunctions,
+  ])
 
   // Wrapper for handleApplyCode to manage decorations collection state
   const handleApplyCodeWithDecorations = useCallback(
@@ -175,22 +218,59 @@ export default function ProjectLayout({
     }
   }, [mergeDecorationsCollection])
 
-  // Enhanced setActiveTab that handles widget acceptance before switching
-  const handleSetActiveTab = useCallback((tab: TTab) => {
-    // Check if there are active widgets (accept/reject buttons)
-    if (hasActiveWidgets()) {
-      try {
-        // Accept all pending changes before switching
-        acceptAllChanges()
-      } catch (error) {
-        console.warn("Failed to accept changes, force clearing:", error)
-        // Fallback: force clear all decorations
-        forceClearAllDecorations()
+  // Close tab with snapshot if closing the active tab with unresolved diffs
+  const handleCloseTab = useCallback(
+    (tab: TTab) => {
+      const isClosingActive = activeTab?.id === tab.id
+      if (isClosingActive && hasActiveWidgets()) {
+        try {
+          const session = getUnresolvedSnapshot(tab.id)
+          if (session) {
+            saveDiffSession(tab.id, session)
+          }
+        } catch (error) {
+          console.warn("Failed to snapshot unresolved diffs on close:", error)
+        }
+        // Clear widgets before closing the tab
+        try {
+          clearVisuals()
+        } catch (error) {
+          forceClearAllDecorations()
+        }
       }
+      removeTab(tab)
+    },
+    [
+      activeTab?.id,
+      hasActiveWidgets,
+      getUnresolvedSnapshot,
+      saveDiffSession,
+      clearVisuals,
+      forceClearAllDecorations,
+      removeTab,
+    ]
+  )
+
+  // Use the session manager for tab switching
+  const handleSetActiveTab = handleSetActiveTabWithSession
+
+  // Bridge to allow diff hook to clear saved session when all widgets are gone
+  useEffect(() => {
+    ;(window as any).__clearDiffSession = (fileId: string) => {
+      try {
+        const session = getDiffSession(fileId)
+        if (session) {
+          // remove only if it matches current active or by id
+          clearDiffSession(fileId)
+        }
+      } catch {}
     }
-    // Switch to the new tab
-    setActiveTab(tab)
-  }, [])
+    return () => {
+      try {
+        delete (window as any).__clearDiffSession
+      } catch {}
+    }
+  }, [getDiffSession, clearDiffSession])
 
   return (
     <ChatProvider
@@ -224,7 +304,7 @@ export default function ProjectLayout({
                     saved={tab.saved}
                     selected={activeTab?.id === tab.id}
                     onClick={() => handleSetActiveTab(tab)}
-                    onClose={() => removeTab(tab)}
+                    onClose={() => handleCloseTab(tab)}
                   >
                     {tab.name}
                   </Tab>
