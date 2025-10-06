@@ -68,19 +68,27 @@ export const Markdown = memo(
               code = children
             }
 
+            // Determine a filename for the toolbar from the intended file path
+            const filename = firstIntendedFile
+              ? firstIntendedFile.split("/").pop() || firstIntendedFile
+              : undefined
+
             return (
               <CodeBlock
                 className={cn(className)}
                 code={code}
                 language={language}
+                filename={filename}
+                showToolbar
               >
-                <CodeBlockCopyButton />
-                {/* Pass the precomputed intended file directly */}
+                {/* Toolbar actions (Apply, Reject, Copy) */}
                 <CodeBlockActions
                   code={code}
                   language={language}
                   intendedFile={firstIntendedFile}
+                  placement="toolbar"
                 />
+                <CodeBlockCopyButton className="size-7" />
               </CodeBlock>
             )
           },

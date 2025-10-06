@@ -17,6 +17,7 @@ export interface CodeBlockActionsProps {
   className?: string
   isForCurrentFile?: boolean
   intendedFile?: string | null
+  placement?: "floating" | "toolbar"
 }
 
 export function CodeBlockActions({
@@ -28,6 +29,8 @@ export function CodeBlockActions({
   isForCurrentFile,
   intendedFile,
 }: CodeBlockActionsProps) {
+  const placement =
+    (arguments[0] as CodeBlockActionsProps).placement ?? "floating"
   const [isApplied, setIsApplied] = useState(false)
   const [isRejected, setIsRejected] = useState(false)
   const activeTab = useAppStore((s) => s.activeTab)
@@ -115,12 +118,15 @@ export function CodeBlockActions({
     rejectHandler?.()
   }
 
-  // Position controls beside the copy button (top-right), mirroring its behavior
-  const positioned = cn(
-    "absolute top-2 right-10 shrink-0 flex items-center gap-1",
-    "opacity-0 group-hover:opacity-100 transition-all",
-    className
-  )
+  // Position controls
+  const positioned =
+    placement === "floating"
+      ? cn(
+          "absolute top-2 right-10 shrink-0 flex items-center gap-1",
+          "opacity-0 group-hover:opacity-100 transition-all",
+          className
+        )
+      : cn("flex items-center gap-1", className)
 
   if (isApplied) {
     return (
