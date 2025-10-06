@@ -10,6 +10,7 @@ import { getCombinedContext } from "../lib/utils"
 
 type ChatProviderProps = {
   activeFileContent: string
+  activeFileName: string
   projectType: string
   fileTree: (TFile | TFolder)[]
   projectName: string
@@ -18,6 +19,7 @@ type ChatProviderProps = {
 
 type ChatContextType = {
   activeFileContent?: string
+  activeFileName?: string
   messages: Message[]
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   input: string
@@ -35,6 +37,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
 function ChatProvider({
   activeFileContent,
+  activeFileName,
   projectType,
   fileTree,
   projectName,
@@ -85,8 +88,9 @@ function ChatProvider({
         activeFileContent,
         fileTree,
         contextContent,
+        projectId,
         projectName,
-        isEditMode: false,
+        fileName: activeFileName,
       })
       const assistantMessage: Message = { role: "assistant", content: "" }
       setMessages([...updatedMessages, assistantMessage])
@@ -132,6 +136,7 @@ function ChatProvider({
     <ChatContext.Provider
       value={{
         activeFileContent,
+        activeFileName,
         messages,
         setMessages,
         input,

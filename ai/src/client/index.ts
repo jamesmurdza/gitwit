@@ -1,10 +1,7 @@
-import { db } from "@gitwit/db"
-import { TIERS } from "@gitwit/web/lib/tiers"
-import { RateLimiter } from "../middleware/rate-limiter"
-import { UsageTracker } from "../middleware/usage-tracker"
+import { createStreamableValue } from "ai/rsc"
 import { AIProvider, createAIProvider } from "../providers"
-import { AIRequest, AIRequestSchema, AITierConfig, AITool } from "../types"
-import { logger, PromptBuilder } from "../utils"
+import { AIProviderConfig, AIRequest, AIRequestSchema, AITool } from "../types"
+import { logger, PromptBuilder, StreamHandler } from "../utils"
 
 /**
  * Configuration options for creating an AI client instance
@@ -12,39 +9,46 @@ import { logger, PromptBuilder } from "../utils"
 export interface AIClientConfig {
   userId: string
   projectId?: string
-  provider?: AIProvider
-  tierConfig?: AITierConfig
+  projectName?: string
+  fileName?: string
+  providerConfig?: Partial<AIProviderConfig>
   tools?: Record<string, AITool>
   disableTools?: boolean
 }
 
 /**
- * Main AI client class that handles AI requests with rate limiting, usage tracking, and provider management
+ * Main AI client class that handles AI requests with provider management and tool integration
+ * Supports both streaming chat responses and immediate edit responses
  *
  * @example
  * ```typescript
- * const client = await AIClient.create({ userId: "user123", projectId: "proj456" })
- * const response = await client.chat({
- *   messages: [{ role: "user", content: "Hello, AI!" }],
- *   stream: true
+ * const client = await AIClient.create({
+ *   userId: "user123",
+ *   projectId: "proj456",
  *   tools: {
  *     weather: weatherTool,
  *     filesystem: fileSystemTool,
- *     project: projectTool,
  *   }
+ * })
+ *
+ * // For streaming chat responses
+ * const streamResponse = await client.streamChat({
+ *   messages: [{ role: "user", content: "Hello, AI!" }],
+ * })
+ *
+ * // For immediate edit responses
+ * const editResponse = await client.processEdit({
+ *   messages: [{ role: "user", content: "Fix this code" }],
  * })
  * ```
  */
 export class AIClient {
   private provider: AIProvider
-  private rateLimiter: RateLimiter
-  private usageTracker: UsageTracker
   private promptBuilder: PromptBuilder
   private config: AIClientConfig
   private logger: typeof logger
   private tools: Record<string, AITool> = {}
   private toolsEnabled: boolean
-
   /**
    * Creates a new AI client instance
    *
@@ -55,22 +59,27 @@ export class AIClient {
     this.toolsEnabled = !config.disableTools // Tools enabled by default, disabled if flag is set
     this.tools = this.toolsEnabled ? config.tools || {} : {}
 
-    // Pass tools to provider when creating it (empty if disabled)
-    this.provider = config.provider || createAIProvider({ tools: this.tools })
+    // Create provider with tools
+    this.provider = createAIProvider({
+      ...config.providerConfig,
+    })
 
-    this.rateLimiter = new RateLimiter(config.userId)
-    this.usageTracker = new UsageTracker(config.userId)
+    if (this.toolsEnabled && Object.keys(this.tools).length > 0) {
+      this.provider.setTools(this.tools)
+    }
+
     this.promptBuilder = new PromptBuilder()
 
     // Create logger with context
     this.logger = logger.child({
       userId: config.userId,
       projectId: config.projectId,
+      projectName: config.projectName,
+      fileName: config.fileName,
     })
 
     this.logger.info("AI Client initialized", {
       provider: this.provider.constructor.name,
-      tierConfig: config.tierConfig,
       toolCount: Object.keys(this.tools).length,
       toolsEnabled: this.toolsEnabled,
     })
@@ -84,21 +93,8 @@ export class AIClient {
    * @throws {Error} When user is not found in the database
    */
   static async create(config: AIClientConfig): Promise<AIClient> {
-    // Fetch user tier and configure accordingly
-    const user = await db.query.user.findFirst({
-      where: (users, { eq }) => eq(users.id, config.userId),
-    })
-
-    if (!user) {
-      throw new Error("User not found")
-    }
-
-    const tierConfig = (TIERS[user.tier as keyof typeof TIERS] ||
-      TIERS.FREE) as AITierConfig
-
     return new AIClient({
       ...config,
-      tierConfig,
     })
   }
 
@@ -126,17 +122,11 @@ export class AIClient {
         context: {
           userId: this.config.userId,
           projectId: this.config.projectId,
+          projectName: this.config.projectName,
+          fileName: this.config.fileName,
           ...request.context,
         },
       })
-
-      // Check rate limits
-      await this.rateLimiter.checkLimit()
-      this.logger.debug("Rate limit check passed")
-
-      // Check usage limits
-      await this.usageTracker.checkUsage()
-      this.logger.debug("Usage limit check passed")
 
       // Build system prompt based on mode
       const systemPrompt = this.promptBuilder.build(validatedRequest)
@@ -153,9 +143,6 @@ export class AIClient {
       const response = validatedRequest.stream
         ? await this.provider.generateStream(validatedRequest)
         : await this.provider.generate(validatedRequest)
-
-      // Track usage
-      await this.usageTracker.increment()
 
       const duration = Date.now() - startTime
       this.logger.info("Chat request completed", {
@@ -191,16 +178,107 @@ export class AIClient {
   }
 
   /**
-   * Processes a merge request by setting the mode to "merge" and calling the chat method
+   * Processes a chat request and returns a React Server Component streamable value
+   * Designed for conversational AI interactions with explanations and context
    *
-   * @param request - Partial AI request object for code merging
-   * @returns Promise that resolves to an HTTP Response containing the AI's merge suggestions
+   * This method:
+   * - Forces streaming mode for real-time response delivery
+   * - Uses chat-oriented system prompts with project context
+   * - Enables tools for enhanced functionality
+   * - Returns an RSC-compatible StreamableValue
+   *
+   * @param request - Partial AI request object containing messages and options
+   * @returns Object with streamable value for RSC consumption: `{ output: StreamableValue }`
+   * @throws {Error} When AI generation fails or streaming encounters errors
+   *
+   * @example
+   * ```typescript
+   * import { AIMessage } from "@gitwit/ai"
+   *
+   * const messages: AIMessage[] = [
+   *   { role: "user", content: "Explain this code" }
+   * ]
+   *
+   * const { output } = await client.streamChat({
+   *   messages,
+   *   context: { projectId: "123", fileName: "app.js" }
+   * })
+   *
+   * for await (const chunk of readStreamableValue(output)) {
+   *   console.log(chunk) // Real-time streaming response
+   * }
+   * ```
    */
-  async merge(request: Partial<AIRequest>): Promise<Response> {
-    return this.chat({
-      ...request,
-      mode: "merge",
-    })
+  async streamChat(request: Partial<AIRequest>) {
+    const stream = createStreamableValue("")
+
+    // Run async to not block the return
+    ;(async () => {
+      try {
+        const response = await this.chat({
+          ...request,
+          stream: true, // Force streaming for RSC
+        })
+
+        if (response.body) {
+          for await (const chunk of StreamHandler.parseStream(response.body)) {
+            stream.update(chunk)
+          }
+        }
+
+        stream.done()
+      } catch (error) {
+        this.logger.error("Stream chat failed", error)
+        stream.error(error)
+      }
+    })()
+
+    return { output: stream.value }
+  }
+
+  /**
+   * Processes an edit request and returns the complete result immediately
+   * Designed for code editing operations that return only code without explanations
+   *
+   * This method:
+   * - Forces non-streaming mode for immediate results
+   * - Uses edit-oriented system prompts focused on code generation
+   * - Disables tools to prevent distractions from code output
+   * - Returns the complete response as a JSON object
+   *
+   * @param request - Partial AI request object for code editing operations
+   * @returns Object with immediate content: `{ content: string }`
+   * @throws {Error} When AI generation fails or edit processing encounters errors
+   *
+   * @example
+   * ```typescript
+   * import { AIMessage } from "@gitwit/ai"
+   *
+   * const messages: AIMessage[] = [
+   *   { role: "user", content: "Add error handling to this function" }
+   * ]
+   *
+   * const { content } = await client.processEdit({
+   *   messages,
+   *   context: { activeFile: "function code here..." }
+   * })
+   *
+   * console.log(content) // Complete code result immediately available
+   * ```
+   */
+  async processEdit(request: Partial<AIRequest>) {
+    try {
+      const response = await this.edit({
+        ...request,
+        stream: false, // Force non-streaming for edits
+      })
+
+      const result = (await response.json()) as { content: string }
+      return { content: result.content }
+    } catch (error) {
+      this.logger.error("Edit request failed", error)
+      throw error
+    }
   }
 
   /**
@@ -213,7 +291,13 @@ export class AIClient {
     this.tools = enabled ? this.config.tools || {} : {}
 
     // Recreate provider with new tools configuration
-    this.provider = createAIProvider({ tools: this.tools })
+    this.provider = createAIProvider({
+      ...this.config.providerConfig,
+    })
+
+    if (this.toolsEnabled && Object.keys(this.tools).length > 0) {
+      this.provider.setTools(this.tools)
+    }
 
     this.logger.info("Tools toggled", {
       toolsEnabled: this.toolsEnabled,
@@ -232,15 +316,41 @@ export class AIClient {
 }
 
 /**
- * Factory function for creating an AI client instance per request
+ * Factory function for creating an AI client instance with tool integration
+ *
+ * Creates a client that supports both streaming chat and immediate edit operations.
+ * Tools are managed at the client level and automatically configured for the provider.
  *
  * @param options - Configuration options for creating the AI client
+ * @param options.userId - Required user identifier for context and logging
+ * @param options.projectId - Optional project identifier for context
+ * @param options.tools - Optional tools to enable for AI function calling
+ * @param options.disableTools - Optional flag to disable all tools
+ * @param options.providerConfig - Optional AI provider configuration (model, API settings)
  * @returns Promise that resolves to a configured AI client instance
+ *
+ * @example
+ * ```typescript
+ * const client = await createAIClient({
+ *   userId: "user123",
+ *   projectId: "proj456",
+ *   tools: {
+ *     fileSystem: fileSystemTool,
+ *     weather: weatherTool
+ *   },
+ *   providerConfig: {
+ *     provider: "anthropic",
+ *     modelId: "claude-sonnet-4-20250514"
+ *   }
+ * })
+ * ```
  */
 export async function createAIClient(options: {
   userId: string
   projectId?: string
-  provider?: AIProvider
+  projectName?: string
+  fileName?: string
+  providerConfig?: Partial<AIProviderConfig>
   tools?: Record<string, AITool>
   disableTools?: boolean
 }): Promise<AIClient> {
