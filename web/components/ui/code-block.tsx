@@ -67,7 +67,7 @@ const CodeBlock = ({
     <CodeBlockContext.Provider value={{ code }}>
       <div className="group relative my-4 rounded-lg border overflow-hidden">
         {showToolbar && (
-          <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
+          <div className="flex items-center justify-between px-3 py-1 border-b bg-muted/40">
             <div className="text-xs font-medium truncate max-w-[60%]">
               {filename ?? "code"}
             </div>
