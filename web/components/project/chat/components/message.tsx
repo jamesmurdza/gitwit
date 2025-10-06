@@ -152,7 +152,7 @@ const MessageContent = ({
   return (
     <div
       className={cn(
-        "flex flex-col gap-0.5 max-w-[90%] sm:max-w-[85%] group pb-1",
+        "flex flex-col gap-0.5 max-w-full sm:max-w-full group pb-1",
         role === "assistant" ? "items-start" : "items-end"
       )}
     >
