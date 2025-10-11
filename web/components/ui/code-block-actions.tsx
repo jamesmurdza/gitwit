@@ -12,7 +12,7 @@ import { normalizePath, pathMatchesTab } from "../project/chat/lib/utils"
 export interface CodeBlockActionsProps {
   code: string
   language?: string
-  onApply?: (code: string) => void
+  onApply?: (code: string) => Promise<void>
   onReject?: () => void
   className?: string
   isForCurrentFile?: boolean
@@ -33,6 +33,7 @@ export function CodeBlockActions({
     (arguments[0] as CodeBlockActionsProps).placement ?? "floating"
   const [isApplied, setIsApplied] = useState(false)
   const [isRejected, setIsRejected] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const activeTab = useAppStore((s) => s.activeTab)
   const tabs = useAppStore((s) => s.tabs)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
@@ -61,7 +62,21 @@ export function CodeBlockActions({
     if (matches) {
       const codeToApply = pending.code
       pendingApplyRef.current = null
-      latestApplyRef.current?.(codeToApply)
+      setIsLoading(true)
+      const applyPromise = latestApplyRef.current?.(codeToApply)
+      if (applyPromise) {
+        applyPromise
+          .then(() => {
+            setIsApplied(true)
+            setIsLoading(false)
+          })
+          .catch((error) => {
+            console.error("Apply failed:", error)
+            setIsLoading(false)
+          })
+      } else {
+        setIsLoading(false)
+      }
     }
   }, [activeTab?.id, activeTab?.name])
   const isActiveForPath = useMemo(
@@ -75,41 +90,51 @@ export function CodeBlockActions({
     return isActiveForPath(normalized)
   }, [isForCurrentFile, intendedFile, isActiveForPath])
 
-  const handleApply = () => {
-    if (isApplied || isRejected) return
-    setIsApplied(true)
-    // If this code is intended for a different tab (supports nested paths), switch first
-    if (!computedIsForCurrentFile && intendedFile) {
-      const normalized = normalizePath(intendedFile)
-      const fileName = normalized.split("/").pop() || normalized
-      const matchBy = (t: { id: string; name: string }) =>
-        pathMatchesTab(normalized, t)
-      let target = tabs.find(matchBy)
-      if (!target) {
-        target = {
-          id: normalized,
-          name: fileName,
-          type: "file",
-          saved: true,
-        } as TTab
-      }
-      if (target && (!activeTab || !matchBy(activeTab))) {
-        // Use the exact intended path (no guessing/candidates)
-        const resolvedId = normalized
-        const resolvedName = resolvedId.split("/").pop() || resolvedId
-        const resolvedTab: TTab = {
-          id: resolvedId,
-          name: resolvedName,
-          type: "file",
-          saved: true,
+  const handleApply = async () => {
+    if (isApplied || isRejected || isLoading) return
+    setIsLoading(true)
+
+    try {
+      // If this code is intended for a different tab (supports nested paths), switch first
+      if (!computedIsForCurrentFile && intendedFile) {
+        const normalized = normalizePath(intendedFile)
+        const fileName = normalized.split("/").pop() || normalized
+        const matchBy = (t: { id: string; name: string }) =>
+          pathMatchesTab(normalized, t)
+        let target = tabs.find(matchBy)
+        if (!target) {
+          target = {
+            id: normalized,
+            name: fileName,
+            type: "file",
+            saved: true,
+          } as TTab
         }
-        // Record intent and switch tabs; an effect will run when activeTab updates
-        pendingApplyRef.current = { code, targetId: resolvedId }
-        setActiveTab(resolvedTab)
-        return
+        if (target && (!activeTab || !matchBy(activeTab))) {
+          // Use the exact intended path (no guessing/candidates)
+          const resolvedId = normalized
+          const resolvedName = resolvedId.split("/").pop() || resolvedId
+          const resolvedTab: TTab = {
+            id: resolvedId,
+            name: resolvedName,
+            type: "file",
+            saved: true,
+          }
+          // Record intent and switch tabs; an effect will run when activeTab updates
+          pendingApplyRef.current = { code, targetId: resolvedId }
+          setActiveTab(resolvedTab)
+          return
+        }
       }
+
+      // Wait for apply to complete
+      await applyHandler?.(code)
+      setIsApplied(true)
+    } catch (error) {
+      console.error("Apply failed:", error)
+    } finally {
+      setIsLoading(false)
     }
-    applyHandler?.(code)
   }
 
   const handleReject = () => {
@@ -157,9 +182,14 @@ export function CodeBlockActions({
         size="smIcon"
         onClick={handleApply}
         className="size-7"
-        title={"Apply this code"}
+        title={isLoading ? "Applying..." : "Apply this code"}
+        disabled={isLoading}
       >
-        <Check size={14} />
+        {isLoading ? (
+          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+        ) : (
+          <Check size={14} />
+        )}
       </Button>
       <Button
         variant="ghost"
@@ -167,6 +197,7 @@ export function CodeBlockActions({
         onClick={handleReject}
         className="size-7"
         title="Reject"
+        disabled={isLoading}
       >
         <X size={14} />
       </Button>

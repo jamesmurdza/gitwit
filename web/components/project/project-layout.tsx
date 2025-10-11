@@ -1,5 +1,6 @@
 "use client"
 
+import { mergeCode } from "@/app/actions/ai"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -198,15 +199,30 @@ export default function ProjectLayout({
 
   // Handler for applying code from chat
   const handleApplyCodeFromChat = useCallback(
-    (code: string, language?: string) => {
+    async (code: string, language?: string) => {
       if (!activeTab) {
         return
       }
-      // Apply the diff view
-      const originalCode = activeFileContent
-      handleApplyCodeWithDecorations(code, originalCode)
+      try {
+        // First, merge the partial code with the original using AI
+        const originalCode = activeFileContent
+        const mergedCode = await mergeCode(
+          code,
+          originalCode,
+          activeTab.name,
+          projectId
+        )
+
+        // Then apply the diff view with the merged code
+        handleApplyCodeWithDecorations(mergedCode, originalCode)
+      } catch (error) {
+        console.error("📝 Apply Code - Failed to merge code:", error)
+        // Fallback: apply the partial code directly
+        const originalCode = activeFileContent
+        handleApplyCodeWithDecorations(code, originalCode)
+      }
     },
-    [activeTab, activeFileContent, handleApplyCodeWithDecorations]
+    [activeTab, activeFileContent, handleApplyCodeWithDecorations, projectId]
   )
 
   // Handler for rejecting code from chat
