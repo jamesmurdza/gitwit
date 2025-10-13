@@ -1,3 +1,4 @@
+export * from "./code-merger"
 export * from "./error-handler"
 export * from "./logger"
 export * from "./prompt-builder"

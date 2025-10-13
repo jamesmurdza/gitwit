@@ -42,10 +42,11 @@ export class PromptBuilder {
    */
   private buildChatPrompt(request: AIRequest): string {
     const { context } = request
-    const templateConfig = context.templateType && context.templateConfigs
-      ? context.templateConfigs[context.templateType]
-      : null
-    
+    const templateConfig =
+      context.templateType && context.templateConfigs
+        ? context.templateConfigs[context.templateType]
+        : null
+
     let prompt = `You are an intelligent programming assistant for a ${
       context.templateType || "web"
     } project.`
@@ -75,12 +76,63 @@ ${JSON.stringify(templateConfig.scripts, null, 2)}
 
     prompt += `
 
-Please respond concisely. When providing code:
-1. Format it using triple backticks with the appropriate language identifier
-2. CRITICAL: Always specify the complete file path relative to the project root
-3. For new files, add "(new file)" after the path
-4. Before any code block, include a line like "File: /path/to/file.ext" to indicate which file the code belongs to
-5. Keep responses brief and to the point`
+🚨 CRITICAL INSTRUCTION: When providing code changes, show ONLY the modified sections, not the entire file.
+
+MANDATORY Rules for code changes:
+1. Show only the lines that need to be changed
+2. Include a few lines of context before and after the changes for clarity
+3. 🚨 ALWAYS use comments like "// ... existing code ..." to indicate unchanged sections in code even when unchanged code is boiler plate code similar to example formats.
+4. For deletions: Use comments like "// REMOVED: [description of what was removed]" to indicate deleted code
+5. For additions: Use comments like "// NEW: [description of what was added]" to indicate new code
+6. Format using triple backticks with the appropriate language identifier
+7. CRITICAL: Always specify the complete file path relative to the project root
+8. For new files, add "(new file)" after the path
+9. Before any code block, include a line like "File: /path/to/file.ext" to indicate which file the code belongs to
+10. Keep responses brief and to the point
+
+🚨 NEVER show complete files. ALWAYS use "// ... existing code ..." comments for unchanged sections.
+
+Example format for additions:
+File: /src/components/Button.tsx
+\`\`\`tsx
+// ... existing imports ...
+
+export function Button({ onClick, children }: ButtonProps) {
+  // ... existing code ...
+  const handleClick = () => {
+    console.log('Button clicked'); // NEW: Added logging
+    onClick?.();
+  };
+  // ... existing code ...
+}
+\`\`\`
+
+Example format for deletions:
+File: /src/components/Button.tsx
+\`\`\`tsx
+// ... existing imports ...
+
+export function Button({ onClick, children }: ButtonProps) {
+  // ... existing code ...
+  // REMOVED: Old handleClick function with console.log
+  const handleClick = () => {
+    onClick?.();
+  };
+  // ... existing code ...
+}
+\`\`\`
+
+For HTML files, use:
+\`\`\`html
+// ... existing code ...
+<head>
+  // ... existing code ...
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App</title>
+  // ... existing code ...
+</head>
+// ... existing code ...
+\`\`\``
 
     return prompt
   }
@@ -105,6 +157,10 @@ Rules:
 - If multiple edits are needed, show them in order of appearance
 
 Current file: ${context.fileName || "unknown"}
-${context.activeFileContent ? `\nFile content:\n${context.activeFileContent}` : ""}`
+${
+  context.activeFileContent
+    ? `\nFile content:\n${context.activeFileContent}`
+    : ""
+}`
   }
 }

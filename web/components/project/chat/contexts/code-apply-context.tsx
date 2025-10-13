@@ -3,7 +3,7 @@
 import { createContext, ReactNode, useContext } from "react"
 
 export interface CodeApplyContextType {
-  onApplyCode: (code: string, language?: string) => void
+  onApplyCode: (code: string, language?: string) => Promise<void>
   onRejectCode: () => void
 }
 
@@ -17,7 +17,7 @@ export function CodeApplyProvider({
   onRejectCode,
 }: {
   children: ReactNode
-  onApplyCode: (code: string, language?: string) => void
+  onApplyCode: (code: string, language?: string) => Promise<void>
   onRejectCode: () => void
 }) {
   return (
