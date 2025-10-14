@@ -28,7 +28,7 @@ export type MessageProps = {
   children: React.ReactNode
   className?: string
   context?: ContextTab[]
-  onApplyCode?: (code: string, language?: string) => void
+  onApplyCode?: (code: string, language?: string) => Promise<void>
   onRejectCode?: () => void
 } & React.HTMLProps<HTMLDivElement>
 

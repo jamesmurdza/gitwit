@@ -28,7 +28,7 @@ import { Message, MessageContent } from "./components/message"
 import { useChat } from "./providers/chat-provider"
 
 type AIChatProps = {
-  onApplyCode?: (code: string, language?: string) => void
+  onApplyCode?: (code: string, language?: string) => Promise<void>
   onRejectCode?: () => void
 }
 
@@ -59,7 +59,7 @@ function MainChatContent({
   onApplyCode,
   onRejectCode,
 }: {
-  onApplyCode?: (code: string, language?: string) => void
+  onApplyCode?: (code: string, language?: string) => Promise<void>
   onRejectCode?: () => void
 }) {
   const { messages, isLoading } = useChat()
