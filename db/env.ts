@@ -8,6 +8,12 @@ export const env = {
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY as string,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY as string,
+  AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID as string | undefined,
+  AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY as
+    | string
+    | undefined,
+  AWS_REGION: (process.env.AWS_REGION as string) || "us-east-1",
+  AWS_BEDROCK_MODEL_ID: process.env.AWS_BEDROCK_MODEL_ID as string | undefined,
   DATABASE_URL: process.env.DATABASE_URL as string,
   NODE_ENV:
     (process.env.NODE_ENV as "development" | "production" | "test") ||

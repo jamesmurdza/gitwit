@@ -57,7 +57,7 @@ export type AIRequest = z.infer<typeof AIRequestSchema>
  * Configuration interface for AI provider setup
  */
 export interface AIProviderConfig {
-  provider: "anthropic" | "openai"
+  provider: "anthropic" | "openai" | "bedrock"
   apiKey?: string
   region?: string
   modelId?: string

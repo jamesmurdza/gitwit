@@ -1,3 +1,4 @@
+import { bedrock } from "@ai-sdk/amazon-bedrock"
 import { anthropic } from "@ai-sdk/anthropic"
 import { openai } from "@ai-sdk/openai"
 import { generateText, LanguageModel, streamText, Tool, tool } from "ai"
@@ -86,6 +87,14 @@ export class AIProvider {
         return anthropic(config.modelId!)
       case "openai":
         return openai(config.modelId!)
+      case "bedrock":
+        if (!config.region) throw new Error("AWS region required for Bedrock")
+        const modelId = config.modelId || process.env.AWS_MODEL_ID
+        if (!modelId)
+          throw new Error(
+            "Bedrock model ID required (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0')"
+          )
+        return bedrock(modelId)
       default:
         throw new Error(`Unsupported provider: ${config.provider}`)
     }
@@ -226,6 +235,19 @@ export function createAIProvider(
     } else if (process.env.OPENAI_API_KEY) {
       config.provider = "openai"
       config.apiKey = process.env.OPENAI_API_KEY
+    } else if (
+      process.env.AWS_ACCESS_KEY_ID &&
+      process.env.AWS_SECRET_ACCESS_KEY
+    ) {
+      config.provider = "bedrock"
+      config.region = process.env.AWS_REGION || "us-east-1"
+      config.modelId = process.env.AWS_MODEL_ID
+      if (!config.modelId) {
+        logger.warn(
+          "Bedrock selected but no model ID provided; defaulting to Claude 3 Sonnet"
+        )
+        config.modelId = "anthropic.claude-3-sonnet-20240229-v1:0"
+      }
     }
   } else {
     // Set the appropriate API key based on the explicitly chosen provider
@@ -233,6 +255,13 @@ export function createAIProvider(
       config.apiKey = process.env.ANTHROPIC_API_KEY
     } else if (overrides.provider === "openai" && process.env.OPENAI_API_KEY) {
       config.apiKey = process.env.OPENAI_API_KEY
+    } else if (overrides.provider === "bedrock") {
+      config.region = overrides.region || process.env.AWS_REGION || "us-east-1"
+      if (!config.modelId) {
+        config.modelId =
+          process.env.AWS_MODEL_ID ||
+          "anthropic.claude-3-sonnet-20240229-v1:0"
+      }
     }
   }
 
