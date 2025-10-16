@@ -14,6 +14,12 @@ export type User = {
   bio: string | null
   personalWebsite: string | null
   links: UserLink[]
+  apiKeys?: {
+    hasAnthropic?: boolean
+    hasOpenai?: boolean
+    hasOpenrouter?: boolean
+    hasAws?: boolean
+  }
   tier: "FREE" | "PRO" | "ENTERPRISE"
   tierExpiresAt: string
   lastResetDate: string
