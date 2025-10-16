@@ -54,10 +54,15 @@ export const AIRequestSchema = z.object({
 export type AIRequest = z.infer<typeof AIRequestSchema>
 
 /**
+ * Supported AI providers
+ */
+export type AIProviderType = "anthropic" | "openai" | "bedrock" | "openrouter"
+
+/**
  * Configuration interface for AI provider setup
  */
 export interface AIProviderConfig {
-  provider: "anthropic" | "openai" | "bedrock"
+  provider: AIProviderType
   apiKey?: string
   region?: string
   modelId?: string

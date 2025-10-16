@@ -13,6 +13,7 @@ import {
   Crown,
   LayoutDashboard,
   LogOut,
+  Settings,
   Sparkles,
   User as UserIcon,
 } from "lucide-react"
@@ -85,6 +86,12 @@ export default function UserButton({ userData }: { userData: User }) {
           <Link href={`/@${userData.username}`}>
             <UserIcon className="mr-2 size-4" />
             <span>Profile</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem className="cursor-pointer" asChild>
+          <Link href={"/settings"}>
+            <Settings className="mr-2 size-4" />
+            <span>Settings</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
