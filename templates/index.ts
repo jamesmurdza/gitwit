@@ -2,12 +2,6 @@ export interface TemplateConfig {
   id: string
   name: string
   runCommand: string
-  fileStructure: {
-    [key: string]: {
-      purpose: string
-      description: string
-    }
-  }
   conventions: string[]
   dependencies?: {
     [key: string]: string
@@ -22,48 +16,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
     id: "reactjs",
     name: "React",
     runCommand: "npm run dev",
-    fileStructure: {
-      "src/": {
-        purpose: "source",
-        description: "Contains all React components and application logic",
-      },
-      "src/components/": {
-        purpose: "components",
-        description: "Reusable React components",
-      },
-      "src/lib/": {
-        purpose: "utilities",
-        description: "Utility functions and shared code",
-      },
-      "src/App.tsx": {
-        purpose: "entry",
-        description: "Main application component",
-      },
-      "src/index.tsx": {
-        purpose: "entry",
-        description: "Application entry point",
-      },
-      "src/index.css": {
-        purpose: "styles",
-        description: "Global CSS styles",
-      },
-      "public/": {
-        purpose: "static",
-        description: "Static assets and index.html",
-      },
-      "tsconfig.json": {
-        purpose: "config",
-        description: "TypeScript configuration",
-      },
-      "vite.config.ts": {
-        purpose: "config",
-        description: "Vite bundler configuration",
-      },
-      "package.json": {
-        purpose: "config",
-        description: "Project dependencies and scripts",
-      },
-    },
     conventions: [
       "Use functional components with hooks",
       "Follow React naming conventions (PascalCase for components)",
@@ -92,56 +44,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
     id: "nextjs",
     name: "NextJS",
     runCommand: "npm run dev",
-    fileStructure: {
-      "pages/": {
-        purpose: "routing",
-        description: "Page components and API routes",
-      },
-      "pages/api/": {
-        purpose: "api",
-        description: "API route handlers",
-      },
-      "pages/_app.tsx": {
-        purpose: "entry",
-        description: "Application wrapper component",
-      },
-      "pages/index.tsx": {
-        purpose: "page",
-        description: "Homepage component",
-      },
-      "public/": {
-        purpose: "static",
-        description: "Static assets and files",
-      },
-      "styles/": {
-        purpose: "styles",
-        description: "CSS modules and global styles",
-      },
-      "styles/globals.css": {
-        purpose: "styles",
-        description: "Global CSS styles",
-      },
-      "styles/Home.module.css": {
-        purpose: "styles",
-        description: "Homepage-specific styles",
-      },
-      "next.config.js": {
-        purpose: "config",
-        description: "Next.js configuration",
-      },
-      "next-env.d.ts": {
-        purpose: "types",
-        description: "Next.js TypeScript declarations",
-      },
-      "tsconfig.json": {
-        purpose: "config",
-        description: "TypeScript configuration",
-      },
-      "package.json": {
-        purpose: "config",
-        description: "Project dependencies and scripts",
-      },
-    },
     conventions: [
       "Use file-system based routing",
       "Keep API routes in pages/api",
@@ -166,24 +68,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
     id: "streamlit",
     name: "Streamlit",
     runCommand: "./venv/bin/streamlit run main.py --server.runOnSave true",
-    fileStructure: {
-      "main.py": {
-        purpose: "entry",
-        description: "Main Streamlit application file",
-      },
-      "requirements.txt": {
-        purpose: "dependencies",
-        description: "Python package dependencies",
-      },
-      Procfile: {
-        purpose: "deployment",
-        description: "Deployment configuration for hosting platforms",
-      },
-      "venv/": {
-        purpose: "environment",
-        description: "Python virtual environment directory",
-      },
-    },
     conventions: [
       "Use Streamlit components for UI",
       "Follow PEP 8 style guide",
@@ -204,32 +88,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
     id: "vanillajs",
     name: "HTML/JS",
     runCommand: "npm run dev",
-    fileStructure: {
-      "index.html": {
-        purpose: "entry",
-        description: "Main HTML entry point",
-      },
-      "style.css": {
-        purpose: "styles",
-        description: "Global CSS styles",
-      },
-      "script.js": {
-        purpose: "scripts",
-        description: "JavaScript application logic",
-      },
-      "package.json": {
-        purpose: "config",
-        description: "Project dependencies and scripts",
-      },
-      "package-lock.json": {
-        purpose: "config",
-        description: "Locked dependency versions",
-      },
-      "vite.config.js": {
-        purpose: "config",
-        description: "Vite bundler configuration",
-      },
-    },
     conventions: [
       "Use semantic HTML elements",
       "Keep CSS modular and organized",
@@ -250,28 +108,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
     id: "php",
     name: "PHP",
     runCommand: "npx vite",
-    fileStructure: {
-      "index.php": {
-        purpose: "entry",
-        description: "Main PHP entry point",
-      },
-      "package.json": {
-        purpose: "config",
-        description: "Frontend dependencies and scripts",
-      },
-      "package-lock.json": {
-        purpose: "config",
-        description: "Locked dependency versions",
-      },
-      "vite.config.js": {
-        purpose: "config",
-        description: "Vite configuration for frontend assets",
-      },
-      "node_modules/": {
-        purpose: "dependencies",
-        description: "Frontend dependency files",
-      },
-    },
     conventions: [
       "Follow PSR-12 coding standards",
       "Use modern PHP 8+ features",
