@@ -3,12 +3,6 @@ export interface TemplateConfig {
   name: string
   runCommand: string
   conventions: string[]
-  dependencies?: {
-    [key: string]: string
-  }
-  scripts?: {
-    [key: string]: string
-  }
 }
 
 export const templateConfigs: { [key: string]: TemplateConfig } = {
@@ -22,22 +16,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
       "Keep components small and focused",
       "Use TypeScript for type safety",
     ],
-    dependencies: {
-      "@radix-ui/react-icons": "^1.3.0",
-      "@radix-ui/react-slot": "^1.1.0",
-      "class-variance-authority": "^0.7.0",
-      clsx: "^2.1.1",
-      "lucide-react": "^0.441.0",
-      react: "^18.3.1",
-      "react-dom": "^18.3.1",
-      "tailwind-merge": "^2.5.2",
-      "tailwindcss-animate": "^1.0.7",
-    },
-    scripts: {
-      dev: "vite",
-      build: "tsc && vite build",
-      preview: "vite preview",
-    },
   },
   // Next.js template config
   nextjs: {
@@ -50,18 +28,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
       "Use CSS Modules for component styles",
       "Follow Next.js data fetching patterns",
     ],
-    dependencies: {
-      next: "^14.1.0",
-      react: "^18.2.0",
-      "react-dom": "18.2.0",
-      tailwindcss: "^3.4.1",
-    },
-    scripts: {
-      dev: "next dev",
-      build: "next build",
-      start: "next start",
-      lint: "next lint",
-    },
   },
   // Streamlit template config
   streamlit: {
@@ -74,14 +40,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
       "Keep dependencies in requirements.txt",
       "Use virtual environment for isolation",
     ],
-    dependencies: {
-      streamlit: "^1.40.0",
-      altair: "^5.5.0",
-    },
-    scripts: {
-      start: "streamlit run main.py",
-      dev: "./venv/bin/streamlit run main.py --server.runOnSave true",
-    },
   },
   // HTML template config
   vanillajs: {
@@ -94,14 +52,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
       "Write clean, modular JavaScript",
       "Follow modern ES6+ practices",
     ],
-    dependencies: {
-      vite: "^5.0.12",
-    },
-    scripts: {
-      dev: "vite",
-      build: "vite build",
-      preview: "vite preview",
-    },
   },
   // PHP template config
   php: {
@@ -114,14 +64,6 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
       "Organize assets with Vite",
       "Keep PHP logic separate from presentation",
     ],
-    dependencies: {
-      vite: "^5.0.0",
-    },
-    scripts: {
-      dev: "vite",
-      build: "vite build",
-      preview: "vite preview",
-    },
   },
 }
 

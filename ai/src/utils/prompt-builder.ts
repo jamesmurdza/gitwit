@@ -59,12 +59,6 @@ ${formatFileTree(context.fileTree || [])}
 
 Conventions:
 ${templateConfig.conventions.join("\n")}
-
-Dependencies:
-${JSON.stringify(templateConfig.dependencies, null, 2)}
-
-Scripts:
-${JSON.stringify(templateConfig.scripts, null, 2)}
 `
     }
 
