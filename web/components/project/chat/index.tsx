@@ -51,7 +51,7 @@ function MainChatContent() {
     return <ChatContainerEmpty />
   }
   return (
-    <ChatScrollContainer className="flex-1 relative w-full max-w-4xl mx-auto">
+    <ChatScrollContainer className="flex-1 relative w-full max-w-5xl mx-auto">
       <ChatContainerContent className="px-2 py-4  overflow-x-hidden">
         {messages.map((message, i) => {
           return (
