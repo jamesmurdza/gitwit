@@ -368,7 +368,7 @@ html.dark .shiki span {
   ::view-transition-group(chat-container),
   ::view-transition-group(chat-container-title) {
     animation-timing-function: ease-out;
-    animation-duration: 0.25s;
+    animation-duration: 0.4s;
   }
 
   /* Prevent overflow during transition */
