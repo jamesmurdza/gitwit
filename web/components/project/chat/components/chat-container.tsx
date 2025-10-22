@@ -144,7 +144,7 @@ function ChatScrollContainer({
 }: ChatScrollContainerProps) {
   return (
     <StickToBottom
-      className={cn("flex overflow-y-auto", className)}
+      className={cn("flex overflow-y-hidden", className)}
       resize="smooth"
       initial="instant"
       role="log"

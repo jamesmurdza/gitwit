@@ -16,6 +16,8 @@ import { type BundledLanguage, codeToHtml } from "shiki"
 type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   code: string
   language: BundledLanguage
+  filename?: string
+  showToolbar?: boolean
 }
 
 type CodeBlockContextType = {
@@ -39,6 +41,8 @@ export async function highlightCode(code: string, language: BundledLanguage) {
 const CodeBlock = ({
   code,
   language,
+  filename,
+  showToolbar = false,
   className,
   children,
   ...props
@@ -61,17 +65,26 @@ const CodeBlock = ({
 
   return (
     <CodeBlockContext.Provider value={{ code }}>
-      <div className="group relative">
+      <div className="group relative my-4 rounded-lg border overflow-hidden">
+        {showToolbar && (
+          <div className="flex items-center justify-between px-3 py-1 border-b bg-muted/40">
+            <div className="text-xs font-medium truncate max-w-[60%]">
+              {filename ?? "code"}
+            </div>
+            <div className="flex items-center gap-1">{children}</div>
+          </div>
+        )}
         <div
           className={cn(
-            "overflow-clip my-4 h-auto rounded-lg border [&>pre]:p-4 [&>pre]:overflow-x-auto",
+            "overflow-x-auto h-auto [&>pre]:p-4 [&>pre]:overflow-x-auto [&>pre]:min-w-0",
+            !showToolbar && "rounded-lg border",
             className
           )}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
           dangerouslySetInnerHTML={{ __html: html }}
           {...props}
         />
-        {children}
+        {!showToolbar && children}
       </div>
     </CodeBlockContext.Provider>
   )
@@ -112,8 +125,7 @@ const CodeBlockCopyButton = ({
   return (
     <button
       className={cn(
-        "absolute top-2 right-2 shrink-0 rounded-md size-7 flex items-center justify-center opacity-0 transition-all",
-        "hover:bg-secondary group-hover:opacity-100 active:scale-95",
+        "rounded-md size-7 flex items-center justify-center transition-all hover:bg-secondary active:scale-95",
         className
       )}
       onClick={copyToClipboard}

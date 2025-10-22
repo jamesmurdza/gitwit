@@ -1,5 +1,6 @@
 "use client"
 
+import { mergeCode } from "@/app/actions/ai"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -8,6 +9,7 @@ import {
 import { useEditorLayout } from "@/context/EditorLayoutContext"
 import { fileRouter } from "@/lib/api"
 import { defaultEditorOptions } from "@/lib/monaco/config"
+import { TTab } from "@/lib/types"
 import { processFileType, sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import Editor from "@monaco-editor/react"
@@ -15,7 +17,7 @@ import { FileJson, TerminalSquare } from "lucide-react"
 import * as monaco from "monaco-editor"
 import { useTheme } from "next-themes"
 import { useParams } from "next/navigation"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import Tab from "../ui/tab"
 import AIEditElements from "./ai-edit/ai-edit-elements"
@@ -23,6 +25,7 @@ import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
 import { ChatProvider } from "./chat/providers/chat-provider"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
+import { useDiffSessionManager } from "./hooks/useDiffSessionManager"
 import { useEditorSocket } from "./hooks/useEditorSocket"
 import { useMonacoEditor } from "./hooks/useMonacoEditor"
 import PreviewWindow from "./preview"
@@ -49,6 +52,10 @@ export default function ProjectLayout({
   const activeTab = useAppStore((s) => s.activeTab)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const removeTab = useAppStore((s) => s.removeTab)
+  const saveDiffSession = useAppStore((s) => s.saveDiffSession)
+  const getDiffSession = useAppStore((s) => s.getDiffSession)
+  const clearDiffSession = useAppStore((s) => s.clearDiffSession)
+  const setEditorRef = useAppStore((s) => s.setEditorRef)
   const draft = useAppStore((s) => s.drafts[activeTab?.id ?? ""])
   const setDraft = useAppStore((s) => s.setDraft)
   const editorLanguage = activeTab?.name
@@ -124,10 +131,53 @@ export default function ProjectLayout({
     setIsAIChatOpen,
   })
 
+  // Set editor ref in store so sidebar can access it
+  useEffect(() => {
+    if (editorRef) {
+      setEditorRef(editorRef)
+    }
+  }, [editorRef, setEditorRef])
+
   // Code diff and merge logic
-  const { handleApplyCode } = useCodeDiffer({
+  const {
+    handleApplyCode,
+    hasActiveWidgets,
+    forceClearAllDecorations,
+    getUnresolvedSnapshot,
+    restoreFromSnapshot,
+    clearVisuals,
+  } = useCodeDiffer({
     editorRef: editorRef || null,
   })
+
+  // Use the session manager for tab switching
+  const { handleSetActiveTab: handleSetActiveTabWithSession } =
+    useDiffSessionManager(
+      hasActiveWidgets,
+      getUnresolvedSnapshot,
+      restoreFromSnapshot,
+      clearVisuals,
+      forceClearAllDecorations
+    )
+
+  // Store diff functions so sidebar can use them
+  const setDiffFunctions = useAppStore((s) => s.setDiffFunctions)
+  useEffect(() => {
+    setDiffFunctions({
+      hasActiveWidgets,
+      getUnresolvedSnapshot,
+      restoreFromSnapshot,
+      clearVisuals,
+      forceClearAllDecorations,
+    })
+  }, [
+    hasActiveWidgets,
+    getUnresolvedSnapshot,
+    restoreFromSnapshot,
+    clearVisuals,
+    forceClearAllDecorations,
+    setDiffFunctions,
+  ])
 
   // Wrapper for handleApplyCode to manage decorations collection state
   const handleApplyCodeWithDecorations = useCallback(
@@ -146,6 +196,98 @@ export default function ProjectLayout({
     }
     setDraft(activeTab.id, content ?? "")
   }
+
+  // Handler for applying code from chat
+  const handleApplyCodeFromChat = useCallback(
+    async (code: string, language?: string) => {
+      if (!activeTab) {
+        return
+      }
+      try {
+        // First, merge the partial code with the original using AI
+        const originalCode = activeFileContent
+        const mergedCode = await mergeCode(
+          code,
+          originalCode,
+          activeTab.name,
+          projectId
+        )
+
+        // Then apply the diff view with the merged code
+        handleApplyCodeWithDecorations(mergedCode, originalCode)
+      } catch (error) {
+        console.error("📝 Apply Code - Failed to merge code:", error)
+        // Fallback: apply the partial code directly
+        const originalCode = activeFileContent
+        handleApplyCodeWithDecorations(code, originalCode)
+      }
+    },
+    [activeTab, activeFileContent, handleApplyCodeWithDecorations, projectId]
+  )
+
+  // Handler for rejecting code from chat
+  const handleRejectCodeFromChat = useCallback(() => {
+    // Clear any existing decorations
+    if (mergeDecorationsCollection) {
+      mergeDecorationsCollection.clear()
+      setMergeDecorationsCollection(undefined)
+    }
+  }, [mergeDecorationsCollection])
+
+  // Close tab with snapshot if closing the active tab with unresolved diffs
+  const handleCloseTab = useCallback(
+    (tab: TTab) => {
+      const isClosingActive = activeTab?.id === tab.id
+      if (isClosingActive && hasActiveWidgets()) {
+        try {
+          const session = getUnresolvedSnapshot(tab.id)
+          if (session) {
+            saveDiffSession(tab.id, session)
+          }
+        } catch (error) {
+          console.warn("Failed to snapshot unresolved diffs on close:", error)
+        }
+        // Clear widgets before closing the tab
+        try {
+          clearVisuals()
+        } catch (error) {
+          forceClearAllDecorations()
+        }
+      }
+      removeTab(tab)
+    },
+    [
+      activeTab?.id,
+      hasActiveWidgets,
+      getUnresolvedSnapshot,
+      saveDiffSession,
+      clearVisuals,
+      forceClearAllDecorations,
+      removeTab,
+    ]
+  )
+
+  // Use the session manager for tab switching
+  const handleSetActiveTab = handleSetActiveTabWithSession
+
+  // Bridge to allow diff hook to clear saved session when all widgets are gone
+  useEffect(() => {
+    ;(window as any).__clearDiffSession = (fileId: string) => {
+      try {
+        const session = getDiffSession(fileId)
+        if (session) {
+          // remove only if it matches current active or by id
+          clearDiffSession(fileId)
+        }
+      } catch {}
+    }
+    return () => {
+      try {
+        delete (window as any).__clearDiffSession
+      } catch {}
+    }
+  }, [getDiffSession, clearDiffSession])
+
   return (
     <ChatProvider
       {...{
@@ -178,8 +320,8 @@ export default function ProjectLayout({
                     key={tab.id}
                     saved={tab.saved}
                     selected={activeTab?.id === tab.id}
-                    onClick={() => setActiveTab(tab)}
-                    onClose={() => removeTab(tab)}
+                    onClick={() => handleSetActiveTab(tab)}
+                    onClose={() => handleCloseTab(tab)}
                   >
                     {tab.name}
                   </Tab>
@@ -223,6 +365,8 @@ export default function ProjectLayout({
                       tabs={tabs}
                       activeFileId={activeTab.id}
                       editorLanguage={editorLanguage}
+                      projectId={projectId}
+                      projectName={projectName}
                     />
                   </>
                 )}
@@ -293,7 +437,10 @@ export default function ProjectLayout({
           <>
             <ResizableHandle />
             <ResizablePanel defaultSize={30} minSize={15}>
-              <AIChat />
+              <AIChat
+                onApplyCode={handleApplyCodeFromChat}
+                onRejectCode={handleRejectCodeFromChat}
+              />
             </ResizablePanel>
           </>
         )}

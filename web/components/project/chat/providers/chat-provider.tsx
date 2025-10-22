@@ -115,6 +115,7 @@ function ChatProvider({
             fileTree,
             contextContent,
             projectName,
+            fileName: activeFileName,
             isEditMode: false,
           }
         )

@@ -1,6 +1,7 @@
 // DB Types
 
 import { KNOWN_PLATFORMS } from "@gitwit/db/constants"
+import * as monaco from "monaco-editor"
 
 export type User = {
   id: string
@@ -112,4 +113,53 @@ export interface ConflictResolutionProps {
   onCancel: () => void
   open: boolean
   pendingPull: boolean
+}
+
+// Represents a granular block of changes in the diff view
+
+export interface DiffBlock {
+  type: "added" | "removed"
+  start: number
+  end: number
+}
+
+/**
+ * Represents a range of lines in the editor
+ */
+export interface LineRange {
+  start: number
+  end: number
+}
+
+// Configuration for diff calculation
+
+export interface DiffConfig {
+  ignoreWhitespace: boolean
+}
+
+// Result of diff calculation containing the combined view
+
+export interface DiffResult {
+  combinedLines: string[]
+  decorations: monaco.editor.IModelDeltaDecoration[]
+  granularBlocks: DiffBlock[]
+}
+
+// Persisted unresolved diff session for a file
+export interface DiffSession {
+  fileId: string
+  originalCode: string
+  mergedCode: string
+  combinedText: string
+  eol: "LF" | "CRLF"
+  unresolvedBlocks: { type: "added" | "removed"; start: number; end: number }[]
+}
+
+// Widget creation options
+
+export interface WidgetOptions {
+  kind: "accept" | "reject"
+  color: string
+  title: string
+  onClick: () => void
 }

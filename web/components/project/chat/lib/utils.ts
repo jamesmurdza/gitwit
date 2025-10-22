@@ -147,3 +147,26 @@ const stringifyContent = (content: any, seen = new WeakSet()): string => {
   return String(content)
 }
 export { getAllFiles, getCombinedContext, stringifyContent }
+/**
+ * Normalize a path by trimming and converting backslashes to forward slashes.
+ */
+const normalizePath = (p?: string | null): string =>
+  p ? p.trim().replace(/\\/g, "/") : ""
+
+/**
+ * Check whether a normalized path corresponds to a given tab (by id or name).
+ */
+const pathMatchesTab = (
+  path: string,
+  tab?: { id?: string; name?: string }
+): boolean => {
+  if (!tab?.id || !tab?.name) return false
+  return (
+    path === tab.id ||
+    path.endsWith(tab.id) ||
+    path === tab.name ||
+    path.endsWith(tab.name)
+  )
+}
+
+export { normalizePath, pathMatchesTab }

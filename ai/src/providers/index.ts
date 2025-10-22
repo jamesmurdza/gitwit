@@ -1,10 +1,10 @@
+import { bedrock } from "@ai-sdk/amazon-bedrock"
 import { anthropic } from "@ai-sdk/anthropic"
 import { openai } from "@ai-sdk/openai"
 import { generateText, LanguageModel, streamText, Tool, tool } from "ai"
 import { z } from "zod"
 import { AIProviderConfig, AIRequest, AITool } from "../types"
 import { logger, StreamHandler } from "../utils"
-import { TIERS } from "@gitwit/web/lib/tiers"
 
 /**
  * AI provider class that handles communication with different AI services
@@ -37,12 +37,17 @@ export class AIProvider {
 
     this.model = this.initializeModel(config)
 
-    // Convert AITool definitions to Vercel AI SDK tool format
-    if (config.tools) {
-      this.tools = this.convertTools(config.tools)
-    }
-
     this.logger.info("AI Provider initialized", {
+      toolCount: Object.keys(this.tools).length,
+    })
+  }
+
+  /**
+   * Set tools for this provider instance
+   */
+  setTools(aiTools: Record<string, AITool>): void {
+    this.tools = this.convertTools(aiTools)
+    this.logger.info("Tools updated", {
       toolCount: Object.keys(this.tools).length,
     })
   }
@@ -74,16 +79,22 @@ export class AIProvider {
   private initializeModel(config: AIProviderConfig): LanguageModel {
     this.logger.debug("Initializing model", {
       provider: config.provider,
-      modelId: config.modelId || TIERS.FREE.anthropicModel,
+      modelId: config.modelId,
     })
 
     switch (config.provider) {
       case "anthropic":
-        return anthropic(config.modelId || TIERS.FREE.anthropicModel)
-
+        return anthropic(config.modelId!)
       case "openai":
-        return openai(config.modelId || "gpt-4o-mini")
-
+        return openai(config.modelId!)
+      case "bedrock":
+        if (!config.region) throw new Error("AWS region required for Bedrock")
+        const modelId = config.modelId || process.env.AWS_MODEL_ID
+        if (!modelId)
+          throw new Error(
+            "Bedrock model ID required (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0')"
+          )
+        return bedrock(modelId)
       default:
         throw new Error(`Unsupported provider: ${config.provider}`)
     }
@@ -195,13 +206,15 @@ export class AIProvider {
  *
  * @example
  * ```typescript
- * // Auto-detects provider from environment
- * const provider = createAIProvider()
+ * // For direct provider usage (not with AIClient)
+ * const provider = createAIProvider({ provider: "openai", modelId: "gpt-4" })
+ * const response = await provider.generate(request)
  *
- * // Override specific settings
- * const customProvider = createAIProvider({
- *   provider: "openai",
- *   modelId: "gpt-4"
+ * // For use with AIClient, use providerConfig instead:
+ * const client = createAIClient({
+ *   userId: "123",
+ *   providerConfig: { provider: "openai", modelId: "gpt-4" },
+ *   tools: myTools
  * })
  * ```
  */
@@ -210,6 +223,7 @@ export function createAIProvider(
 ): AIProvider {
   const config: AIProviderConfig = {
     provider: "anthropic",
+    modelId: "claude-sonnet-4-20250514",
     ...overrides,
   }
 
@@ -221,6 +235,19 @@ export function createAIProvider(
     } else if (process.env.OPENAI_API_KEY) {
       config.provider = "openai"
       config.apiKey = process.env.OPENAI_API_KEY
+    } else if (
+      process.env.AWS_ACCESS_KEY_ID &&
+      process.env.AWS_SECRET_ACCESS_KEY
+    ) {
+      config.provider = "bedrock"
+      config.region = process.env.AWS_REGION || "us-east-1"
+      config.modelId = process.env.AWS_MODEL_ID
+      if (!config.modelId) {
+        logger.warn(
+          "Bedrock selected but no model ID provided; defaulting to Claude 3 Sonnet"
+        )
+        config.modelId = "anthropic.claude-3-sonnet-20240229-v1:0"
+      }
     }
   } else {
     // Set the appropriate API key based on the explicitly chosen provider
@@ -228,6 +255,13 @@ export function createAIProvider(
       config.apiKey = process.env.ANTHROPIC_API_KEY
     } else if (overrides.provider === "openai" && process.env.OPENAI_API_KEY) {
       config.apiKey = process.env.OPENAI_API_KEY
+    } else if (overrides.provider === "bedrock") {
+      config.region = overrides.region || process.env.AWS_REGION || "us-east-1"
+      if (!config.modelId) {
+        config.modelId =
+          process.env.AWS_MODEL_ID ||
+          "anthropic.claude-3-sonnet-20240229-v1:0"
+      }
     }
   }
 

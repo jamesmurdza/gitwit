@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import * as React from "react"
 // import { type ContextTab } from "../lib/types"
+import { CodeApplyProvider } from "../contexts/code-apply-context"
 import { stringifyContent } from "../lib/utils"
 import { ContextTab } from "./context-tab"
 
@@ -27,6 +28,8 @@ export type MessageProps = {
   children: React.ReactNode
   className?: string
   context?: ContextTab[]
+  onApplyCode?: (code: string, language?: string) => Promise<void>
+  onRejectCode?: () => void
 } & React.HTMLProps<HTMLDivElement>
 
 export type MessageContextValue = {
@@ -49,6 +52,8 @@ const Message = ({
   className,
   role,
   context,
+  onApplyCode,
+  onRejectCode,
   ...props
 }: MessageProps) => (
   <MessageContext.Provider value={{ role, context }}>
@@ -60,7 +65,16 @@ const Message = ({
       )}
       {...props}
     >
-      {children}
+      {role === "assistant" && onApplyCode && onRejectCode ? (
+        <CodeApplyProvider
+          onApplyCode={onApplyCode}
+          onRejectCode={onRejectCode}
+        >
+          {children}
+        </CodeApplyProvider>
+      ) : (
+        children
+      )}
     </div>
   </MessageContext.Provider>
 )
@@ -138,7 +152,7 @@ const MessageContent = ({
   return (
     <div
       className={cn(
-        "flex flex-col gap-0.5 max-w-[90%] sm:max-w-[85%] group pb-1",
+        "flex flex-col gap-0.5 max-w-full sm:max-w-full group pb-1",
         role === "assistant" ? "items-start" : "items-end"
       )}
     >

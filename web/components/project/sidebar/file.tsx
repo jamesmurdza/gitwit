@@ -17,17 +17,27 @@ import { useAppStore } from "@/store/context"
 import { useDraggable } from "@dnd-kit/react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useParams } from "next/navigation"
+import { useDiffSessionManager } from "../hooks/useDiffSessionManager"
 import { useFileContent, useFileTree } from "../hooks/useFile"
 
 const HOVER_PREFETCH_DELAY = 100
 const SidebarFile = memo((props: TFile) => {
   const { id: projectId } = useParams<{ id: string }>()
-  const setActiveTab = useAppStore((s) => s.setActiveTab)
   const queryClient = useQueryClient()
   const { deleteFile, renameFile, isDeletingFile } = useFileTree()
   const { prefetchFileContent } = useFileContent({
     id: props.id,
   })
+
+  // Get the diff functions from the project layout context
+  const diffFunctions = useAppStore((s) => s.diffFunctions)
+  const { handleSetActiveTab } = useDiffSessionManager(
+    diffFunctions?.hasActiveWidgets || (() => false),
+    diffFunctions?.getUnresolvedSnapshot || (() => null),
+    diffFunctions?.restoreFromSnapshot || (() => {}),
+    diffFunctions?.clearVisuals || (() => {}),
+    diffFunctions?.forceClearAllDecorations || (() => {})
+  )
   const { ref, isDragging } = useDraggable({
     id: props.id,
     type: props.type,
@@ -48,7 +58,7 @@ const SidebarFile = memo((props: TFile) => {
         fileId: props.id,
       })
     )
-    setActiveTab(newTab)
+    handleSetActiveTab(newTab)
   }
   const handleMouseEnter = () => {
     if (!editing && !isDeletingFile) {

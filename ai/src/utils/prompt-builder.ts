@@ -1,4 +1,3 @@
-import { templateConfigs } from "@gitwit/templates"
 import { AIRequest } from "../types"
 
 /**
@@ -23,13 +22,11 @@ export class PromptBuilder {
    * @returns Generated system prompt string tailored to the request
    */
   build(request: AIRequest): string {
-    const { mode, context } = request
+    const { mode } = request
 
     switch (mode) {
       case "edit":
         return this.buildEditPrompt(request)
-      case "merge":
-        return this.buildMergePrompt(request)
       case "chat":
       default:
         return this.buildChatPrompt(request)
@@ -45,9 +42,10 @@ export class PromptBuilder {
    */
   private buildChatPrompt(request: AIRequest): string {
     const { context } = request
-    const templateConfig = context.templateType
-      ? templateConfigs[context.templateType]
-      : null
+    const templateConfig =
+      context.templateType && context.templateConfigs
+        ? context.templateConfigs[context.templateType]
+        : null
 
     let prompt = `You are an intelligent programming assistant for a ${
       context.templateType || "web"
@@ -69,8 +67,8 @@ ${JSON.stringify(templateConfig.scripts, null, 2)}
 `
     }
 
-    if (context.activeFile) {
-      prompt += `\n\nActive File Content:\n${context.activeFile}`
+    if (context.activeFileContent) {
+      prompt += `\n\nActive File Content:\n${context.activeFileContent}`
     }
     if (context.contextContent) {
       prompt += `\n\nAdditional Context(selected files):\n${context.contextContent}`
@@ -78,11 +76,63 @@ ${JSON.stringify(templateConfig.scripts, null, 2)}
 
     prompt += `
 
-Please respond concisely. When providing code:
-1. Format it using triple backticks with the appropriate language identifier
-2. Always specify the complete file path relative to the project root
-3. For new files, add "(new file)" after the path
-4. Keep responses brief and to the point`
+🚨 CRITICAL INSTRUCTION: When providing code changes, show ONLY the modified sections, not the entire file.
+
+MANDATORY Rules for code changes:
+1. Show only the lines that need to be changed
+2. Include a few lines of context before and after the changes for clarity
+3. 🚨 ALWAYS use comments like "// ... existing code ..." to indicate unchanged sections in code even when unchanged code is boiler plate code similar to example formats.
+4. For deletions: Use comments like "// REMOVED: [description of what was removed]" to indicate deleted code
+5. For additions: Use comments like "// NEW: [description of what was added]" to indicate new code
+6. Format using triple backticks with the appropriate language identifier
+7. CRITICAL: Always specify the complete file path relative to the project root
+8. For new files, add "(new file)" after the path
+9. Before any code block, include a line like "File: /path/to/file.ext" to indicate which file the code belongs to
+10. Keep responses brief and to the point
+
+🚨 NEVER show complete files. ALWAYS use "// ... existing code ..." comments for unchanged sections.
+
+Example format for additions:
+File: /src/components/Button.tsx
+\`\`\`tsx
+// ... existing imports ...
+
+export function Button({ onClick, children }: ButtonProps) {
+  // ... existing code ...
+  const handleClick = () => {
+    console.log('Button clicked'); // NEW: Added logging
+    onClick?.();
+  };
+  // ... existing code ...
+}
+\`\`\`
+
+Example format for deletions:
+File: /src/components/Button.tsx
+\`\`\`tsx
+// ... existing imports ...
+
+export function Button({ onClick, children }: ButtonProps) {
+  // ... existing code ...
+  // REMOVED: Old handleClick function with console.log
+  const handleClick = () => {
+    onClick?.();
+  };
+  // ... existing code ...
+}
+\`\`\`
+
+For HTML files, use:
+\`\`\`html
+// ... existing code ...
+<head>
+  // ... existing code ...
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App</title>
+  // ... existing code ...
+</head>
+// ... existing code ...
+\`\`\``
 
     return prompt
   }
@@ -106,54 +156,11 @@ Rules:
 - Preserve the exact formatting and style of the existing code
 - If multiple edits are needed, show them in order of appearance
 
-Current file: ${context.activeFile || "unknown"}
-${context.activeFile ? `\nFile content:\n${context.activeFile}` : ""}`
-  }
-
-  /**
-   * Builds a merge-focused system prompt for code merging tasks
-   * Emphasizes strict rules for merging new code with existing files
-   *
-   * @param request - AI request object with merge context
-   * @returns System prompt optimized for code merging operations
-   */
-  private buildMergePrompt(request: AIRequest): string {
-    const { context } = request
-
-    return `You are a code merging assistant. Your task is to merge the new code snippet with the original file content while following these strict rules:
-
-1. Code Integration Rules:
-   - ONLY use code from the provided new code snippet
-   - DO NOT add any new code that isn't in the snippet
-   - DO NOT modify existing code unless directly replaced by the snippet
-   - Preserve all existing imports, exports, and component structure
-
-2. Structure Preservation:
-   - Keep the original file's organization intact
-   - Maintain existing code patterns and style
-   - Preserve all comments and documentation
-   - Keep type definitions and interfaces unchanged
-
-3. Merge Guidelines:
-   - Replace the exact portions of code that match the snippet's context
-   - If the snippet contains new code, place it in the most logical location
-   - Maintain consistent indentation and formatting
-   - Keep existing error handling and type safety
-
-4. Output Requirements:
-   - Return ONLY the final merged code
-   - Do not include:
-     • Code fence markers (\`\`\`)
-     • Language identifiers
-     • Explanations or comments about changes
-     • Markdown formatting
-     • Line numbers
-     • Any text before or after the code
-
-The output must be the exact code that will replace the existing file content, nothing more and nothing less.
-
-IMPORTANT: Never add any code that isn't explicitly provided in the new code snippet.
-
-Current file: ${context.activeFile || "unknown"}`
+Current file: ${context.fileName || "unknown"}
+${
+  context.activeFileContent
+    ? `\nFile content:\n${context.activeFileContent}`
+    : ""
+}`
   }
 }

@@ -27,7 +27,6 @@
     "php"
   ],
   "devDependencies": {
-    "typescript": "^5.8.3",
-    "@types/node": "^20.19.1"
+    "typescript": "^5.8.3"
   }
 }
