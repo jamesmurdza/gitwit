@@ -17,6 +17,7 @@ import { getCombinedContext } from "../lib/utils"
 
 type ChatProviderProps = {
   activeFileContent: string
+  activeFileName: string
   projectType: string
   fileTree: (TFile | TFolder)[]
   projectName: string
@@ -25,6 +26,7 @@ type ChatProviderProps = {
 
 type ChatContextType = {
   activeFileContent?: string
+  activeFileName?: string
   messages: Message[]
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   input: string
@@ -42,6 +44,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
 function ChatProvider({
   activeFileContent,
+  activeFileName,
   projectType,
   fileTree,
   projectName,
@@ -179,6 +182,7 @@ function ChatProvider({
   const contextValue = useMemo(
     () => ({
       activeFileContent,
+      activeFileName,
       messages,
       setMessages,
       input,
@@ -193,6 +197,7 @@ function ChatProvider({
     }),
     [
       activeFileContent,
+      activeFileName,
       messages,
       input,
       isGenerating,

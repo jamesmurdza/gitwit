@@ -151,6 +151,7 @@ export default function ProjectLayout({
       {...{
         fileTree,
         activeFileContent,
+        activeFileName: activeTab?.name ?? "",
         projectName,
         projectType,
       }}
