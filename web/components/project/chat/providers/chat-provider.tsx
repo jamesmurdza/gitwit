@@ -4,7 +4,14 @@ import { useAppStore } from "@/store/context"
 import { useQueryClient } from "@tanstack/react-query"
 import { readStreamableValue } from "ai/rsc"
 import { useParams } from "next/navigation"
-import React, { createContext, ReactNode, useRef, useState } from "react"
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import type { ContextTab, Message } from "../lib/types"
 import { getCombinedContext } from "../lib/utils"
 
@@ -51,102 +58,157 @@ function ChatProvider({
   const [contextTabs, setContextTabs] = useState<ContextTab[]>([])
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  const addContextTab = (newTab: ContextTab) => {
+  const addContextTab = useCallback((newTab: ContextTab) => {
     setContextTabs((prev) => [...prev, newTab])
-  }
+  }, [])
 
-  const removeContextTab = (id: string) => {
+  const removeContextTab = useCallback((id: string) => {
     setContextTabs((prev) => prev.filter((tab) => tab.id !== id))
-  }
+  }, [])
 
-  const sendMessage = async (message: string) => {
-    if (!message.trim()) return
-    const userMessage: Message = {
-      role: "user",
-      content: message,
-      context: contextTabs,
-    }
-    const updatedMessages = [...messages, userMessage]
-    setMessages(updatedMessages)
-    setContextTabs([])
-    setInput("")
-    setIsGenerating(true)
-    setIsLoading(true)
-    const contextContent = await getCombinedContext({
+  // Throttle streaming updates to reduce render frequency
+  const throttledSetMessages = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  )
+  const updateAssistantMessage = useCallback((buffer: string) => {
+    setMessages((prev) => {
+      const updated = [...prev]
+      updated[updated.length - 1].content = buffer
+      return updated
+    })
+  }, [])
+
+  const sendMessage = useCallback(
+    async (message: string) => {
+      if (!message.trim()) return
+      setIsGenerating(true)
+      setIsLoading(true)
+
+      // Batch state updates
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: message, context: contextTabs },
+      ])
+      setInput("")
+
+      const contextContent = await getCombinedContext({
+        contextTabs,
+        queryClient,
+        projectId,
+        drafts,
+      })
+      setContextTabs([])
+
+      abortControllerRef.current = new AbortController()
+      try {
+        const { output } = await streamChat(
+          [
+            ...messages,
+            { role: "user", content: message, context: contextTabs },
+          ],
+          {
+            templateType: projectType,
+            activeFileContent,
+            fileTree,
+            contextContent,
+            projectName,
+            isEditMode: false,
+          }
+        )
+        setMessages((prev) => [...prev, { role: "assistant", content: "" }])
+        let buffer = ""
+        let firstChunk = true
+        for await (const chunk of readStreamableValue(output)) {
+          if (abortControllerRef.current?.signal.aborted) break
+          buffer += chunk
+          if (firstChunk) {
+            setIsLoading(false)
+            firstChunk = false
+          }
+          // Throttle updates to every 50ms
+          if (!throttledSetMessages.current) {
+            throttledSetMessages.current = setTimeout(() => {
+              updateAssistantMessage(buffer)
+              throttledSetMessages.current = null
+            }, 50)
+          }
+        }
+        // Final update after stream ends
+        updateAssistantMessage(buffer)
+      } catch (error: any) {
+        if (error.name === "AbortError") {
+          console.log("Generation aborted")
+        } else {
+          console.error("Error:", error)
+          setMessages((prev) => {
+            const updated = [...prev]
+            updated[updated.length - 1].content =
+              error.message || "Sorry, an error occurred."
+            return updated
+          })
+        }
+      } finally {
+        setIsGenerating(false)
+        setIsLoading(false)
+        abortControllerRef.current = null
+        if (throttledSetMessages.current) {
+          clearTimeout(throttledSetMessages.current)
+          throttledSetMessages.current = null
+        }
+      }
+    },
+    [
       contextTabs,
       queryClient,
       projectId,
       drafts,
-    })
-    abortControllerRef.current = new AbortController()
-    try {
-      const { output } = await streamChat(updatedMessages, {
-        templateType: projectType,
-        activeFileContent,
-        fileTree,
-        contextContent,
-        projectName,
-        isEditMode: false,
-      })
-      const assistantMessage: Message = { role: "assistant", content: "" }
-      setMessages([...updatedMessages, assistantMessage])
-      let buffer = ""
-      let firstChunk = true
-      for await (const chunk of readStreamableValue(output)) {
-        if (abortControllerRef.current?.signal.aborted) break
-        buffer += chunk
-        if (firstChunk) {
-          setIsLoading(false)
-          firstChunk = false
-        }
-        setMessages((prev) => {
-          const updated = [...prev]
-          updated[updated.length - 1].content = buffer
-          return updated
-        })
-      }
-    } catch (error: any) {
-      if (error.name === "AbortError") {
-        console.log("Generation aborted")
-      } else {
-        console.error("Error:", error)
-        setMessages((prev) => {
-          const updated = [...prev]
-          updated[updated.length - 1].content =
-            error.message || "Sorry, an error occurred."
-          return updated
-        })
-      }
-    } finally {
-      setIsGenerating(false)
-      setIsLoading(false)
-      abortControllerRef.current = null
-    }
-  }
+      projectType,
+      activeFileContent,
+      fileTree,
+      projectName,
+      messages,
+      updateAssistantMessage,
+    ]
+  )
 
-  const stopGeneration = () => {
+  const stopGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
-  }
+  }, [])
+
+  // Memoize context value to avoid unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      activeFileContent,
+      messages,
+      setMessages,
+      input,
+      setInput,
+      isGenerating,
+      isLoading,
+      contextTabs,
+      addContextTab,
+      removeContextTab,
+      sendMessage,
+      stopGeneration,
+    }),
+    [
+      activeFileContent,
+      messages,
+      input,
+      isGenerating,
+      isLoading,
+      contextTabs,
+      addContextTab,
+      removeContextTab,
+      sendMessage,
+      stopGeneration,
+      setMessages,
+      setInput,
+    ]
+  )
 
   return (
-    <ChatContext.Provider
-      value={{
-        activeFileContent,
-        messages,
-        setMessages,
-        input,
-        setInput,
-        isGenerating,
-        isLoading,
-        contextTabs,
-        addContextTab,
-        removeContextTab,
-        sendMessage,
-        stopGeneration,
-      }}
-    >
-      {children}
-    </ChatContext.Provider>
+    <ChatContext.Provider value={contextValue}>{children}</ChatContext.Provider>
   )
 }
 
