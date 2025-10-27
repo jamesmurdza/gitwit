@@ -6,8 +6,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { userRouter } from "@/lib/api"
 import { Provider, ProviderConfig } from "@/lib/types"
 import { apiClient } from "@/server/client"
+import { useQueryClient } from "@tanstack/react-query"
 import { Check, ExternalLink, Eye, EyeOff, Key, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -27,6 +29,7 @@ export default function ProviderCard({
   configuredModel,
   onUpdate,
 }: ProviderCardProps) {
+  const queryClient = useQueryClient()
   const [isEditing, setIsEditing] = useState(false)
   const [showKey, setShowKey] = useState(false)
   const [apiKey, setApiKey] = useState("")
@@ -76,6 +79,8 @@ export default function ProviderCard({
         setAwsAccessKeyId("")
         setAwsSecretAccessKey("")
         onUpdate()
+        // Invalidate the available models query so it refreshes in the chat input
+        queryClient.invalidateQueries(userRouter.availableModels.getOptions())
       } else {
         const error = await response.text()
         toast.error(`Failed to save API key: ${error}`)
@@ -98,6 +103,8 @@ export default function ProviderCard({
       if (response.ok) {
         toast.success(`${config.name} API key deleted successfully`)
         onUpdate()
+        // Invalidate the available models query so it refreshes in the chat input
+        queryClient.invalidateQueries(userRouter.availableModels.getOptions())
       } else {
         const error = await response.text()
         toast.error(`Failed to delete API key: ${error}`)

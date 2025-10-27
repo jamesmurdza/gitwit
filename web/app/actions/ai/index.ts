@@ -3,12 +3,9 @@
 import { defaultTools } from "@/lib/ai/tools"
 import { TFile, TFolder } from "@/lib/types"
 import { currentUser } from "@clerk/nextjs/server"
-import { AIMessage, AIProviderConfig, createAIClient } from "@gitwit/ai"
-import { db } from "@gitwit/db"
-import { user as userTable } from "@gitwit/db/schema"
-import { decrypt } from "@gitwit/lib/utils/encryption"
+import { AIMessage, createAIClient } from "@gitwit/ai"
 import { templateConfigs } from "@gitwit/templates"
-import { eq } from "drizzle-orm"
+import { getUserProviderConfig } from "./helpers"
 
 interface BaseContext {
   templateType?: string
@@ -18,83 +15,6 @@ interface BaseContext {
   projectId?: string
   projectName?: string
   fileName?: string
-}
-
-/**
- * Fetch and decrypt user's custom API keys, returning provider configuration
- * Falls back to system environment variables if user hasn't configured custom keys
- */
-async function getUserProviderConfig(
-  userId: string
-): Promise<Partial<AIProviderConfig> | undefined> {
-  try {
-    const userRecord = await db.query.user.findFirst({
-      where: eq(userTable.id, userId),
-    })
-
-    if (!userRecord || !userRecord.apiKeys) {
-      return undefined // Will use system defaults
-    }
-
-    const encryptedKeys = userRecord.apiKeys as Record<string, string>
-
-    // Decrypt keys if they exist
-    let anthropicKey: string | undefined
-    let openaiKey: string | undefined
-    let openrouterKey: string | undefined
-    let awsAccessKey: string | undefined
-    let awsSecretKey: string | undefined
-    let awsRegion: string | undefined
-
-    if (encryptedKeys.anthropic) {
-      anthropicKey = decrypt(encryptedKeys.anthropic)
-    }
-    if (encryptedKeys.openai) {
-      openaiKey = decrypt(encryptedKeys.openai)
-    }
-    if (encryptedKeys.openrouter) {
-      openrouterKey = decrypt(encryptedKeys.openrouter)
-    }
-    if (encryptedKeys.awsAccessKeyId && encryptedKeys.awsSecretAccessKey) {
-      awsAccessKey = decrypt(encryptedKeys.awsAccessKeyId)
-      awsSecretKey = decrypt(encryptedKeys.awsSecretAccessKey)
-      awsRegion = encryptedKeys.awsRegion // Region is not encrypted
-    }
-
-    // Priority: OpenRouter > Anthropic > OpenAI > AWS
-    if (openrouterKey) {
-      return {
-        provider: "openrouter",
-        apiKey: openrouterKey,
-        modelId:
-          encryptedKeys.openrouterModel || "anthropic/claude-sonnet-4-20250514",
-      }
-    } else if (anthropicKey) {
-      return {
-        provider: "anthropic",
-        apiKey: anthropicKey,
-        modelId: encryptedKeys.anthropicModel || "claude-sonnet-4-20250514",
-      }
-    } else if (openaiKey) {
-      return {
-        provider: "openai",
-        apiKey: openaiKey,
-        modelId: encryptedKeys.openaiModel || "gpt-4o",
-      }
-    } else if (awsAccessKey && awsSecretKey) {
-      return {
-        provider: "bedrock",
-        region: awsRegion || "us-east-1",
-        modelId:
-          encryptedKeys.awsModel || "anthropic.claude-3-sonnet-20240229-v1:0",
-      }
-    }
-
-    return undefined // No custom keys configured, use system defaults
-  } catch (error) {
-    console.error("Failed to fetch user API keys:", error)
-    return undefined // Fall back to system defaults on error
-  }
 }
 
 export async function streamChat(messages: AIMessage[], context?: BaseContext) {

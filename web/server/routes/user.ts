@@ -636,4 +636,235 @@ export const userRouter = createRouter()
       )
     }
   )
+  // #endregion
+  // #region GET /available-models
+  .get(
+    "/available-models",
+    describeRoute({
+      tags: ["User"],
+      description:
+        "Get available AI models based on user's configured API keys",
+      responses: {
+        200: jsonContent(
+          z.object({
+            models: z.array(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                provider: z.string(),
+              })
+            ),
+            defaultModel: z.string().optional(),
+            selectedProvider: z.string().optional(),
+          }),
+          "Available models response"
+        ),
+      },
+    }),
+    async (c) => {
+      const userId = c.get("user").id
+
+      const userRecord = await db.query.user.findFirst({
+        where: (user, { eq }) => eq(user.id, userId),
+      })
+
+      if (!userRecord) {
+        return c.json({ error: "User not found" }, 404)
+      }
+
+      const apiKeys = (userRecord.apiKeys || {}) as Record<string, string>
+      const models: Array<{ id: string; name: string; provider: string }> = []
+      let defaultModel: string | undefined
+
+      // Import available models list
+      const { AVAILABLE_MODELS, DEFAULT_MODELS } = await import(
+        "@/lib/available-models"
+      )
+
+      // Helper function to check if a model ID already exists in the models array
+      const modelExists = (modelId: string) =>
+        models.some((m) => m.id === modelId)
+
+      // Priority order: OpenRouter > Anthropic > OpenAI > AWS > Default
+
+      // Add models for OpenAI and Anthropic (dropdown list)
+      if (apiKeys.openai) {
+        // Add predefined models
+        AVAILABLE_MODELS.openai.forEach((model) => {
+          models.push({ ...model, provider: "openai" })
+        })
+
+        // Add custom model if user specified one in settings and it's not already in the list
+        const customModel = apiKeys.openaiModel
+        if (customModel && !modelExists(customModel)) {
+          models.push({
+            id: customModel,
+            name: customModel,
+            provider: "openai",
+          })
+        }
+      }
+
+      if (apiKeys.anthropic) {
+        // Add predefined models
+        AVAILABLE_MODELS.anthropic.forEach((model) => {
+          models.push({ ...model, provider: "anthropic" })
+        })
+
+        // Add custom model if user specified one in settings and it's not already in the list
+        const customModel = apiKeys.anthropicModel
+        if (customModel && !modelExists(customModel)) {
+          models.push({
+            id: customModel,
+            name: customModel,
+            provider: "anthropic",
+          })
+        }
+      }
+
+      // For OpenRouter and AWS, show custom model or default
+      if (apiKeys.openrouter) {
+        const customModel = apiKeys.openrouterModel
+        if (customModel) {
+          models.push({
+            id: customModel,
+            name: customModel,
+            provider: "openrouter",
+          })
+        } else {
+          // Provide a default OpenRouter model if none specified
+          models.push({
+            id: DEFAULT_MODELS.openrouter.id,
+            name: DEFAULT_MODELS.openrouter.name,
+            provider: "openrouter",
+          })
+        }
+      }
+
+      if (apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey) {
+        const customModel = apiKeys.awsModel
+        if (customModel) {
+          models.push({
+            id: customModel,
+            name: customModel,
+            provider: "aws",
+          })
+        } else {
+          // Provide a default AWS Bedrock model if none specified
+          models.push({
+            id: DEFAULT_MODELS.aws.id,
+            name: DEFAULT_MODELS.aws.name,
+            provider: "aws",
+          })
+        }
+      }
+
+      // Determine default model based on last selected model
+      // This ensures the user's last selection is preserved
+      let selectedProvider: string | undefined
+
+      if (apiKeys.lastSelectedModel && apiKeys.lastSelectedProvider) {
+        defaultModel = apiKeys.lastSelectedModel
+        selectedProvider = apiKeys.lastSelectedProvider
+      } else {
+        // Fallback to priority order if no last selection
+        // Priority: OpenRouter > Anthropic > OpenAI > AWS
+        if (apiKeys.openrouter) {
+          defaultModel = apiKeys.openrouterModel || DEFAULT_MODELS.openrouter.id
+          selectedProvider = "openrouter"
+        } else if (apiKeys.anthropic) {
+          defaultModel =
+            apiKeys.anthropicModel ||
+            models.find((m) => m.provider === "anthropic")?.id
+          selectedProvider = "anthropic"
+        } else if (apiKeys.openai) {
+          defaultModel =
+            apiKeys.openaiModel ||
+            models.find((m) => m.provider === "openai")?.id
+          selectedProvider = "openai"
+        } else if (apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey) {
+          defaultModel = apiKeys.awsModel || DEFAULT_MODELS.aws.id
+          selectedProvider = "aws"
+        } else if (models.length > 0) {
+          // If models exist but no specific model selected, use first available
+          defaultModel = models[0].id
+          selectedProvider = models[0].provider
+        }
+      }
+
+      // If no API keys configured at all, show "Default"
+      if (models.length === 0) {
+        defaultModel = "Default"
+      }
+
+      return c.json({
+        models,
+        defaultModel,
+        selectedProvider,
+      })
+    }
+  )
+  // #endregion
+  // #region PUT /selected-model
+  .put(
+    "/selected-model",
+    describeRoute({
+      tags: ["User"],
+      description: "Update user's selected AI model",
+      responses: {
+        200: jsonContent(
+          z.object({
+            success: z.boolean(),
+            message: z.string(),
+          }),
+          "Selected model update response"
+        ),
+      },
+    }),
+    zValidator(
+      "json",
+      z.object({
+        provider: z.enum(["anthropic", "openai", "openrouter", "aws"]),
+        modelId: z.string(),
+      })
+    ),
+    async (c) => {
+      const userId = c.get("user").id
+      const { provider, modelId } = c.req.valid("json")
+
+      const userRecord = await db.query.user.findFirst({
+        where: (user, { eq }) => eq(user.id, userId),
+      })
+
+      if (!userRecord) {
+        return c.json({ error: "User not found" }, 404)
+      }
+
+      const currentApiKeys = (userRecord.apiKeys || {}) as Record<
+        string,
+        string
+      >
+
+      // Update the model for the specific provider
+      if (provider === "aws") {
+        currentApiKeys.awsModel = modelId
+      } else {
+        currentApiKeys[`${provider}Model`] = modelId
+      }
+
+      // Track the last selected provider and model to prioritize it
+      currentApiKeys.lastSelectedProvider = provider
+      currentApiKeys.lastSelectedModel = modelId
+
+      await db
+        .update(user)
+        .set({ apiKeys: currentApiKeys })
+        .where(eq(user.id, userId))
+
+      return c.json({
+        success: true,
+        message: "Selected model updated successfully",
+      })
+    }
+  )
 // #endregion
