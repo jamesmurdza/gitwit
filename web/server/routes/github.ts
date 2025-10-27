@@ -9,7 +9,7 @@ import { describeRoute } from "hono-openapi"
 import { validator as zValidator } from "hono-openapi/zod"
 import minimatch from "minimatch"
 import z from "zod"
-import { GithubSyncManager } from "../../../lib/services/GithubSyncManager"
+import { GithubSyncManager } from "@gitwit/lib/services/GithubSyncManager"
 import { githubAuth } from "../middlewares/githubAuth"
 
 export const githubRouter = createRouter()
