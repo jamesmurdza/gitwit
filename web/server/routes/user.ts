@@ -306,12 +306,27 @@ export const userRouter = createRouter()
             openrouterModel: z.string().optional(),
             hasAws: z.boolean(),
             awsModel: z.string().optional(),
+            encryptionAvailable: z.boolean(),
           }),
           "API keys configuration response"
         ),
       },
     }),
     async (c) => {
+      // Check if encryption is available
+      const { isEncryptionAvailable } = await import(
+        "@gitwit/lib/utils/encryption"
+      )
+      if (!isEncryptionAvailable()) {
+        return c.json({
+          hasAnthropic: false,
+          hasOpenai: false,
+          hasOpenrouter: false,
+          hasAws: false,
+          encryptionAvailable: false,
+        })
+      }
+
       const userId = c.get("user").id
 
       const userRecord = await db.query.user.findFirst({
@@ -333,6 +348,7 @@ export const userRouter = createRouter()
         openrouterModel: apiKeys.openrouterModel,
         hasAws: !!(apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey),
         awsModel: apiKeys.awsModel,
+        encryptionAvailable: true,
       })
     }
   )
@@ -365,6 +381,21 @@ export const userRouter = createRouter()
       })
     ),
     async (c) => {
+      // Check if encryption is available
+      const { isEncryptionAvailable, encrypt } = await import(
+        "@gitwit/lib/utils/encryption"
+      )
+      if (!isEncryptionAvailable()) {
+        return c.json(
+          {
+            success: false,
+            message:
+              "Custom API key feature is disabled. ENCRYPTION_KEY is not configured.",
+          },
+          503
+        )
+      }
+
       const userId = c.get("user").id
       const {
         provider,
@@ -387,7 +418,6 @@ export const userRouter = createRouter()
         string,
         string
       >
-      const { encrypt } = await import("@gitwit/lib/utils/encryption")
 
       // Update the appropriate keys based on provider
       if (provider === "aws") {
@@ -441,6 +471,21 @@ export const userRouter = createRouter()
       })
     ),
     async (c) => {
+      // Check if encryption is available
+      const { isEncryptionAvailable } = await import(
+        "@gitwit/lib/utils/encryption"
+      )
+      if (!isEncryptionAvailable()) {
+        return c.json(
+          {
+            success: false,
+            message:
+              "Custom API key feature is disabled. ENCRYPTION_KEY is not configured.",
+          },
+          503
+        )
+      }
+
       const userId = c.get("user").id
       const { provider } = c.req.valid("param")
 

@@ -16,6 +16,7 @@ type ConfiguredKeys = {
   openrouterModel?: string
   hasAws: boolean
   awsModel?: string
+  encryptionAvailable?: boolean
 }
 
 export default function ApiKeysSettings() {
@@ -24,6 +25,7 @@ export default function ApiKeysSettings() {
     hasOpenai: false,
     hasOpenrouter: false,
     hasAws: false,
+    encryptionAvailable: true,
   })
 
   useEffect(() => {
@@ -41,6 +43,49 @@ export default function ApiKeysSettings() {
       console.error("Failed to load API keys status:", error)
       toast.error("Failed to load API keys configuration")
     }
+  }
+
+  // Show message if encryption is not available
+  if (configuredKeys.encryptionAvailable === false) {
+    return (
+      <div className="max-w-4xl">
+        <div className="border rounded-lg p-6 bg-muted/30">
+          <h3 className="font-semibold mb-2">Custom API Keys Not Available</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            The custom API key feature requires the{" "}
+            <code className="px-1.5 py-0.5 bg-muted rounded text-xs">
+              ENCRYPTION_KEY
+            </code>{" "}
+            environment variable to be configured on the server.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            To enable this feature, set the{" "}
+            <code className="px-1.5 py-0.5 bg-muted rounded text-xs">
+              ENCRYPTION_KEY
+            </code>{" "}
+            in your server&apos;s environment variables and restart the
+            application.
+          </p>
+          <details className="mt-4">
+            <summary className="text-sm font-medium cursor-pointer">
+              How to generate an encryption key
+            </summary>
+            <div className="mt-2 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Run one of these commands to generate a secure key:
+              </p>
+              <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
+                node -e
+                &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&apos;hex&apos;))&quot;
+              </pre>
+              <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
+                openssl rand -base64 32
+              </pre>
+            </div>
+          </details>
+        </div>
+      </div>
+    )
   }
 
   return (
