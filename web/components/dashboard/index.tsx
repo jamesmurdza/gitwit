@@ -1,5 +1,9 @@
 "use client"
 
+import AboutModal from "@/components/dashboard/about"
+import NewProjectModal from "@/components/dashboard/new-project"
+import DashboardProjects from "@/components/dashboard/projects"
+import DashboardSettings from "@/components/dashboard/settings"
 import { Button } from "@/components/ui/button"
 import CustomButton from "@/components/ui/customButton"
 import { Sandbox, User } from "@/lib/types"
@@ -8,10 +12,6 @@ import { Code2, FolderDot, HelpCircle, Plus, Settings } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import AboutModal from "@/components/dashboard/about"
-import NewProjectModal from "@/components/dashboard/newProject"
-import DashboardProjects from "@/components/dashboard/projects"
-import DashboardSettings from "@/components/dashboard/settings"
 
 type TScreen = "projects" | "shared" | "settings" | "search"
 
