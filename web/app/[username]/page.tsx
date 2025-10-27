@@ -1,8 +1,8 @@
-import ProfilePage from "@/components/profile"
-import ProfileNavbar from "@/components/profile/navbar"
+import ProfilePage from "@/components/dashboard/settings/profile"
+import ProfileNavbar from "@/components/dashboard/settings/profile/profile-navbar"
 import { SandboxWithLiked } from "@/lib/types"
 import { apiClient } from "@/server/client"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
 export default async function Page({
   params,
@@ -27,6 +27,15 @@ export default async function Page({
   }
 
   const profileOwner = (await profileOwnerResponse.json()).data
+
+  // If logged in user is viewing their own profile, redirect to dashboard settings
+  if (loggedInUserResponse.ok) {
+    const loggedInUser = (await loggedInUserResponse.json()).data
+    if (profileOwner?.id === loggedInUser.id) {
+      redirect("/dashboard?tab=settings")
+    }
+  }
+
   const publicSandboxes: SandboxWithLiked[] = []
   const privateSandboxes: SandboxWithLiked[] = []
 
@@ -37,6 +46,7 @@ export default async function Page({
       privateSandboxes.push(sandbox as SandboxWithLiked)
     }
   })
+
   if (!loggedInUserResponse.ok) {
     return (
       <section>
@@ -50,9 +60,10 @@ export default async function Page({
       </section>
     )
   }
-  const loggedInUser = (await loggedInUserResponse.json()).data
 
+  const loggedInUser = (await loggedInUserResponse.json()).data
   const isUserLoggedIn = Boolean(loggedInUser?.id)
+
   return (
     <section>
       <ProfileNavbar userData={loggedInUser} />

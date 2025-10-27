@@ -5,6 +5,7 @@ import { TFile, TFolder } from "@/lib/types"
 import { currentUser } from "@clerk/nextjs/server"
 import { AIMessage, createAIClient } from "@gitwit/ai"
 import { templateConfigs } from "@gitwit/templates"
+import { getUserProviderConfig } from "./helpers"
 
 interface BaseContext {
   templateType?: string
@@ -22,6 +23,9 @@ export async function streamChat(messages: AIMessage[], context?: BaseContext) {
     throw new Error("Unauthorized")
   }
 
+  // Fetch user's custom API keys and determine provider configuration
+  const providerConfig = await getUserProviderConfig(user.id)
+
   const aiClient = await createAIClient({
     userId: user.id,
     projectId: context?.projectId,
@@ -29,6 +33,7 @@ export async function streamChat(messages: AIMessage[], context?: BaseContext) {
     fileName: context?.fileName,
     tools: defaultTools,
     disableTools: false,
+    providerConfig,
   })
 
   return aiClient.streamChat({
@@ -58,6 +63,9 @@ export async function processEdit(
     throw new Error("Unauthorized")
   }
 
+  // Fetch user's custom API keys and determine provider configuration
+  const providerConfig = await getUserProviderConfig(user.id)
+
   const aiClient = await createAIClient({
     userId: user.id,
     projectId: context?.projectId,
@@ -65,6 +73,7 @@ export async function processEdit(
     fileName: context?.fileName,
     tools: defaultTools,
     disableTools: true, // Tools disabled for edit mode
+    providerConfig,
   })
 
   return aiClient.processEdit({
@@ -97,11 +106,15 @@ export async function mergeCode(
   console.log("🔀 Code Merge - Partial Code:", partialCode)
   console.log("🔀 Code Merge - Original Code Length:", originalCode.length)
 
+  // Fetch user's custom API keys and determine provider configuration
+  const providerConfig = await getUserProviderConfig(user.id)
+
   const aiClient = await createAIClient({
     userId: user.id,
     projectId: projectId,
     tools: {},
     disableTools: true,
+    providerConfig,
   })
 
   try {

@@ -28,6 +28,8 @@
     "./services/ConnectionManager": "./dist/services/ConnectionManager.js",
     "./services/DokkuClient": "./dist/services/DokkuClient.js",
     "./services/FileManager": "./dist/services/FileManager.js",
+    "./services/github": "./dist/services/github.js",
+    "./services/GithubSyncManager": "./dist/services/GithubSyncManager.js",
     "./services/Project": "./dist/services/Project.js",
     "./services/ProjectHandlers": "./dist/services/ProjectHandlers.js",
     "./services/SecureGitClient": "./dist/services/SecureGitClient.js",
@@ -36,6 +38,7 @@
     "./services/TerminalManager": "./dist/services/TerminalManager.js",
     "./utils/clerk": "./dist/utils/clerk.js",
     "./utils/constants": "./dist/utils/constants.js",
+    "./utils/encryption": "./dist/utils/encryption.js",
     "./utils/lock": "./dist/utils/lock.js",
     "./utils/ratelimit": "./dist/utils/ratelimit.js",
     "./utils/types": "./dist/utils/types.js"

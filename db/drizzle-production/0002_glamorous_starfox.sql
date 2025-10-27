@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "apiKeys" json DEFAULT '{}'::json NOT NULL;

@@ -451,3 +451,44 @@ export type FileTree = NonNullable<
 >
 
 // #endregion
+
+// #region User
+export const userRouter = router("user", {
+  availableModels: router.query({
+    fetcher: async () => {
+      const res = await apiClient.user["available-models"].$get()
+      if (!res.ok) {
+        throw new Error("Failed to fetch available models")
+      }
+      const data = await res.json()
+      return data
+    },
+  }),
+  updateSelectedModel: router.mutation({
+    mutationFn: async ({
+      provider,
+      modelId,
+    }: {
+      provider: "anthropic" | "openai" | "openrouter" | "aws"
+      modelId: string
+    }) => {
+      const res = await apiClient.user["selected-model"].$put({
+        json: {
+          provider,
+          modelId,
+        },
+      })
+      if (!res.ok) {
+        throw new Error("Failed to update selected model")
+      }
+      const data = await res.json()
+      return data
+    },
+  }),
+})
+
+export type AvailableModels = Awaited<
+  ReturnType<typeof userRouter.availableModels.fetcher>
+>
+
+// #endregion
