@@ -1,147 +1,18 @@
-"use client"
-
-import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Provider, ProviderConfig } from "@/lib/types"
 import { apiClient } from "@/server/client"
 import { Check, ExternalLink, Eye, EyeOff, Key, Trash2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 
-type Provider = "anthropic" | "openai" | "openrouter" | "aws"
-
-interface ProviderConfig {
-  name: string
-  description: string
-  placeholder: string
-  modelPlaceholder: string
-  docsUrl: string
-  dashboardUrl: string
-}
-
-const PROVIDERS: Record<Provider, ProviderConfig> = {
-  anthropic: {
-    name: "Anthropic (Claude)",
-    description: "Use Claude models from Anthropic",
-    placeholder: "sk-ant-...",
-    modelPlaceholder: "claude-sonnet-4-20250514",
-    docsUrl: "https://docs.anthropic.com/",
-    dashboardUrl: "https://console.anthropic.com/settings/keys",
-  },
-  openai: {
-    name: "OpenAI",
-    description: "Use GPT models from OpenAI",
-    placeholder: "sk-...",
-    modelPlaceholder: "gpt-4o",
-    docsUrl: "https://platform.openai.com/docs",
-    dashboardUrl: "https://platform.openai.com/api-keys",
-  },
-  openrouter: {
-    name: "OpenRouter",
-    description: "Access multiple AI models through OpenRouter",
-    placeholder: "sk-or-v1-...",
-    modelPlaceholder: "anthropic/claude-sonnet-4-20250514",
-    docsUrl: "https://openrouter.ai/docs",
-    dashboardUrl: "https://openrouter.ai/keys",
-  },
-  aws: {
-    name: "AWS Bedrock",
-    description: "Use AWS Bedrock for AI models",
-    placeholder: "Access Key ID",
-    modelPlaceholder: "anthropic.claude-3-sonnet-20240229-v1:0",
-    docsUrl: "https://docs.aws.amazon.com/bedrock/",
-    dashboardUrl: "https://console.aws.amazon.com/bedrock/",
-  },
-}
-
-export default function ApiKeysSettings() {
-  const [configuredKeys, setConfiguredKeys] = useState({
-    hasAnthropic: false,
-    anthropicModel: undefined as string | undefined,
-    hasOpenai: false,
-    openaiModel: undefined as string | undefined,
-    hasOpenrouter: false,
-    openrouterModel: undefined as string | undefined,
-    hasAws: false,
-    awsModel: undefined as string | undefined,
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadApiKeysStatus()
-  }, [])
-
-  const loadApiKeysStatus = async () => {
-    try {
-      const response = await apiClient.user["api-keys"].$get()
-      if (response.ok) {
-        const data = await response.json()
-        setConfiguredKeys(data)
-      }
-    } catch (error) {
-      console.error("Failed to load API keys status:", error)
-      toast.error("Failed to load API keys configuration")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold mb-2">API Keys</h2>
-        <p className="text-muted-foreground">
-          Configure your own API keys for AI providers. Your keys are encrypted
-          and stored securely. If no custom keys are provided, system defaults
-          will be used.
-        </p>
-      </div>
-
-      <div className="grid gap-6">
-        {(Object.entries(PROVIDERS) as [Provider, ProviderConfig][]).map(
-          ([provider, config]) => {
-            const isConfigured = (
-              provider === "aws"
-                ? configuredKeys.hasAws
-                : configuredKeys[
-                    `has${
-                      provider.charAt(0).toLocaleUpperCase() + provider.slice(1)
-                    }` as keyof typeof configuredKeys
-                  ]
-            ) as boolean
-
-            const configuredModel =
-              provider === "aws"
-                ? configuredKeys.awsModel
-                : configuredKeys[
-                    `${provider}Model` as keyof typeof configuredKeys
-                  ]
-
-            return (
-              <ProviderCard
-                key={provider}
-                provider={provider}
-                config={config}
-                isConfigured={isConfigured}
-                configuredModel={configuredModel as string | undefined}
-                onUpdate={loadApiKeysStatus}
-              />
-            )
-          }
-        )}
-      </div>
-    </div>
-  )
-}
-
-interface ProviderCardProps {
+export interface ProviderCardProps {
   provider: Provider
   config: ProviderConfig
   isConfigured: boolean
@@ -149,7 +20,7 @@ interface ProviderCardProps {
   onUpdate: () => void
 }
 
-function ProviderCard({
+export default function ProviderCard({
   provider,
   config,
   isConfigured,
@@ -240,57 +111,61 @@ function ProviderCard({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 flex-1">
+    <AccordionItem value={provider} className="border rounded-lg">
+      <div className="flex items-center justify-between px-4">
+        <AccordionTrigger className="hover:no-underline py-4 flex-1 pr-4">
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <CardTitle className="text-lg">{config.name}</CardTitle>
-              {isConfigured && !isEditing && (
-                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+              <span className="font-medium">{config.name}</span>
+              {isConfigured && (
+                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-2 py-0.5 rounded-full">
                   <Check className="size-3" />
                   <span>Configured</span>
                 </div>
               )}
             </div>
-            <CardDescription>{config.description}</CardDescription>
+            {configuredModel && (
+              <code className="text-xs px-2 py-0.5 bg-muted rounded font-mono text-muted-foreground">
+                {configuredModel}
+              </code>
+            )}
           </div>
-          <div className="flex items-center gap-2">
+        </AccordionTrigger>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="smIcon"
+            asChild
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <a
+              href={config.dashboardUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Get API Key"
+            >
+              <ExternalLink className="size-4" />
+            </a>
+          </Button>
+          {isConfigured && (
             <Button
               variant="ghost"
               size="smIcon"
-              asChild
-              className="text-muted-foreground"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
             >
-              <a
-                href={config.dashboardUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Get API Key"
-              >
-                <ExternalLink className="size-4" />
-              </a>
+              <Trash2 className="size-4" />
             </Button>
-            {isConfigured && !isEditing && (
-              <Button
-                variant="ghost"
-                size="smIcon"
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            )}
-          </div>
+          )}
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <AccordionContent className="pb-4 pt-2 px-4">
         {!isConfigured || isEditing ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {provider === "aws" ? (
               <>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor={`${provider}-access-key`}>
                     AWS Access Key ID
                   </Label>
@@ -302,7 +177,7 @@ function ProviderCard({
                     onChange={(e) => setAwsAccessKeyId(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor={`${provider}-secret-key`}>
                     AWS Secret Access Key
                   </Label>
@@ -330,7 +205,7 @@ function ProviderCard({
                     </Button>
                   </div>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor={`${provider}-region`}>AWS Region</Label>
                   <Input
                     id={`${provider}-region`}
@@ -340,9 +215,10 @@ function ProviderCard({
                     onChange={(e) => setAwsRegion(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor={`${provider}-model`}>
-                    Model ID (Optional)
+                <div className="space-y-1.5">
+                  <Label htmlFor={`${provider}-model`} className="text-sm">
+                    Model ID{" "}
+                    <span className="text-muted-foreground">(Optional)</span>
                   </Label>
                   <Input
                     id={`${provider}-model`}
@@ -358,7 +234,7 @@ function ProviderCard({
               </>
             ) : (
               <>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor={`${provider}-key`}>API Key</Label>
                   <div className="relative">
                     <Input
@@ -384,9 +260,10 @@ function ProviderCard({
                     </Button>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor={`${provider}-model`}>
-                    Model ID (Optional)
+                <div className="space-y-1.5">
+                  <Label htmlFor={`${provider}-model`} className="text-sm">
+                    Model ID{" "}
+                    <span className="text-muted-foreground">(Optional)</span>
                   </Label>
                   <Input
                     id={`${provider}-model`}
@@ -401,9 +278,9 @@ function ProviderCard({
                 </div>
               </>
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-1">
               <Button onClick={handleSave} disabled={isSaving} size="sm">
-                {isSaving ? "Saving..." : "Save API Key"}
+                {isSaving ? "Saving..." : "Save"}
               </Button>
               {isEditing && (
                 <Button
@@ -421,7 +298,7 @@ function ProviderCard({
                 </Button>
               )}
             </div>
-            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded">
               <Key className="size-3 mt-0.5 flex-shrink-0" />
               <span>
                 Get your API key from{" "}
@@ -438,7 +315,7 @@ function ProviderCard({
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <div className="text-sm text-muted-foreground">
@@ -463,7 +340,7 @@ function ProviderCard({
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </AccordionContent>
+    </AccordionItem>
   )
 }

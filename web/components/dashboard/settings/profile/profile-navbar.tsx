@@ -1,10 +1,9 @@
 import { Logo } from "@/components/ui/logo"
-
 import { ThemeSwitcher } from "@/components/ui/theme-switcher"
 import UserButton from "@/components/ui/userButton"
 import { User } from "@/lib/types"
 import Link from "next/link"
-import { Button } from "../ui/button"
+import { Button } from "../../../ui/button"
 
 export default function ProfileNavbar({ userData }: { userData?: User }) {
   return (

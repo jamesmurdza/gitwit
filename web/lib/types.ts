@@ -169,3 +169,49 @@ export interface WidgetOptions {
   title: string
   onClick: () => void
 }
+
+export type Provider = "anthropic" | "openai" | "openrouter" | "aws"
+
+export interface ProviderConfig {
+  name: string
+  description: string
+  placeholder: string
+  modelPlaceholder: string
+  docsUrl: string
+  dashboardUrl: string
+}
+
+export const PROVIDERS: Record<Provider, ProviderConfig> = {
+  anthropic: {
+    name: "Anthropic",
+    description: "Use Claude models from Anthropic",
+    placeholder: "sk-ant-...",
+    modelPlaceholder: "claude-sonnet-4-20250514",
+    docsUrl: "https://docs.anthropic.com/",
+    dashboardUrl: "https://console.anthropic.com/settings/keys",
+  },
+  openai: {
+    name: "OpenAI",
+    description: "Use GPT models from OpenAI",
+    placeholder: "sk-...",
+    modelPlaceholder: "gpt-4o",
+    docsUrl: "https://platform.openai.com/docs",
+    dashboardUrl: "https://platform.openai.com/api-keys",
+  },
+  openrouter: {
+    name: "OpenRouter",
+    description: "Access multiple AI models through OpenRouter",
+    placeholder: "sk-or-v1-...",
+    modelPlaceholder: "anthropic/claude-sonnet-4-20250514",
+    docsUrl: "https://openrouter.ai/docs",
+    dashboardUrl: "https://openrouter.ai/keys",
+  },
+  aws: {
+    name: "AWS Bedrock",
+    description: "Use AWS Bedrock for AI models",
+    placeholder: "Access Key ID",
+    modelPlaceholder: "anthropic.claude-3-sonnet-20240229-v1:0",
+    docsUrl: "https://docs.aws.amazon.com/bedrock/",
+    dashboardUrl: "https://console.aws.amazon.com/bedrock/",
+  },
+}
