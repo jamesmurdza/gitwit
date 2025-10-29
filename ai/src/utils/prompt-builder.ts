@@ -1,4 +1,5 @@
 import { AIRequest } from "../types"
+import { formatFileTree } from "./file-tree-formatter"
 
 /**
  * Prompt builder class that generates context-aware system prompts for AI interactions
@@ -53,17 +54,11 @@ export class PromptBuilder {
 
     if (templateConfig) {
       prompt += `
-      
-Project Template: ${templateConfig.name}
+File Tree:
+${formatFileTree(context.fileTree || [])}
 
 Conventions:
 ${templateConfig.conventions.join("\n")}
-
-Dependencies:
-${JSON.stringify(templateConfig.dependencies, null, 2)}
-
-Scripts:
-${JSON.stringify(templateConfig.scripts, null, 2)}
 `
     }
 
