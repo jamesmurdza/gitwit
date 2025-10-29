@@ -322,7 +322,8 @@ export const useMonacoEditor = ({
         run: (editor) => handleAiEdit(editor),
       })
 
-      // Add Cmd/Ctrl+L command for AI chat toggle
+      // Add Cmd/Ctrl+L command for AI chat toggle (editor-focused shortcut)
+      // Note: Global shortcut (works outside editor) is handled in useEditorShortcuts hook
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyL, () => {
         setIsAIChatOpen((prev) => !prev)
       })
