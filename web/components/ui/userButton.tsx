@@ -15,15 +15,14 @@ import {
   LogOut,
   Settings,
   Sparkles,
-  User as UserIcon,
 } from "lucide-react"
 import Link from "next/link"
 
+import Avatar from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import { TIERS } from "@/lib/tiers"
 import { useRouter } from "@bprogress/next/app"
 import { useState } from "react"
-import Avatar from "./avatar"
-import { Button } from "./button"
 
 // TODO: Remove this once we have a proper tier system
 const TIER_INFO = {
@@ -83,13 +82,7 @@ export default function UserButton({ userData }: { userData: User }) {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="cursor-pointer" asChild>
-          <Link href={`/@${userData.username}`}>
-            <UserIcon className="mr-2 size-4" />
-            <span>Profile</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer" asChild>
-          <Link href={"/settings"}>
+          <Link href={"/dashboard?tab=settings"}>
             <Settings className="mr-2 size-4" />
             <span>Settings</span>
           </Link>

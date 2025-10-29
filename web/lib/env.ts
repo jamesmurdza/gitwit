@@ -7,7 +7,7 @@ export const env = createEnv({
     GITHUB_CLIENT_SECRET: z.string().min(1),
     E2B_API_KEY: z.string().min(1),
     CLERK_SECRET_KEY: z.string().min(1),
-    ENCRYPTION_KEY: z.string().min(1),
+    ENCRYPTION_KEY: z.string().min(1).optional(),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
     OPENROUTER_API_KEY: z.string().min(1).optional(),

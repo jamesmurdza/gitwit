@@ -8,6 +8,13 @@ const TAG_POSITION = SALT_LENGTH + IV_LENGTH
 const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH
 
 /**
+ * Check if encryption is available (ENCRYPTION_KEY is set)
+ */
+export function isEncryptionAvailable(): boolean {
+  return !!process.env.ENCRYPTION_KEY
+}
+
+/**
  * Get encryption key from environment variable
  * The key should be a 32-byte base64 encoded string
  */
