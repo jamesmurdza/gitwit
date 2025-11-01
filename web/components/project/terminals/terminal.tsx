@@ -26,6 +26,10 @@ export default function EditorTerminal({
   const { resolvedTheme: theme } = useTheme()
   const terminalContainerRef = useRef<ElementRef<"div">>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
+  const lineBufferRef = useRef<string>("")
+  const expectedEchoLineRef = useRef<string>("")
+  const expectedEchoIndexRef = useRef<number>(0)
+  const dropEchoNewlineOnceRef = useRef<boolean>(false)
 
   useEffect(() => {
     if (!terminalContainerRef.current) return
@@ -39,15 +43,19 @@ export default function EditorTerminal({
       letterSpacing: 0,
       allowTransparency: true,
       rightClickSelectsWord: true,
-      allowProposedApi: true, // for custom key events
+      allowProposedApi: true,
     })
 
-    // right-click paste handler
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault()
       navigator.clipboard.readText().then((text) => {
-        if (text) {
-          socket.emit("terminalData", { id, data: text })
+        if (!text) return
+        for (const ch of text) {
+          const code = ch.charCodeAt(0)
+          if (code >= 32 && code <= 126) {
+            terminal.write(ch)
+            lineBufferRef.current += ch
+          }
         }
       })
     }
@@ -57,7 +65,6 @@ export default function EditorTerminal({
       handleContextMenu
     )
 
-    // keyboard paste handler
     terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
       if (event.type === "keydown") {
         if (
@@ -66,8 +73,13 @@ export default function EditorTerminal({
         ) {
           event.preventDefault()
           navigator.clipboard.readText().then((text) => {
-            if (text) {
-              socket.emit("terminalData", { id, data: text })
+            if (!text) return
+            for (const ch of text) {
+              const code = ch.charCodeAt(0)
+              if (code >= 32 && code <= 126) {
+                terminal.write(ch)
+                lineBufferRef.current += ch
+              }
             }
           })
           return false
@@ -106,7 +118,36 @@ export default function EditorTerminal({
     }
 
     const disposableOnData = term.onData((data) => {
-      socket.emit("terminalData", { id, data })
+      for (const char of data) {
+        const code = char.charCodeAt(0)
+
+        if (code >= 32 && code <= 126) {
+          term.write(char)
+          lineBufferRef.current += char
+          continue
+        }
+
+        if (char === "\x7f" || char === "\b") {
+          if (lineBufferRef.current.length > 0) {
+            term.write("\b \b")
+            lineBufferRef.current = lineBufferRef.current.slice(0, -1)
+          }
+          continue
+        }
+
+        if (char === "\r") {
+          term.write("\r\n")
+          const toSend = lineBufferRef.current + "\r"
+          expectedEchoLineRef.current = lineBufferRef.current
+          expectedEchoIndexRef.current = 0
+          dropEchoNewlineOnceRef.current = true
+          socket.emit("terminalData", { id, data: toSend })
+          lineBufferRef.current = ""
+          continue
+        }
+
+        socket.emit("terminalData", { id, data: char })
+      }
     })
 
     const disposableOnResize = term.onResize((dimensions) => {
@@ -126,11 +167,7 @@ export default function EditorTerminal({
           width !== terminalContainerRef.current.offsetWidth ||
           height !== terminalContainerRef.current.offsetHeight
         ) {
-          try {
-            fitAddonRef.current.fit()
-          } catch (err) {
-            console.error("Error during fit:", err)
-          }
+          fitAddonRef.current.fit()
         }
       }, 50)
     )
@@ -146,8 +183,43 @@ export default function EditorTerminal({
   useEffect(() => {
     if (!term) return
     const handleTerminalResponse = (response: { id: string; data: string }) => {
-      if (response.id === id) {
-        term.write(response.data)
+      if (response.id !== id) {
+        return
+      }
+
+      let output = response.data
+
+      while (
+        expectedEchoIndexRef.current < expectedEchoLineRef.current.length &&
+        output.length > 0 &&
+        output[0] === expectedEchoLineRef.current[expectedEchoIndexRef.current]
+      ) {
+        output = output.slice(1)
+        expectedEchoIndexRef.current += 1
+      }
+
+      if (
+        expectedEchoIndexRef.current < expectedEchoLineRef.current.length &&
+        output.length > 0 &&
+        output[0] !== expectedEchoLineRef.current[expectedEchoIndexRef.current]
+      ) {
+        expectedEchoLineRef.current = ""
+        expectedEchoIndexRef.current = 0
+        dropEchoNewlineOnceRef.current = false
+      }
+
+      if (expectedEchoIndexRef.current === expectedEchoLineRef.current.length) {
+        if (dropEchoNewlineOnceRef.current) {
+          if (output.startsWith("\r")) output = output.slice(1)
+          if (output.startsWith("\n")) output = output.slice(1)
+          dropEchoNewlineOnceRef.current = false
+        }
+        expectedEchoLineRef.current = ""
+        expectedEchoIndexRef.current = 0
+      }
+
+      if (output.length > 0) {
+        term.write(output)
       }
     }
     socket.on("terminalResponse", handleTerminalResponse)
