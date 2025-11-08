@@ -1,6 +1,6 @@
 "use client"
 
-import { cn } from "@/lib/utils"
+import { cn, extractFilePathFromCode } from "@/lib/utils"
 import {
   type ComponentProps,
   isValidElement,
@@ -33,15 +33,19 @@ export const Markdown = memo(
 
     const markdownText = extractMarkdownText(props.children)
 
-    // Use same regex to get the first file path
-    const filePattern =
-      /(?:^|\s)([a-zA-Z0-9._\/-]+\.(?:html|js|ts|tsx|jsx|css|scss|sass|less|json|md|txt|py|java|cpp|c|h|php|rb|go|rs|swift|kt|dart|vue|svelte))(?:\s|$)/i
-    const firstMatch = markdownText.match(filePattern)
-    // Keep the AI-provided path as-is (no stripping). Trust relative path from response.
-    const firstIntendedFile = firstMatch ? firstMatch[1].trim() : null
+    // Use refs to store dynamic data without causing re-renders
+    const markdownTextRef = useRef(markdownText)
+    markdownTextRef.current = markdownText
 
-    // Keep a ref if you still want it elsewhere
-    currentIntendedFileRef.current = firstIntendedFile
+    const codeBlockFileMapRef = useRef<Map<string, string>>(new Map())
+    const lastMarkdownLengthRef = useRef(0)
+
+    if (markdownText.length < lastMarkdownLengthRef.current * 0.5) {
+      codeBlockFileMapRef.current.clear()
+    }
+    lastMarkdownLengthRef.current = markdownText.length
+
+    // Create stable components that don't depend on changing markdownText
     const componentsWithIntendedFile: MarkdownProps["components"] =
       useMemo(() => {
         return {
@@ -68,9 +72,18 @@ export const Markdown = memo(
               code = children
             }
 
+            // Extract file path for THIS specific code block
+            const intendedFile = extractFilePathFromCode(
+              code,
+              markdownTextRef.current,
+              codeBlockFileMapRef.current
+            )
+
+            currentIntendedFileRef.current = intendedFile
+
             // Determine a filename for the toolbar from the intended file path
-            const filename = firstIntendedFile
-              ? firstIntendedFile.split("/").pop() || firstIntendedFile
+            const filename = intendedFile
+              ? intendedFile.split("/").pop() || intendedFile
               : undefined
 
             return (
@@ -85,7 +98,7 @@ export const Markdown = memo(
                 <CodeBlockActions
                   code={code}
                   language={language}
-                  intendedFile={firstIntendedFile}
+                  intendedFile={intendedFile}
                   placement="toolbar"
                 />
                 <CodeBlockCopyButton className="size-7" />
@@ -97,7 +110,7 @@ export const Markdown = memo(
             return <p {...props}>{children}</p>
           },
         }
-      }, [firstIntendedFile])
+      }, [])
 
     return (
       <Streamdown
