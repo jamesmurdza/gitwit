@@ -1,4 +1,4 @@
-export * from "./code-merger"
+export * from "./aider-diff-merger"
 export * from "./error-handler"
 export * from "./logger"
 export * from "./prompt-builder"
