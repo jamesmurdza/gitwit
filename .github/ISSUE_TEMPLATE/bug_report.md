@@ -6,8 +6,6 @@ labels: ""
 assignees: ""
 ---
 
-(You can earn 💰 for reporting bugs! Join the [BUGATHON](https://github.com/jamesmurdza/gitwit/blob/main/BUGATHON.md).)
-
 **Describe the bug**
 A clear and concise description of what the bug is.
 
