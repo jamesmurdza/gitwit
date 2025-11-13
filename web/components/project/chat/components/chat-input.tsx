@@ -53,6 +53,7 @@ import React, {
   useRef,
   useState,
 } from "react"
+import { toast } from "sonner"
 import { getIconForFile } from "vscode-icons-js"
 import { Button } from "../../../ui/button"
 import {
@@ -448,6 +449,10 @@ function ChatInputContextMenu() {
     [contextTabs]
   )
   const files = React.useMemo(() => getAllFiles(fileTree), [fileTree])
+  const isAllowedFileType = (type: string) =>
+    ALLOWED_FILE_TYPES.some((allowed) => allowed === type)
+  const isAllowedImageType = (type: string) =>
+    ALLOWED_IMAGE_TYPES.some((allowed) => allowed === type)
   const handleFileUpload: React.MouseEventHandler<HTMLDivElement> = (event) => {
     event.preventDefault()
     const fileInput = document.createElement("input")
@@ -456,6 +461,17 @@ function ChatInputContextMenu() {
     fileInput.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
+        const fileType = file.type
+        if (!fileType || !isAllowedFileType(fileType)) {
+          toast.error("Unsupported file type. Select a valid document or code file.")
+          ;(e.target as HTMLInputElement).value = ""
+          return
+        }
+        if (isAllowedImageType(fileType)) {
+          toast.error("Use the Images option to upload image files.")
+          ;(e.target as HTMLInputElement).value = ""
+          return
+        }
         const reader = new FileReader()
         reader.onload = () => {
           addContextTab({
@@ -485,6 +501,12 @@ function ChatInputContextMenu() {
     fileInput.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
+        const fileType = file.type
+        if (!fileType || !isAllowedImageType(fileType)) {
+          toast.error("Only image files are supported in the Images section.")
+          ;(e.target as HTMLInputElement).value = ""
+          return
+        }
         const reader = new FileReader()
         reader.onload = () => {
           addContextTab({
@@ -592,5 +614,5 @@ export {
   ChatInputContextMenu,
   ChatInputModelSelect,
   ChatInputSubmit,
-  ChatInputTextarea,
+  ChatInputTextarea
 }
