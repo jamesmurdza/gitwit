@@ -63,20 +63,23 @@ export function CodeBlockActions({
       const codeToApply = pending.code
       pendingApplyRef.current = null
       setIsLoading(true)
-      const applyPromise = latestApplyRef.current?.(codeToApply)
-      if (applyPromise) {
-        applyPromise
-          .then(() => {
-            setIsApplied(true)
-            setIsLoading(false)
-          })
-          .catch((error) => {
-            console.error("Apply failed:", error)
-            setIsLoading(false)
-          })
-      } else {
-        setIsLoading(false)
-      }
+
+      setTimeout(() => {
+        const applyPromise = latestApplyRef.current?.(codeToApply)
+        if (applyPromise) {
+          applyPromise
+            .then(() => {
+              setIsApplied(true)
+              setIsLoading(false)
+            })
+            .catch((error) => {
+              console.error("Apply failed:", error)
+              setIsLoading(false)
+            })
+        } else {
+          setIsLoading(false)
+        }
+      }, 100) // Small delay to allow Editor component to mount
     }
   }, [activeTab?.id, activeTab?.name])
   const isActiveForPath = useMemo(

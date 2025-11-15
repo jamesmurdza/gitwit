@@ -131,6 +131,12 @@ export default function ProjectLayout({
     setIsAIChatOpen,
   })
 
+  // Keep a ref to editorRef so callbacks can access the latest value
+  const editorRefRef = useRef(editorRef)
+  useEffect(() => {
+    editorRefRef.current = editorRef
+  }, [editorRef])
+
   // Set editor ref in store so sidebar can access it
   useEffect(() => {
     if (editorRef) {
@@ -197,6 +203,65 @@ export default function ProjectLayout({
     setDraft(activeTab.id, content ?? "")
   }
 
+  const waitForEditorModel = useCallback(async () => {
+    if (!activeTab?.id) {
+      return null
+    }
+
+    const editorRefMaxAttempts = 100
+    const delayMs = 50
+    const uri = monaco.Uri.parse(activeTab.id)
+
+    for (let attempt = 0; attempt < editorRefMaxAttempts; attempt++) {
+      // Check the ref which always has the latest value
+      const currentEditorRef = editorRefRef.current
+      if (currentEditorRef) {
+        const maxAttempts = 60
+
+        for (let modelAttempt = 0; modelAttempt < maxAttempts; modelAttempt++) {
+          // Try getting model from editor first
+          let model = currentEditorRef.getModel()
+
+          // If not found, try getting it by URI (might be created but not set yet)
+          if (!model) {
+            model = monaco.editor.getModel(uri)
+          }
+
+          // Verify the model is set on the editor and matches the expected URI
+          if (model) {
+            const editorModel = currentEditorRef.getModel()
+            if (
+              editorModel === model &&
+              model.uri.toString() === uri.toString()
+            ) {
+              return model
+            }
+            // If model exists in registry but not on editor yet, wait a bit more
+            // @monaco-editor/react should set it automatically
+            if (modelAttempt % 10 === 0) {
+            }
+          } else if (modelAttempt % 10 === 0) {
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+        }
+
+        // If we got here, the editor exists but model never appeared
+        // This might mean the Editor component hasn't fully initialized
+        return null
+      }
+
+      // Editor not mounted yet, wait and retry
+      if (attempt % 20 === 0) {
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+
+    // Editor never mounted
+    return null
+  }, [activeTab?.id])
+
   // Handler for applying code from chat
   const handleApplyCodeFromChat = useCallback(
     async (code: string, language?: string) => {
@@ -204,8 +269,34 @@ export default function ProjectLayout({
         return
       }
       try {
-        // First, merge the partial code with the original using AI
-        const originalCode = activeFileContent
+        let originalCode = activeFileContent
+
+        // When the file is opened for the first time, the content may still be loading.
+        // If we don't have the original code yet, fetch it directly before merging.
+        if (!originalCode && activeTab.id && projectId) {
+          try {
+            const response = await fileRouter.fileContent.fetcher({
+              fileId: activeTab.id,
+              projectId,
+            })
+            const fetchedContent = response?.data ?? ""
+            if (fetchedContent) {
+              originalCode = fetchedContent
+              updateActiveFileContent(fetchedContent)
+            }
+          } catch (fetchError) {
+            console.warn("Failed to fetch original file content:", fetchError)
+          }
+        }
+
+        // Wait for the Monaco editor model to be ready before applying the diff
+        // This is especially important when opening a file for the first time
+        const model = await waitForEditorModel()
+        if (!model) {
+          return
+        }
+
+        // First, merge the partial code with the original using aider diff
         const mergedCode = await mergeCode(
           code,
           originalCode,
@@ -222,7 +313,14 @@ export default function ProjectLayout({
         handleApplyCodeWithDecorations(code, originalCode)
       }
     },
-    [activeTab, activeFileContent, handleApplyCodeWithDecorations, projectId]
+    [
+      activeTab,
+      activeFileContent,
+      handleApplyCodeWithDecorations,
+      projectId,
+      updateActiveFileContent,
+      waitForEditorModel,
+    ]
   )
 
   // Handler for rejecting code from chat
