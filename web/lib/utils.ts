@@ -9,10 +9,44 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Checks if a file path indicates a new file (contains "(new file)" marker)
+ */
+export function isNewFile(
+  filePath: string | null,
+  code: string,
+  markdownText: string
+): boolean {
+  if (!filePath) return false
+
+  // Check in code block itself
+  const filePatternInCode = /^File:\s*([^\n]+)/m
+  const matchInCode = code.match(filePatternInCode)
+  if (matchInCode) {
+    const rawPath = matchInCode[1].trim()
+    return /\s*\(new file\)\s*$/i.test(rawPath)
+  }
+
+  // Check in markdown text
+  const filePattern = /File:\s*([^\n]+)/g
+  let match
+  while ((match = filePattern.exec(markdownText)) !== null) {
+    const rawPath = match[1].trim()
+    const cleanPath = rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
+    if (cleanPath === filePath && /\s*\(new file\)\s*$/i.test(rawPath)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
  * Extracts the file path for a code block from various sources:
  * 1. "File: /path" pattern in the code block itself
  * 2. File path pattern in the code block
  * 3. Most recent "File: /path" before this code block in the markdown
+ *
+ * Strips "(new file)" marker from the path and returns clean path
  */
 export function extractFilePathFromCode(
   code: string,
@@ -23,7 +57,9 @@ export function extractFilePathFromCode(
   const filePatternInCode = /^File:\s*([^\n]+)/m
   const matchInCode = code.match(filePatternInCode)
   if (matchInCode) {
-    return matchInCode[1].trim()
+    const rawPath = matchInCode[1].trim()
+    // Strip "(new file)" marker from the path
+    return rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
   }
 
   // Second, try to find file path pattern in the code block
@@ -60,9 +96,12 @@ export function extractFilePathFromCode(
   }> = []
   let match
   while ((match = filePattern.exec(markdownText)) !== null) {
+    const rawPath = match[1].trim()
+    // Strip "(new file)" marker from the path
+    const cleanPath = rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
     positions.push({
       position: match.index,
-      filePath: match[1].trim(),
+      filePath: cleanPath,
     })
   }
 
