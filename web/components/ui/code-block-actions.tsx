@@ -8,6 +8,7 @@ import { Check, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useCodeApply } from "../project/chat/contexts/code-apply-context"
 import { normalizePath, pathMatchesTab } from "../project/chat/lib/utils"
+import { useChat } from "../project/chat/providers/chat-provider"
 
 export interface CodeBlockActionsProps {
   code: string
@@ -37,7 +38,8 @@ export function CodeBlockActions({
   const activeTab = useAppStore((s) => s.activeTab)
   const tabs = useAppStore((s) => s.tabs)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
-  const { onApplyCode, onRejectCode } = useCodeApply()
+  const { onApplyCode, onRejectCode, messageId } = useCodeApply()
+  const { fileActionStatuses } = useChat()
 
   const applyHandler = onApply ?? onApplyCode
   const rejectHandler = onReject ?? onRejectCode
@@ -92,6 +94,26 @@ export function CodeBlockActions({
     const normalized = normalizePath(intendedFile)
     return isActiveForPath(normalized)
   }, [isForCurrentFile, intendedFile, isActiveForPath])
+
+  const normalizedIntendedFile = useMemo(
+    () => (intendedFile ? normalizePath(intendedFile) : undefined),
+    [intendedFile]
+  )
+
+  const externalStatus =
+    messageId && normalizedIntendedFile
+      ? fileActionStatuses[messageId]?.[normalizedIntendedFile]
+      : undefined
+
+  useEffect(() => {
+    if (externalStatus === "applied") {
+      setIsApplied(true)
+      setIsRejected(false)
+    } else if (externalStatus === "rejected") {
+      setIsRejected(true)
+      setIsApplied(false)
+    }
+  }, [externalStatus])
 
   const handleApply = async () => {
     if (isApplied || isRejected || isLoading) return

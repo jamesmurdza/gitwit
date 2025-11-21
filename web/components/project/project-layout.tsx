@@ -23,6 +23,12 @@ import Tab from "../ui/tab"
 import AIEditElements from "./ai-edit/ai-edit-elements"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
+import type {
+  ApplyMergedFileArgs,
+  FileMergeResult,
+  PrecomputeMergeArgs,
+} from "./chat/lib/types"
+import { normalizePath, pathMatchesTab } from "./chat/lib/utils"
 import { ChatProvider } from "./chat/providers/chat-provider"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
 import { useDiffSessionManager } from "./hooks/useDiffSessionManager"
@@ -82,6 +88,13 @@ export default function ProjectLayout({
   // Apply Button merger decoration state
   const [mergeDecorationsCollection, setMergeDecorationsCollection] =
     useState<monaco.editor.IEditorDecorationsCollection>()
+  const pendingPreviewApplyRef = useRef<{
+    filePath: string
+    content: string
+    resolve: () => void
+    reject: (error: unknown) => void
+  } | null>(null)
+  const [pendingApplyTick, setPendingApplyTick] = useState(0)
 
   // Editor layout and state management
   const {
@@ -196,12 +209,22 @@ export default function ProjectLayout({
     [handleApplyCode]
   )
 
-  const updateActiveFileContent = (content?: string) => {
-    if (!activeTab) {
-      return
-    }
-    setDraft(activeTab.id, content ?? "")
-  }
+  const updateFileDraft = useCallback(
+    (fileId: string, content?: string) => {
+      setDraft(fileId, content ?? "")
+    },
+    [setDraft]
+  )
+
+  const handleEditorChange = useCallback(
+    (value?: string) => {
+      if (!activeTab?.id) {
+        return
+      }
+      updateFileDraft(activeTab.id, value)
+    },
+    [activeTab?.id, updateFileDraft]
+  )
 
   const waitForEditorModel = useCallback(async () => {
     if (!activeTab?.id) {
@@ -262,6 +285,45 @@ export default function ProjectLayout({
     return null
   }, [activeTab?.id])
 
+  const precomputeMergeForFile = useCallback(
+    async ({
+      filePath,
+      code,
+    }: PrecomputeMergeArgs): Promise<FileMergeResult> => {
+      const normalizedPath = normalizePath(filePath)
+      let originalCode = ""
+
+      if (projectId) {
+        try {
+          const response = await fileRouter.fileContent.fetcher({
+            fileId: normalizedPath,
+            projectId,
+          })
+          originalCode = response?.data ?? ""
+        } catch (error) {
+          console.warn(
+            "Failed to fetch original file content for merge:",
+            error
+          )
+        }
+      }
+
+      try {
+        const mergedCode = await mergeCode(
+          code,
+          originalCode,
+          normalizedPath.split("/").pop() || normalizedPath,
+          projectId
+        )
+        return { mergedCode, originalCode }
+      } catch (error) {
+        console.error("Auto-merge failed:", error)
+        return { mergedCode: code, originalCode }
+      }
+    },
+    [projectId]
+  )
+
   // Handler for applying code from chat
   const handleApplyCodeFromChat = useCallback(
     async (code: string, language?: string) => {
@@ -282,7 +344,7 @@ export default function ProjectLayout({
             const fetchedContent = response?.data ?? ""
             if (fetchedContent) {
               originalCode = fetchedContent
-              updateActiveFileContent(fetchedContent)
+              updateFileDraft(activeTab.id, fetchedContent)
             }
           } catch (fetchError) {
             console.warn("Failed to fetch original file content:", fetchError)
@@ -318,7 +380,7 @@ export default function ProjectLayout({
       activeFileContent,
       handleApplyCodeWithDecorations,
       projectId,
-      updateActiveFileContent,
+      updateFileDraft,
       waitForEditorModel,
     ]
   )
@@ -331,6 +393,127 @@ export default function ProjectLayout({
       setMergeDecorationsCollection(undefined)
     }
   }, [mergeDecorationsCollection])
+
+  const enqueueFileContentUpdate = useCallback(
+    (filePath: string, content: string) => {
+      const normalizedPath = normalizePath(filePath)
+      const matchBy = (tab: TTab) => pathMatchesTab(normalizedPath, tab)
+
+      let targetTab = tabs.find(matchBy)
+      if (!targetTab) {
+        targetTab = {
+          id: normalizedPath,
+          name: normalizedPath.split("/").pop() || normalizedPath,
+          type: "file",
+          saved: true,
+        }
+      }
+
+      if (pendingPreviewApplyRef.current?.reject) {
+        pendingPreviewApplyRef.current.reject(
+          new Error("Previous apply request superseded")
+        )
+      }
+
+      const completion = new Promise<void>((resolve, reject) => {
+        pendingPreviewApplyRef.current = {
+          filePath: normalizedPath,
+          content,
+          resolve,
+          reject,
+        }
+
+        setPendingApplyTick((tick) => tick + 1)
+      })
+
+      const isAlreadyActive = activeTab ? matchBy(activeTab) : false
+      if (!isAlreadyActive) {
+        setActiveTab(targetTab)
+      }
+
+      return completion
+    },
+    [activeTab, setActiveTab, tabs]
+  )
+
+  const applyPrecomputedMerge = useCallback(
+    ({ filePath, mergedCode }: ApplyMergedFileArgs) => {
+      return enqueueFileContentUpdate(filePath, mergedCode)
+    },
+    [enqueueFileContentUpdate]
+  )
+
+  const restoreOriginalFile = useCallback(
+    ({ filePath, originalCode }: ApplyMergedFileArgs) => {
+      return enqueueFileContentUpdate(filePath, originalCode)
+    },
+    [enqueueFileContentUpdate]
+  )
+
+  useEffect(() => {
+    const pending = pendingPreviewApplyRef.current
+    if (!pending) {
+      return
+    }
+    if (!activeTab || !pathMatchesTab(pending.filePath, activeTab)) {
+      return
+    }
+
+    let isCancelled = false
+    const applyMergedCode = async () => {
+      try {
+        const model = await waitForEditorModel()
+        if (!model || isCancelled) {
+          throw new Error("Editor not ready")
+        }
+        const editorInstance = editorRefRef.current
+        const fullRange = model.getFullModelRange()
+
+        if (editorInstance) {
+          editorInstance.pushUndoStop()
+          editorInstance.executeEdits("ai-chat-apply-merged-file", [
+            {
+              range: fullRange,
+              text: pending.content,
+              forceMoveMarkers: true,
+            },
+          ])
+          editorInstance.pushUndoStop()
+        } else {
+          model.setValue(pending.content)
+        }
+
+        updateFileDraft(pending.filePath, pending.content)
+
+        if (mergeDecorationsCollection) {
+          mergeDecorationsCollection.clear()
+          setMergeDecorationsCollection(undefined)
+        }
+
+        pending.resolve()
+      } catch (error) {
+        pending.reject(error)
+      } finally {
+        if (!isCancelled) {
+          pendingPreviewApplyRef.current = null
+        }
+      }
+    }
+
+    applyMergedCode()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [
+    activeTab?.id,
+    activeTab?.name,
+    mergeDecorationsCollection,
+    pendingApplyTick,
+    setMergeDecorationsCollection,
+    updateFileDraft,
+    waitForEditorModel,
+  ])
 
   // Close tab with snapshot if closing the active tab with unresolved diffs
   const handleCloseTab = useCallback(
@@ -444,7 +627,7 @@ export default function ProjectLayout({
                       beforeMount={handleEditorWillMount}
                       onMount={handleEditorMount}
                       path={activeTab.id}
-                      onChange={updateActiveFileContent}
+                      onChange={handleEditorChange}
                       theme={theme === "light" ? "vs" : "vs-dark"}
                       options={defaultEditorOptions}
                       value={activeFileContent}
@@ -538,6 +721,9 @@ export default function ProjectLayout({
               <AIChat
                 onApplyCode={handleApplyCodeFromChat}
                 onRejectCode={handleRejectCodeFromChat}
+                precomputeMergeForFile={precomputeMergeForFile}
+                applyPrecomputedMerge={applyPrecomputedMerge}
+                restoreOriginalFile={restoreOriginalFile}
               />
             </ResizablePanel>
           </>

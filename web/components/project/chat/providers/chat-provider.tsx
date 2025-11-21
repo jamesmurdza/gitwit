@@ -3,10 +3,17 @@ import { TFile, TFolder } from "@/lib/types"
 import { useAppStore } from "@/store/context"
 import { useQueryClient } from "@tanstack/react-query"
 import { readStreamableValue } from "ai/rsc"
+import { nanoid } from "nanoid"
 import { useParams } from "next/navigation"
-import React, { createContext, ReactNode, useRef, useState } from "react"
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useRef,
+  useState,
+} from "react"
 import type { ContextTab, Message } from "../lib/types"
-import { getCombinedContext } from "../lib/utils"
+import { getCombinedContext, normalizePath } from "../lib/utils"
 
 type ChatProviderProps = {
   activeFileContent: string
@@ -31,6 +38,13 @@ type ChatContextType = {
   removeContextTab: (id: string) => void
   sendMessage: (message: string, context?: string) => Promise<void>
   stopGeneration: () => void
+  fileActionStatuses: Record<string, Record<string, "applied" | "rejected">>
+  markFileActionStatus: (
+    messageId: string,
+    filePath: string,
+    status: "applied" | "rejected"
+  ) => void
+  latestAssistantId?: string
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
@@ -52,6 +66,12 @@ function ChatProvider({
   const [isGenerating, setIsGenerating] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [contextTabs, setContextTabs] = useState<ContextTab[]>([])
+  const [fileActionStatuses, setFileActionStatuses] = useState<
+    Record<string, Record<string, "applied" | "rejected">>
+  >({})
+  const [latestAssistantId, setLatestAssistantId] = useState<string | null>(
+    null
+  )
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const addContextTab = (newTab: ContextTab) => {
@@ -65,6 +85,7 @@ function ChatProvider({
   const sendMessage = async (message: string) => {
     if (!message.trim()) return
     const userMessage: Message = {
+      id: nanoid(),
       role: "user",
       content: message,
       context: contextTabs,
@@ -92,7 +113,13 @@ function ChatProvider({
         projectName,
         fileName: activeFileName,
       })
-      const assistantMessage: Message = { role: "assistant", content: "" }
+      const assistantMessageId = nanoid()
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+      }
+      setLatestAssistantId(assistantMessageId)
       setMessages([...updatedMessages, assistantMessage])
       let buffer = ""
       let firstChunk = true
@@ -132,6 +159,21 @@ function ChatProvider({
     abortControllerRef.current?.abort()
   }
 
+  const markFileActionStatus = useCallback(
+    (messageId: string, filePath: string, status: "applied" | "rejected") => {
+      if (!messageId) return
+      const normalized = normalizePath(filePath)
+      setFileActionStatuses((prev) => ({
+        ...prev,
+        [messageId]: {
+          ...(prev[messageId] ?? {}),
+          [normalized]: status,
+        },
+      }))
+    },
+    []
+  )
+
   return (
     <ChatContext.Provider
       value={{
@@ -148,6 +190,9 @@ function ChatProvider({
         removeContextTab,
         sendMessage,
         stopGeneration,
+        fileActionStatuses,
+        markFileActionStatus,
+        latestAssistantId: latestAssistantId ?? undefined,
       }}
     >
       {children}
