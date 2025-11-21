@@ -23,6 +23,7 @@ import {
   ChatInputTextarea,
 } from "./components/chat-input"
 import { ContextTab } from "./components/context-tab"
+import { GeneratedFilesPreview } from "./components/generated-files-preview"
 import { Message, MessageContent } from "./components/message"
 import { useChat } from "./providers/chat-provider"
 
@@ -119,6 +120,7 @@ function MainChatInput() {
 
   return (
     <div className="from-transparent via-background to-background bg-gradient-to-b px-2 pb-4 bottom-0">
+      <GeneratedFilesPreview />
       <ChatInput
         value={input}
         onValueChange={handleValueChange}
