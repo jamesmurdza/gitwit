@@ -366,11 +366,95 @@ export default function ProjectLayout({
 
   // Handler for applying code from chat
   const handleApplyCodeFromChat = useCallback(
-    async (code: string, language?: string) => {
+    async (
+      code: string,
+      language?: string,
+      options?: {
+        mergeStatuses?: Record<
+          string,
+          { status: string; result?: FileMergeResult; error?: string }
+        >
+        getCurrentFileContent?: (filePath: string) => Promise<string> | string
+        getMergeStatus?: (
+          filePath: string
+        ) =>
+          | { status: string; result?: FileMergeResult; error?: string }
+          | undefined
+      }
+    ) => {
       if (!activeTab) {
         return
       }
       try {
+        const normalizedPath = normalizePath(activeTab.id)
+        const mergeStatus = options?.mergeStatuses?.[normalizedPath]
+
+        // Check if there's a precomputed merge
+        if (mergeStatus?.status === "ready" && mergeStatus.result) {
+          // Check if current content matches the original code used in merge
+          if (options?.getCurrentFileContent) {
+            try {
+              const currentContent = await Promise.resolve(
+                options.getCurrentFileContent(normalizedPath)
+              )
+              if (currentContent === mergeStatus.result.originalCode) {
+                // Content matches, use precomputed merge
+                const model = await waitForEditorModel()
+                if (model) {
+                  handleApplyCodeWithDecorations(
+                    mergeStatus.result.mergedCode,
+                    mergeStatus.result.originalCode
+                  )
+                  return
+                }
+              }
+            } catch (error) {
+              console.warn("Failed to check current file content:", error)
+              // Fall through to recalculate
+            }
+          }
+        } else if (mergeStatus?.status === "pending") {
+          // Wait for merge to complete
+          let waited = 0
+          const maxWait = 10000 // 10 seconds max
+          const pollInterval = 100 // Check every 100ms
+
+          while (waited < maxWait) {
+            await new Promise((resolve) => setTimeout(resolve, pollInterval))
+            waited += pollInterval
+
+            // Re-check merge status using the getter function
+            const updatedStatus = options?.getMergeStatus?.(normalizedPath)
+            if (updatedStatus?.status === "ready" && updatedStatus.result) {
+              // Merge completed, check content and use it
+              if (options?.getCurrentFileContent) {
+                try {
+                  const currentContent = await Promise.resolve(
+                    options.getCurrentFileContent(normalizedPath)
+                  )
+                  if (currentContent === updatedStatus.result.originalCode) {
+                    const model = await waitForEditorModel()
+                    if (model) {
+                      handleApplyCodeWithDecorations(
+                        updatedStatus.result.mergedCode,
+                        updatedStatus.result.originalCode
+                      )
+                      return
+                    }
+                  }
+                } catch (error) {
+                  console.warn("Failed to check current file content:", error)
+                }
+              }
+              // Content changed or check failed, fall through to recalculate
+              break
+            } else if (updatedStatus?.status === "error") {
+              // Merge failed, recalculate
+              break
+            }
+          }
+        }
+
         let originalCode = activeFileContent
 
         // When the file is opened for the first time, the content may still be loading.

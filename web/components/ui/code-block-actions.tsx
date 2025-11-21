@@ -39,7 +39,7 @@ export function CodeBlockActions({
   const tabs = useAppStore((s) => s.tabs)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const { onApplyCode, onRejectCode, messageId } = useCodeApply()
-  const { fileActionStatuses } = useChat()
+  const { fileActionStatuses, mergeStatuses } = useChat()
 
   const applyHandler = onApply ?? onApplyCode
   const rejectHandler = onReject ?? onRejectCode
@@ -104,6 +104,12 @@ export function CodeBlockActions({
     messageId && normalizedIntendedFile
       ? fileActionStatuses[messageId]?.[normalizedIntendedFile]
       : undefined
+
+  // Check if merge is in progress for this file
+  const mergeStatus = normalizedIntendedFile
+    ? mergeStatuses[normalizedIntendedFile]
+    : undefined
+  const isMergePending = mergeStatus?.status === "pending"
 
   useEffect(() => {
     if (externalStatus === "applied") {

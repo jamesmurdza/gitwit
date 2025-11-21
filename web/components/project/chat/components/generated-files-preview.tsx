@@ -10,7 +10,7 @@ import type {
   PrecomputeMergeArgs,
 } from "../lib/types"
 import { normalizePath } from "../lib/utils"
-import { useChat } from "../providers/chat-provider"
+import { useChat, type MergeState } from "../providers/chat-provider"
 
 type GeneratedFile = {
   id: string
@@ -19,12 +19,6 @@ type GeneratedFile = {
   additions: number
   code?: string
 }
-
-type MergeState =
-  | { status: "idle" }
-  | { status: "pending" }
-  | { status: "ready"; result: FileMergeResult }
-  | { status: "error"; error: string }
 
 type GeneratedFilesPreviewProps = {
   files?: GeneratedFile[]
@@ -45,7 +39,13 @@ export function GeneratedFilesPreview({
   restoreOriginalFile,
   getCurrentFileContent,
 }: GeneratedFilesPreviewProps) {
-  const { messages, markFileActionStatus, latestAssistantId } = useChat()
+  const {
+    messages,
+    markFileActionStatus,
+    latestAssistantId,
+    mergeStatuses,
+    setMergeStatuses,
+  } = useChat()
   const [isOpen, setIsOpen] = React.useState(true)
   const [applyingMap, setApplyingMap] = React.useState<Record<string, boolean>>(
     {}
@@ -85,9 +85,6 @@ export function GeneratedFilesPreview({
       .join("|")
   }, [generatedFiles, sourceKey])
 
-  const [mergeStatuses, setMergeStatuses] = React.useState<
-    Record<string, MergeState>
-  >({})
   const mergeStatusRef = React.useRef(mergeStatuses)
   React.useEffect(() => {
     mergeStatusRef.current = mergeStatuses

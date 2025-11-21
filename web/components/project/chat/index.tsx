@@ -63,7 +63,11 @@ function AIChatBase({
           <ChatContainerCollapse />
         </ChatContainerActions>
       </ChatContainerHeader>
-      <MainChatContent onApplyCode={onApplyCode} onRejectCode={onRejectCode} />
+      <MainChatContent
+        onApplyCode={onApplyCode}
+        onRejectCode={onRejectCode}
+        getCurrentFileContent={getCurrentFileContent}
+      />
       <MainChatInput
         precomputeMergeForFile={precomputeMergeForFile}
         applyPrecomputedMerge={applyPrecomputedMerge}
@@ -87,12 +91,45 @@ export const AIChat = React.memo(
 function MainChatContent({
   onApplyCode,
   onRejectCode,
+  getCurrentFileContent,
 }: {
-  onApplyCode?: (code: string, language?: string) => Promise<void>
+  onApplyCode?: (
+    code: string,
+    language?: string,
+    options?: {
+      mergeStatuses?: Record<
+        string,
+        { status: string; result?: any; error?: string }
+      >
+      getCurrentFileContent?: (filePath: string) => Promise<string> | string
+      getMergeStatus?: (
+        filePath: string
+      ) => { status: string; result?: any; error?: string } | undefined
+    }
+  ) => Promise<void>
   onRejectCode?: () => void
+  getCurrentFileContent?: GetCurrentFileContentFn
 }) {
-  const { messages, isLoading } = useChat()
+  const { messages, isLoading, mergeStatuses } = useChat()
   const isEmpty = messages.length === 0
+  const mergeStatusesRef = React.useRef(mergeStatuses)
+  React.useEffect(() => {
+    mergeStatusesRef.current = mergeStatuses
+  }, [mergeStatuses])
+
+  const wrappedOnApplyCode = React.useCallback(
+    async (code: string, language?: string): Promise<void> => {
+      if (onApplyCode) {
+        await onApplyCode(code, language, {
+          mergeStatuses,
+          getCurrentFileContent,
+          getMergeStatus: (filePath: string) =>
+            mergeStatusesRef.current[filePath],
+        })
+      }
+    },
+    [onApplyCode, mergeStatuses, getCurrentFileContent]
+  )
 
   if (isEmpty) {
     return <ChatContainerEmpty />
@@ -107,7 +144,7 @@ function MainChatContent({
               role={message.role}
               context={message.context}
               key={i}
-              onApplyCode={onApplyCode}
+              onApplyCode={wrappedOnApplyCode}
               onRejectCode={onRejectCode}
             >
               <MessageContent>{message.content}</MessageContent>

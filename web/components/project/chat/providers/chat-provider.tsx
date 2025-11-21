@@ -12,7 +12,7 @@ import React, {
   useRef,
   useState,
 } from "react"
-import type { ContextTab, Message } from "../lib/types"
+import type { ContextTab, FileMergeResult, Message } from "../lib/types"
 import { getCombinedContext, normalizePath } from "../lib/utils"
 
 type ChatProviderProps = {
@@ -23,6 +23,12 @@ type ChatProviderProps = {
   projectName: string
   children: ReactNode
 }
+
+export type MergeState =
+  | { status: "idle" }
+  | { status: "pending" }
+  | { status: "ready"; result: FileMergeResult }
+  | { status: "error"; error: string }
 
 type ChatContextType = {
   activeFileContent?: string
@@ -45,6 +51,10 @@ type ChatContextType = {
     status: "applied" | "rejected"
   ) => void
   latestAssistantId?: string
+  mergeStatuses: Record<string, MergeState>
+  setMergeStatuses: React.Dispatch<
+    React.SetStateAction<Record<string, MergeState>>
+  >
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
@@ -72,6 +82,9 @@ function ChatProvider({
   const [latestAssistantId, setLatestAssistantId] = useState<string | null>(
     null
   )
+  const [mergeStatuses, setMergeStatuses] = useState<
+    Record<string, MergeState>
+  >({})
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const addContextTab = (newTab: ContextTab) => {
@@ -193,6 +206,8 @@ function ChatProvider({
         fileActionStatuses,
         markFileActionStatus,
         latestAssistantId: latestAssistantId ?? undefined,
+        mergeStatuses,
+        setMergeStatuses,
       }}
     >
       {children}
