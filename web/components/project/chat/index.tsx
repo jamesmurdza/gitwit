@@ -28,6 +28,7 @@ import { Message, MessageContent } from "./components/message"
 import type {
   ApplyMergedFileArgs,
   FileMergeResult,
+  GetCurrentFileContentFn,
   PrecomputeMergeArgs,
 } from "./lib/types"
 import { useChat } from "./providers/chat-provider"
@@ -42,6 +43,7 @@ type AIChatProps = {
   precomputeMergeForFile?: PrecomputeMergeFn
   applyPrecomputedMerge?: ApplyPrecomputedMergeFn
   restoreOriginalFile?: RestorePrecomputedMergeFn
+  getCurrentFileContent?: GetCurrentFileContentFn
 }
 
 function AIChatBase({
@@ -50,6 +52,7 @@ function AIChatBase({
   precomputeMergeForFile,
   applyPrecomputedMerge,
   restoreOriginalFile,
+  getCurrentFileContent,
 }: AIChatProps) {
   return (
     <ChatContainerRoot>
@@ -65,6 +68,7 @@ function AIChatBase({
         precomputeMergeForFile={precomputeMergeForFile}
         applyPrecomputedMerge={applyPrecomputedMerge}
         restoreOriginalFile={restoreOriginalFile}
+        getCurrentFileContent={getCurrentFileContent}
       />
     </ChatContainerRoot>
   )
@@ -77,7 +81,8 @@ export const AIChat = React.memo(
     prev.onRejectCode === next.onRejectCode &&
     prev.precomputeMergeForFile === next.precomputeMergeForFile &&
     prev.applyPrecomputedMerge === next.applyPrecomputedMerge &&
-    prev.restoreOriginalFile === next.restoreOriginalFile
+    prev.restoreOriginalFile === next.restoreOriginalFile &&
+    prev.getCurrentFileContent === next.getCurrentFileContent
 )
 function MainChatContent({
   onApplyCode,
@@ -138,10 +143,12 @@ function MainChatInput({
   precomputeMergeForFile,
   applyPrecomputedMerge,
   restoreOriginalFile,
+  getCurrentFileContent,
 }: {
   precomputeMergeForFile?: PrecomputeMergeFn
   applyPrecomputedMerge?: ApplyPrecomputedMergeFn
   restoreOriginalFile?: RestorePrecomputedMergeFn
+  getCurrentFileContent?: GetCurrentFileContentFn
 }) {
   const { input, setInput, isLoading, isGenerating, sendMessage } = useChat()
   const handleSubmit = () => {
@@ -158,6 +165,7 @@ function MainChatInput({
         precomputeMerge={precomputeMergeForFile}
         applyPrecomputedMerge={applyPrecomputedMerge}
         restoreOriginalFile={restoreOriginalFile}
+        getCurrentFileContent={getCurrentFileContent}
       />
       <ChatInput
         value={input}

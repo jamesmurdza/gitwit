@@ -64,6 +64,7 @@ export default function ProjectLayout({
   const setEditorRef = useAppStore((s) => s.setEditorRef)
   const draft = useAppStore((s) => s.drafts[activeTab?.id ?? ""])
   const setDraft = useAppStore((s) => s.setDraft)
+  const getDraft = useAppStore((s) => s.getDraft)
   const editorLanguage = activeTab?.name
     ? processFileType(activeTab.name)
     : "plaintext"
@@ -94,7 +95,16 @@ export default function ProjectLayout({
     resolve: () => void
     reject: (error: unknown) => void
   } | null>(null)
+  const pendingUpdatesQueueRef = useRef<
+    Array<{
+      filePath: string
+      content: string
+      resolve: () => void
+      reject: (error: unknown) => void
+    }>
+  >([])
   const [pendingApplyTick, setPendingApplyTick] = useState(0)
+  const isProcessingQueueRef = useRef(false)
 
   // Editor layout and state management
   const {
@@ -324,6 +334,36 @@ export default function ProjectLayout({
     [projectId]
   )
 
+  // Get current file content (from draft or server)
+  const getCurrentFileContent = useCallback(
+    async (filePath: string): Promise<string> => {
+      const normalizedPath = normalizePath(filePath)
+
+      // First, check if there's a draft (unsaved changes)
+      const draftContent = getDraft(normalizedPath)
+      if (draftContent !== undefined) {
+        return draftContent
+      }
+
+      // If no draft, fetch from server
+      if (projectId) {
+        try {
+          const response = await fileRouter.fileContent.fetcher({
+            fileId: normalizedPath,
+            projectId,
+          })
+          return response?.data ?? ""
+        } catch (error) {
+          console.warn("Failed to fetch current file content:", error)
+          return ""
+        }
+      }
+
+      return ""
+    },
+    [projectId, getDraft]
+  )
+
   // Handler for applying code from chat
   const handleApplyCodeFromChat = useCallback(
     async (code: string, language?: string) => {
@@ -394,46 +434,55 @@ export default function ProjectLayout({
     }
   }, [mergeDecorationsCollection])
 
+  const processNextInQueue = useCallback(() => {
+    if (
+      isProcessingQueueRef.current ||
+      pendingUpdatesQueueRef.current.length === 0
+    ) {
+      return
+    }
+
+    const next = pendingUpdatesQueueRef.current.shift()
+    if (!next) return
+
+    isProcessingQueueRef.current = true
+    pendingPreviewApplyRef.current = next
+    setPendingApplyTick((tick) => tick + 1)
+
+    const matchBy = (tab: TTab) => pathMatchesTab(next.filePath, tab)
+    let targetTab = tabs.find(matchBy)
+    if (!targetTab) {
+      targetTab = {
+        id: next.filePath,
+        name: next.filePath.split("/").pop() || next.filePath,
+        type: "file",
+        saved: true,
+      }
+    }
+
+    const isAlreadyActive = activeTab ? matchBy(activeTab) : false
+    if (!isAlreadyActive) {
+      setActiveTab(targetTab)
+    }
+  }, [activeTab, setActiveTab, tabs])
+
   const enqueueFileContentUpdate = useCallback(
     (filePath: string, content: string) => {
       const normalizedPath = normalizePath(filePath)
-      const matchBy = (tab: TTab) => pathMatchesTab(normalizedPath, tab)
-
-      let targetTab = tabs.find(matchBy)
-      if (!targetTab) {
-        targetTab = {
-          id: normalizedPath,
-          name: normalizedPath.split("/").pop() || normalizedPath,
-          type: "file",
-          saved: true,
-        }
-      }
-
-      if (pendingPreviewApplyRef.current?.reject) {
-        pendingPreviewApplyRef.current.reject(
-          new Error("Previous apply request superseded")
-        )
-      }
 
       const completion = new Promise<void>((resolve, reject) => {
-        pendingPreviewApplyRef.current = {
+        pendingUpdatesQueueRef.current.push({
           filePath: normalizedPath,
           content,
           resolve,
           reject,
-        }
-
-        setPendingApplyTick((tick) => tick + 1)
+        })
+        processNextInQueue()
       })
-
-      const isAlreadyActive = activeTab ? matchBy(activeTab) : false
-      if (!isAlreadyActive) {
-        setActiveTab(targetTab)
-      }
 
       return completion
     },
-    [activeTab, setActiveTab, tabs]
+    [processNextInQueue]
   )
 
   const applyPrecomputedMerge = useCallback(
@@ -496,6 +545,8 @@ export default function ProjectLayout({
       } finally {
         if (!isCancelled) {
           pendingPreviewApplyRef.current = null
+          isProcessingQueueRef.current = false
+          processNextInQueue()
         }
       }
     }
@@ -513,6 +564,7 @@ export default function ProjectLayout({
     setMergeDecorationsCollection,
     updateFileDraft,
     waitForEditorModel,
+    processNextInQueue,
   ])
 
   // Close tab with snapshot if closing the active tab with unresolved diffs
@@ -724,6 +776,7 @@ export default function ProjectLayout({
                 precomputeMergeForFile={precomputeMergeForFile}
                 applyPrecomputedMerge={applyPrecomputedMerge}
                 restoreOriginalFile={restoreOriginalFile}
+                getCurrentFileContent={getCurrentFileContent}
               />
             </ResizablePanel>
           </>

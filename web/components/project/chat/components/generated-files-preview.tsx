@@ -5,6 +5,7 @@ import React from "react"
 import type {
   ApplyMergedFileArgs,
   FileMergeResult,
+  GetCurrentFileContentFn,
   Message,
   PrecomputeMergeArgs,
 } from "../lib/types"
@@ -31,6 +32,7 @@ type GeneratedFilesPreviewProps = {
   precomputeMerge?: (args: PrecomputeMergeArgs) => Promise<FileMergeResult>
   applyPrecomputedMerge?: (args: ApplyMergedFileArgs) => Promise<void>
   restoreOriginalFile?: (args: ApplyMergedFileArgs) => Promise<void>
+  getCurrentFileContent?: GetCurrentFileContentFn
 }
 
 const HARDCODED_ADDITIONS = 3
@@ -41,6 +43,7 @@ export function GeneratedFilesPreview({
   precomputeMerge,
   applyPrecomputedMerge,
   restoreOriginalFile,
+  getCurrentFileContent,
 }: GeneratedFilesPreviewProps) {
   const { messages, markFileActionStatus, latestAssistantId } = useChat()
   const [isOpen, setIsOpen] = React.useState(true)
@@ -220,8 +223,54 @@ export function GeneratedFilesPreview({
       }
 
       startLoading()
+
+      // If we have a ready merge, check if file content has changed
       if (currentStatus?.status === "ready") {
-        applyWithResult(currentStatus.result)
+        const checkAndApply = async () => {
+          if (!getCurrentFileContent || !precomputeMerge) {
+            // If we can't check, just use the precomputed merge
+            applyWithResult(currentStatus.result)
+            return
+          }
+
+          try {
+            // Get current file content
+            const currentContent = await Promise.resolve(
+              getCurrentFileContent(key)
+            )
+
+            // Compare with original code used in merge
+            if (currentContent !== currentStatus.result.originalCode) {
+              // Content has changed, re-calculate merge with current content
+              if (!file.code || !precomputeMerge) {
+                // Can't re-calculate, use precomputed merge
+                applyWithResult(currentStatus.result)
+                return
+              }
+
+              setMergeStatuses((prev) => ({
+                ...prev,
+                [key]: { status: "pending" },
+              }))
+
+              const newJob = precomputeMerge({ filePath: key, code: file.code })
+              mergeJobsRef.current.set(key, newJob)
+              waitForJob(newJob)
+            } else {
+              // Content hasn't changed, use precomputed merge
+              applyWithResult(currentStatus.result)
+            }
+          } catch (error) {
+            console.warn(
+              "Failed to check current file content, using precomputed merge:",
+              error
+            )
+            // On error, fall back to precomputed merge
+            applyWithResult(currentStatus.result)
+          }
+        }
+
+        checkAndApply()
         return
       }
 
@@ -248,6 +297,7 @@ export function GeneratedFilesPreview({
       batchKey,
       latestAssistantId,
       markFileActionStatus,
+      getCurrentFileContent,
     ]
   )
 
@@ -384,13 +434,24 @@ export function GeneratedFilesPreview({
           </span>
         </div>
         <div className="flex items-center gap-1 text-[10px]">
-          <Button size="xs" className="h-5 px-2 text-[10px]">
+          <Button
+            size="xs"
+            className="h-5 px-2 text-[10px]"
+            onClick={() => {
+              visibleFiles.forEach((file) => handleKeepFile(file))
+            }}
+            disabled={!applyPrecomputedMerge}
+          >
             Keep All
           </Button>
           <Button
             variant="destructive"
             size="xs"
             className="h-5 px-2 text-[10px] text-destructive hover:text-destructive"
+            onClick={() => {
+              visibleFiles.forEach((file) => handleRejectFile(file))
+            }}
+            disabled={!restoreOriginalFile}
           >
             Reject
           </Button>
@@ -501,25 +562,38 @@ function extractFilesFromMarkdown(markdown: string): {
 }[] {
   if (!markdown) return []
 
-  const files = new Map<string, { code?: string }>()
+  const files: Array<{ path: string; code?: string }> = []
   const codeBlockFileMap = new Map<string, string>()
   const codeBlockRegex = /```[\s\S]*?```/g
   let match
+  let previousCodeBlockEnd = 0
 
   while ((match = codeBlockRegex.exec(markdown)) !== null) {
     const codeBlock = match[0]
     const code = stripCodeFence(codeBlock)
     if (!code.trim()) continue
 
-    const filePath = extractFilePathFromCode(code, markdown, codeBlockFileMap)
+    // Pass the index of where this code block starts in the markdown
+    const codeBlockIndex = match.index
+    const filePath = extractFilePathFromCode(
+      code,
+      markdown,
+      codeBlockFileMap,
+      codeBlockIndex,
+      previousCodeBlockEnd
+    )
     if (filePath) {
       const normalized = normalizePath(filePath)
-      files.set(normalized, { code })
+      files.push({ path: normalized, code })
     }
+
+    // Update previous code block end position
+    previousCodeBlockEnd = match.index + match[0].length
   }
 
-  if (!files.size) {
+  if (files.length === 0) {
     const filePattern = /File:\s*([^\n]+)/gi
+    const seenPaths = new Set<string>()
     let fallbackMatch
     while ((fallbackMatch = filePattern.exec(markdown)) !== null) {
       const cleanPath = fallbackMatch[1]
@@ -527,17 +601,15 @@ function extractFilesFromMarkdown(markdown: string): {
         .trim()
       if (cleanPath) {
         const normalized = normalizePath(cleanPath)
-        if (!files.has(normalized)) {
-          files.set(normalized, {})
+        if (!seenPaths.has(normalized)) {
+          seenPaths.add(normalized)
+          files.push({ path: normalized })
         }
       }
     }
   }
 
-  return Array.from(files.entries()).map(([path, value]) => ({
-    path,
-    code: value.code,
-  }))
+  return files
 }
 
 function stripCodeFence(codeBlock: string) {

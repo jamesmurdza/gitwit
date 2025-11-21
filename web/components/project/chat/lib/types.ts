@@ -41,6 +41,10 @@ export type ApplyMergedFileArgs = FileMergeResult & {
   displayName?: string
 }
 
+export type GetCurrentFileContentFn = (
+  filePath: string
+) => Promise<string> | string
+
 // AIChat props interface
 export interface AIChatProps {
   activeFileContent: string

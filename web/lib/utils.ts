@@ -51,7 +51,9 @@ export function isNewFile(
 export function extractFilePathFromCode(
   code: string,
   markdownText: string,
-  codeBlockFileMap: Map<string, string>
+  codeBlockFileMap: Map<string, string>,
+  codeBlockIndex?: number,
+  previousCodeBlockEnd?: number
 ): string | null {
   // First, try to find "File: /path/to/file" pattern in the code block itself
   const filePatternInCode = /^File:\s*([^\n]+)/m
@@ -69,7 +71,6 @@ export function extractFilePathFromCode(
   if (matchInCodePath) {
     return matchInCodePath[1].trim()
   }
-
   // Third, use current markdown text to find the most recent "File: /path" before this code block
   if (!markdownText) {
     return null
@@ -79,8 +80,8 @@ export function extractFilePathFromCode(
   const codePrefix = code.substring(0, Math.min(100, code.length)).trim()
   const codeHash = codePrefix.substring(0, 50) // Use first 50 chars as identifier
 
-  // Check cache first
-  if (codeBlockFileMap.has(codeHash)) {
+  // Check cache first (but only if we don't have a specific index)
+  if (codeBlockIndex === undefined && codeBlockFileMap.has(codeHash)) {
     return codeBlockFileMap.get(codeHash) || null
   }
 
@@ -105,15 +106,30 @@ export function extractFilePathFromCode(
     })
   }
 
-  // Find this code block in the markdown and look backwards for file path
-  const codeIndex = markdownText.indexOf(codePrefix)
+  // Use the provided code block index, or find it in the markdown
+  let codeIndex: number
+  if (codeBlockIndex !== undefined) {
+    codeIndex = codeBlockIndex
+  } else {
+    // Fallback: find this code block in the markdown
+    codeIndex = markdownText.indexOf(codePrefix)
+  }
+
   if (codeIndex > 0) {
     // Find the most recent file path before this position
+    // If previousCodeBlockEnd is provided, only look for file paths after it
+    const searchStart =
+      previousCodeBlockEnd !== undefined ? previousCodeBlockEnd : 0
     for (let i = positions.length - 1; i >= 0; i--) {
-      if (positions[i].position < codeIndex) {
+      if (
+        positions[i].position >= searchStart &&
+        positions[i].position < codeIndex
+      ) {
         const intendedFile = positions[i].filePath
-        // Cache it for future renders
-        codeBlockFileMap.set(codeHash, intendedFile)
+        // Cache it for future renders (only if we don't have a specific index)
+        if (codeBlockIndex === undefined) {
+          codeBlockFileMap.set(codeHash, intendedFile)
+        }
         return intendedFile
       }
     }
