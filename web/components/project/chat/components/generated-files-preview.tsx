@@ -1,24 +1,15 @@
 import { Button } from "@/components/ui/button"
-import { cn, extractFilePathFromCode } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { Check, ChevronDown, Info, Loader2, X } from "lucide-react"
 import React from "react"
+import { GeneratedFile, extractFilesFromMessages } from "../lib/file-utils"
 import type {
   ApplyMergedFileArgs,
   FileMergeResult,
   GetCurrentFileContentFn,
-  Message,
   PrecomputeMergeArgs,
 } from "../lib/types"
-import { normalizePath } from "../lib/utils"
-import { useChat, type MergeState } from "../providers/chat-provider"
-
-type GeneratedFile = {
-  id: string
-  name: string
-  path: string
-  additions: number
-  code?: string
-}
+import { useChat } from "../providers/chat-provider"
 
 type GeneratedFilesPreviewProps = {
   files?: GeneratedFile[]
@@ -28,8 +19,6 @@ type GeneratedFilesPreviewProps = {
   restoreOriginalFile?: (args: ApplyMergedFileArgs) => Promise<void>
   getCurrentFileContent?: GetCurrentFileContentFn
 }
-
-const HARDCODED_ADDITIONS = 3
 
 export function GeneratedFilesPreview({
   files,
@@ -45,6 +34,7 @@ export function GeneratedFilesPreview({
     latestAssistantId,
     mergeStatuses,
     setMergeStatuses,
+    fileActionStatuses,
   } = useChat()
   const [isOpen, setIsOpen] = React.useState(true)
   const [applyingMap, setApplyingMap] = React.useState<Record<string, boolean>>(
@@ -107,7 +97,7 @@ export function GeneratedFilesPreview({
 
   React.useEffect(() => {
     setMergeStatuses((prev) => {
-      const next: Record<string, MergeState> = {}
+      const next: Record<string, any> = {}
       generatedFiles.forEach((file) => {
         next[file.path] = prev[file.path] ?? { status: "idle" }
       })
@@ -191,6 +181,10 @@ export function GeneratedFilesPreview({
             if (latestAssistantId) {
               markFileActionStatus(latestAssistantId, key, "applied")
             }
+          })
+          .catch((error) => {
+            console.error("Failed to apply file changes:", error)
+            // Don't mark as applied if it failed
           })
           .finally(stopLoading)
 
@@ -319,12 +313,17 @@ export function GeneratedFilesPreview({
           filePath: key,
           mergedCode: result.mergedCode,
           originalCode: result.originalCode,
+          displayName: file.name,
         })
           .then(() => {
             setResolvedFiles((prev) => ({ ...prev, [key]: "rejected" }))
             if (latestAssistantId) {
               markFileActionStatus(latestAssistantId, key, "rejected")
             }
+          })
+          .catch((error) => {
+            console.error("Failed to restore file:", error)
+            // Don't mark as rejected if it failed
           })
           .finally(stopLoading)
 
@@ -391,9 +390,14 @@ export function GeneratedFilesPreview({
     return null
   }
 
-  const visibleFiles = generatedFiles.filter(
-    (file) => !resolvedFiles[file.path]
-  )
+  // Check if files are resolved either locally or via code block actions
+  const visibleFiles = generatedFiles.filter((file) => {
+    const isResolvedLocally = resolvedFiles[file.path]
+    const isResolvedViaCodeBlock =
+      latestAssistantId &&
+      fileActionStatuses[latestAssistantId]?.[file.path] !== undefined
+    return !isResolvedLocally && !isResolvedViaCodeBlock
+  })
 
   if (!visibleFiles.length) {
     return null
@@ -524,99 +528,6 @@ export function GeneratedFilesPreview({
       </div>
     </div>
   )
-}
-
-function extractFilesFromMessages(messages: Message[]): {
-  files: GeneratedFile[]
-  sourceKey: string | null
-} {
-  if (!messages.length) return { files: [], sourceKey: null }
-
-  const latestAssistant = [...messages]
-    .reverse()
-    .find(
-      (message) => message.role === "assistant" && !!message.content?.trim()
-    )
-
-  if (!latestAssistant?.content) return { files: [], sourceKey: null }
-
-  const files = extractFilesFromMarkdown(latestAssistant.content).map(
-    ({ path, code }) => ({
-      id: path,
-      path,
-      name: getDisplayName(path),
-      code,
-      additions: HARDCODED_ADDITIONS,
-    })
-  )
-
-  return { files, sourceKey: latestAssistant.content }
-}
-
-function extractFilesFromMarkdown(markdown: string): {
-  path: string
-  code?: string
-}[] {
-  if (!markdown) return []
-
-  const files: Array<{ path: string; code?: string }> = []
-  const codeBlockFileMap = new Map<string, string>()
-  const codeBlockRegex = /```[\s\S]*?```/g
-  let match
-  let previousCodeBlockEnd = 0
-
-  while ((match = codeBlockRegex.exec(markdown)) !== null) {
-    const codeBlock = match[0]
-    const code = stripCodeFence(codeBlock)
-    if (!code.trim()) continue
-
-    // Pass the index of where this code block starts in the markdown
-    const codeBlockIndex = match.index
-    const filePath = extractFilePathFromCode(
-      code,
-      markdown,
-      codeBlockFileMap,
-      codeBlockIndex,
-      previousCodeBlockEnd
-    )
-    if (filePath) {
-      const normalized = normalizePath(filePath)
-      files.push({ path: normalized, code })
-    }
-
-    // Update previous code block end position
-    previousCodeBlockEnd = match.index + match[0].length
-  }
-
-  if (files.length === 0) {
-    const filePattern = /File:\s*([^\n]+)/gi
-    const seenPaths = new Set<string>()
-    let fallbackMatch
-    while ((fallbackMatch = filePattern.exec(markdown)) !== null) {
-      const cleanPath = fallbackMatch[1]
-        .replace(/\s*\(new file\)\s*$/i, "")
-        .trim()
-      if (cleanPath) {
-        const normalized = normalizePath(cleanPath)
-        if (!seenPaths.has(normalized)) {
-          seenPaths.add(normalized)
-          files.push({ path: normalized })
-        }
-      }
-    }
-  }
-
-  return files
-}
-
-function stripCodeFence(codeBlock: string) {
-  return codeBlock.replace(/^```[\w-]*\s*\n?/, "").replace(/```\s*$/, "")
-}
-
-function getDisplayName(path: string) {
-  const normalized = normalizePath(path)
-  const parts = normalized.split("/")
-  return parts[parts.length - 1] || normalized
 }
 
 function HoverIconButton({

@@ -1,6 +1,5 @@
 "use client"
 
-import { mergeCode } from "@/app/actions/ai"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -23,19 +22,15 @@ import Tab from "../ui/tab"
 import AIEditElements from "./ai-edit/ai-edit-elements"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
-import type {
-  ApplyMergedFileArgs,
-  FileMergeResult,
-  PrecomputeMergeArgs,
-} from "./chat/lib/types"
-import { normalizePath, pathMatchesTab } from "./chat/lib/utils"
 import { ChatProvider } from "./chat/providers/chat-provider"
+import { useAIFileActions } from "./hooks/useAIFileActions"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
 import { useDiffSessionManager } from "./hooks/useDiffSessionManager"
 import { useEditorSocket } from "./hooks/useEditorSocket"
 import { useMonacoEditor } from "./hooks/useMonacoEditor"
 import PreviewWindow from "./preview"
 import Terminals from "./terminals"
+
 export interface ProjectLayoutProps {
   isOwner: boolean
   projectName: string
@@ -89,22 +84,6 @@ export default function ProjectLayout({
   // Apply Button merger decoration state
   const [mergeDecorationsCollection, setMergeDecorationsCollection] =
     useState<monaco.editor.IEditorDecorationsCollection>()
-  const pendingPreviewApplyRef = useRef<{
-    filePath: string
-    content: string
-    resolve: () => void
-    reject: (error: unknown) => void
-  } | null>(null)
-  const pendingUpdatesQueueRef = useRef<
-    Array<{
-      filePath: string
-      content: string
-      resolve: () => void
-      reject: (error: unknown) => void
-    }>
-  >([])
-  const [pendingApplyTick, setPendingApplyTick] = useState(0)
-  const isProcessingQueueRef = useRef(false)
 
   // Editor layout and state management
   const {
@@ -295,219 +274,22 @@ export default function ProjectLayout({
     return null
   }, [activeTab?.id])
 
-  const precomputeMergeForFile = useCallback(
-    async ({
-      filePath,
-      code,
-    }: PrecomputeMergeArgs): Promise<FileMergeResult> => {
-      const normalizedPath = normalizePath(filePath)
-      let originalCode = ""
-
-      if (projectId) {
-        try {
-          const response = await fileRouter.fileContent.fetcher({
-            fileId: normalizedPath,
-            projectId,
-          })
-          originalCode = response?.data ?? ""
-        } catch (error) {
-          console.warn(
-            "Failed to fetch original file content for merge:",
-            error
-          )
-        }
-      }
-
-      try {
-        const mergedCode = await mergeCode(
-          code,
-          originalCode,
-          normalizedPath.split("/").pop() || normalizedPath,
-          projectId
-        )
-        return { mergedCode, originalCode }
-      } catch (error) {
-        console.error("Auto-merge failed:", error)
-        return { mergedCode: code, originalCode }
-      }
-    },
-    [projectId]
-  )
-
-  // Get current file content (from draft or server)
-  const getCurrentFileContent = useCallback(
-    async (filePath: string): Promise<string> => {
-      const normalizedPath = normalizePath(filePath)
-
-      // First, check if there's a draft (unsaved changes)
-      const draftContent = getDraft(normalizedPath)
-      if (draftContent !== undefined) {
-        return draftContent
-      }
-
-      // If no draft, fetch from server
-      if (projectId) {
-        try {
-          const response = await fileRouter.fileContent.fetcher({
-            fileId: normalizedPath,
-            projectId,
-          })
-          return response?.data ?? ""
-        } catch (error) {
-          console.warn("Failed to fetch current file content:", error)
-          return ""
-        }
-      }
-
-      return ""
-    },
-    [projectId, getDraft]
-  )
-
-  // Handler for applying code from chat
-  const handleApplyCodeFromChat = useCallback(
-    async (
-      code: string,
-      language?: string,
-      options?: {
-        mergeStatuses?: Record<
-          string,
-          { status: string; result?: FileMergeResult; error?: string }
-        >
-        getCurrentFileContent?: (filePath: string) => Promise<string> | string
-        getMergeStatus?: (
-          filePath: string
-        ) =>
-          | { status: string; result?: FileMergeResult; error?: string }
-          | undefined
-      }
-    ) => {
-      if (!activeTab) {
-        return
-      }
-      try {
-        const normalizedPath = normalizePath(activeTab.id)
-        const mergeStatus = options?.mergeStatuses?.[normalizedPath]
-
-        // Check if there's a precomputed merge
-        if (mergeStatus?.status === "ready" && mergeStatus.result) {
-          // Check if current content matches the original code used in merge
-          if (options?.getCurrentFileContent) {
-            try {
-              const currentContent = await Promise.resolve(
-                options.getCurrentFileContent(normalizedPath)
-              )
-              if (currentContent === mergeStatus.result.originalCode) {
-                // Content matches, use precomputed merge
-                const model = await waitForEditorModel()
-                if (model) {
-                  handleApplyCodeWithDecorations(
-                    mergeStatus.result.mergedCode,
-                    mergeStatus.result.originalCode
-                  )
-                  return
-                }
-              }
-            } catch (error) {
-              console.warn("Failed to check current file content:", error)
-              // Fall through to recalculate
-            }
-          }
-        } else if (mergeStatus?.status === "pending") {
-          // Wait for merge to complete
-          let waited = 0
-          const maxWait = 10000 // 10 seconds max
-          const pollInterval = 100 // Check every 100ms
-
-          while (waited < maxWait) {
-            await new Promise((resolve) => setTimeout(resolve, pollInterval))
-            waited += pollInterval
-
-            // Re-check merge status using the getter function
-            const updatedStatus = options?.getMergeStatus?.(normalizedPath)
-            if (updatedStatus?.status === "ready" && updatedStatus.result) {
-              // Merge completed, check content and use it
-              if (options?.getCurrentFileContent) {
-                try {
-                  const currentContent = await Promise.resolve(
-                    options.getCurrentFileContent(normalizedPath)
-                  )
-                  if (currentContent === updatedStatus.result.originalCode) {
-                    const model = await waitForEditorModel()
-                    if (model) {
-                      handleApplyCodeWithDecorations(
-                        updatedStatus.result.mergedCode,
-                        updatedStatus.result.originalCode
-                      )
-                      return
-                    }
-                  }
-                } catch (error) {
-                  console.warn("Failed to check current file content:", error)
-                }
-              }
-              // Content changed or check failed, fall through to recalculate
-              break
-            } else if (updatedStatus?.status === "error") {
-              // Merge failed, recalculate
-              break
-            }
-          }
-        }
-
-        let originalCode = activeFileContent
-
-        // When the file is opened for the first time, the content may still be loading.
-        // If we don't have the original code yet, fetch it directly before merging.
-        if (!originalCode && activeTab.id && projectId) {
-          try {
-            const response = await fileRouter.fileContent.fetcher({
-              fileId: activeTab.id,
-              projectId,
-            })
-            const fetchedContent = response?.data ?? ""
-            if (fetchedContent) {
-              originalCode = fetchedContent
-              updateFileDraft(activeTab.id, fetchedContent)
-            }
-          } catch (fetchError) {
-            console.warn("Failed to fetch original file content:", fetchError)
-          }
-        }
-
-        // Wait for the Monaco editor model to be ready before applying the diff
-        // This is especially important when opening a file for the first time
-        const model = await waitForEditorModel()
-        if (!model) {
-          return
-        }
-
-        // First, merge the partial code with the original using aider diff
-        const mergedCode = await mergeCode(
-          code,
-          originalCode,
-          activeTab.name,
-          projectId
-        )
-
-        // Then apply the diff view with the merged code
-        handleApplyCodeWithDecorations(mergedCode, originalCode)
-      } catch (error) {
-        console.error("📝 Apply Code - Failed to merge code:", error)
-        // Fallback: apply the partial code directly
-        const originalCode = activeFileContent
-        handleApplyCodeWithDecorations(code, originalCode)
-      }
-    },
-    [
-      activeTab,
-      activeFileContent,
-      handleApplyCodeWithDecorations,
-      projectId,
-      updateFileDraft,
-      waitForEditorModel,
-    ]
-  )
+  const {
+    getCurrentFileContent,
+    precomputeMergeForFile,
+    handleApplyCodeFromChat,
+    applyPrecomputedMerge,
+    restoreOriginalFile,
+  } = useAIFileActions({
+    projectId,
+    activeTab,
+    tabs,
+    setActiveTab,
+    editorRef,
+    waitForEditorModel,
+    handleApplyCodeWithDecorations,
+    updateFileDraft,
+  })
 
   // Handler for rejecting code from chat
   const handleRejectCodeFromChat = useCallback(() => {
@@ -517,139 +299,6 @@ export default function ProjectLayout({
       setMergeDecorationsCollection(undefined)
     }
   }, [mergeDecorationsCollection])
-
-  const processNextInQueue = useCallback(() => {
-    if (
-      isProcessingQueueRef.current ||
-      pendingUpdatesQueueRef.current.length === 0
-    ) {
-      return
-    }
-
-    const next = pendingUpdatesQueueRef.current.shift()
-    if (!next) return
-
-    isProcessingQueueRef.current = true
-    pendingPreviewApplyRef.current = next
-    setPendingApplyTick((tick) => tick + 1)
-
-    const matchBy = (tab: TTab) => pathMatchesTab(next.filePath, tab)
-    let targetTab = tabs.find(matchBy)
-    if (!targetTab) {
-      targetTab = {
-        id: next.filePath,
-        name: next.filePath.split("/").pop() || next.filePath,
-        type: "file",
-        saved: true,
-      }
-    }
-
-    const isAlreadyActive = activeTab ? matchBy(activeTab) : false
-    if (!isAlreadyActive) {
-      setActiveTab(targetTab)
-    }
-  }, [activeTab, setActiveTab, tabs])
-
-  const enqueueFileContentUpdate = useCallback(
-    (filePath: string, content: string) => {
-      const normalizedPath = normalizePath(filePath)
-
-      const completion = new Promise<void>((resolve, reject) => {
-        pendingUpdatesQueueRef.current.push({
-          filePath: normalizedPath,
-          content,
-          resolve,
-          reject,
-        })
-        processNextInQueue()
-      })
-
-      return completion
-    },
-    [processNextInQueue]
-  )
-
-  const applyPrecomputedMerge = useCallback(
-    ({ filePath, mergedCode }: ApplyMergedFileArgs) => {
-      return enqueueFileContentUpdate(filePath, mergedCode)
-    },
-    [enqueueFileContentUpdate]
-  )
-
-  const restoreOriginalFile = useCallback(
-    ({ filePath, originalCode }: ApplyMergedFileArgs) => {
-      return enqueueFileContentUpdate(filePath, originalCode)
-    },
-    [enqueueFileContentUpdate]
-  )
-
-  useEffect(() => {
-    const pending = pendingPreviewApplyRef.current
-    if (!pending) {
-      return
-    }
-    if (!activeTab || !pathMatchesTab(pending.filePath, activeTab)) {
-      return
-    }
-
-    let isCancelled = false
-    const applyMergedCode = async () => {
-      try {
-        const model = await waitForEditorModel()
-        if (!model || isCancelled) {
-          throw new Error("Editor not ready")
-        }
-        const editorInstance = editorRefRef.current
-        const fullRange = model.getFullModelRange()
-
-        if (editorInstance) {
-          editorInstance.pushUndoStop()
-          editorInstance.executeEdits("ai-chat-apply-merged-file", [
-            {
-              range: fullRange,
-              text: pending.content,
-              forceMoveMarkers: true,
-            },
-          ])
-          editorInstance.pushUndoStop()
-        } else {
-          model.setValue(pending.content)
-        }
-
-        updateFileDraft(pending.filePath, pending.content)
-
-        if (mergeDecorationsCollection) {
-          mergeDecorationsCollection.clear()
-          setMergeDecorationsCollection(undefined)
-        }
-
-        pending.resolve()
-      } catch (error) {
-        pending.reject(error)
-      } finally {
-        if (!isCancelled) {
-          pendingPreviewApplyRef.current = null
-          isProcessingQueueRef.current = false
-          processNextInQueue()
-        }
-      }
-    }
-
-    applyMergedCode()
-
-    return () => {
-      isCancelled = true
-    }
-  }, [
-    activeTab?.id,
-    activeTab?.name,
-    mergeDecorationsCollection,
-    pendingApplyTick,
-    setMergeDecorationsCollection,
-    updateFileDraft,
-    waitForEditorModel,
-    processNextInQueue,
-  ])
 
   // Close tab with snapshot if closing the active tab with unresolved diffs
   const handleCloseTab = useCallback(
