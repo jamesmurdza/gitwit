@@ -471,8 +471,6 @@ export function GeneratedFilesPreview({
           const isApplying = applyingMap[file.path]
           const isRejecting = rejectingMap[file.path]
           const isProcessing = isApplying || isRejecting
-          const pending =
-            status === "pending" || (!!file.code && status === "idle")
           return (
             <div
               key={file.id}
@@ -483,20 +481,7 @@ export function GeneratedFilesPreview({
                 <span className="text-[11px] font-medium text-foreground">
                   {file.name}
                 </span>
-                {status === "error" && (
-                  <span className="text-[10px] font-medium text-red-500">
-                    Prep failed
-                  </span>
-                )}
-                {pending && !isApplying && (
-                  <span className="text-[10px] text-muted-foreground">
-                    Preparing...
-                  </span>
-                )}
               </div>
-              <span className="text-[10px] font-semibold text-emerald-500 transition group-hover:opacity-0">
-                +{file.additions}
-              </span>
               <div
                 className={cn(
                   "flex items-center gap-1 transition",
