@@ -135,6 +135,16 @@ OPENAI_API_KEY='🔑'
 ANTHROPIC_API_KEY='🔑'
 ```
 
+**Optional (AWS Bedrock):**
+
+```
+AWS_ACCESS_KEY_ID='🔑'
+AWS_SECRET_ACCESS_KEY='🔑'
+AWS_REGION='us-east-1'
+AWS_MODEL_ID='qwen.qwen3-32b-v1:0'
+# AWS_MODEL_ID='qwen.qwen3-coder-30b-a3b-v1:0'
+```
+
 **Note:**
 
 - If `ENCRYPTION_KEY` is not set, the custom API keys feature will be disabled, but the app will still work using system-level API keys.
