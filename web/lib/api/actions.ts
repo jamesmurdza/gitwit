@@ -147,6 +147,7 @@ export async function updateUser(
       return { message: "Successfully updated", newRoute }
     }
     revalidatePath(`/[username]`, "page")
+    revalidatePath("/dashboard", "layout")
     return { message: "Successfully updated" }
   } catch (error) {
     if (error instanceof z.ZodError) {
