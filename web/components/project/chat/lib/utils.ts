@@ -1,5 +1,6 @@
 import { fileRouter } from "@/lib/api"
 import { TFile, TFolder } from "@/lib/types"
+import { processFileType } from "@/lib/utils"
 import { EditorSlice } from "@/store/slices/editor"
 import { QueryClient } from "@tanstack/react-query"
 import * as React from "react"
@@ -41,6 +42,50 @@ const getAllFiles = (items: (TFile | TFolder)[]): TFile[] => {
     return acc
   }, [])
 }
+
+const formatLineInfo = (lineRange?: { start: number; end: number }): string => {
+  if (!lineRange) return ""
+  return lineRange.start === lineRange.end
+    ? ` (line ${lineRange.start})`
+    : ` (lines ${lineRange.start}-${lineRange.end})`
+}
+
+const processCodeContext = async ({
+  tab,
+  queryClient,
+  projectId,
+  drafts,
+}: {
+  tab: ContextTab & { type: "code" }
+  queryClient: QueryClient
+  projectId: string
+  drafts: EditorSlice["drafts"]
+}): Promise<string> => {
+  const lineInfo = formatLineInfo(tab.lineRange)
+  const language = processFileType(tab.name)
+  if (tab.content) {
+    return `Code from ${tab.name}${lineInfo}:\n\`\`\`${language}\n${tab.content}\n\`\`\``
+  }
+
+  const draftContent = drafts[tab.id]
+  if (draftContent !== undefined) {
+    return `Code from ${tab.name}${lineInfo}:\n\`\`\`${language}\n${draftContent}\n\`\`\``
+  }
+
+  try {
+    const data = await queryClient.ensureQueryData(
+      fileRouter.fileContent.getOptions({
+        fileId: tab.id,
+        projectId: projectId,
+      })
+    )
+    return `Code from ${tab.name}${lineInfo}:\n\`\`\`${language}\n${data.data}\n\`\`\``
+  } catch (error) {
+    console.error(`Failed to fetch content for ${tab.name}:`, error)
+    return `Code from ${tab.name}${lineInfo}: [Failed to load content]`
+  }
+}
+
 const getCombinedContext = async ({
   contextTabs,
   queryClient,
@@ -51,52 +96,54 @@ const getCombinedContext = async ({
   queryClient: QueryClient
   projectId: string
   drafts: EditorSlice["drafts"]
-}) => {
-  let contextMessage: string[] = []
+}): Promise<string> => {
   if (contextTabs.length === 0) return ""
-  const codeContextTabs = contextTabs.filter((tab) => tab.type === "code")
 
-  const remainingContextTabs = contextTabs.filter((tab) => tab.type !== "code")
-  remainingContextTabs.forEach((tab) => {
-    if (tab.type === "file") {
-      const cleanContent = tab.content
-        .replace(/^```[\w-]*\n/, "")
-        .replace(/\n```$/, "")
-      const fileExt = tab.name.split(".").pop() || "txt"
-      contextMessage.push(
-        `File ${tab.name}:\n\`\`\`${fileExt}\n${cleanContent}\n\`\`\``
-      )
-    } else {
-      contextMessage.push(`Image ${tab.name}:\n${tab.content}`)
-    }
-  })
-  const getCodeContents = codeContextTabs.map((c) => {
-    const draftContent = drafts[c.id]
-    // Check the draft first
-    if (draftContent !== undefined) {
-      contextMessage.push(
-        `Code from ${c.id}:\n\`\`\`typescript\n${draftContent}\n\`\`\``
-      )
-      return Promise.resolve()
-    }
-    // Check query cache next, then finally fetch it not available
-    return queryClient
-      .ensureQueryData(
-        fileRouter.fileContent.getOptions({
-          fileId: c.id,
-          projectId: projectId,
-        })
-      )
-      .then((data) => {
-        contextMessage.push(
-          `Code from ${c.id}:\n\`\`\`typescript\n${data.data}\n\`\`\``
-        )
-      })
-  })
-  // Fetch all content in parallel for speed
-  await Promise.all(getCodeContents)
+  const contextMessages: string[] = []
 
-  return contextMessage.join("\n\n")
+  const codeContextTabs = contextTabs.filter(
+    (tab): tab is ContextTab & { type: "code" } => tab.type === "code"
+  )
+  const textContextTabs = contextTabs.filter(
+    (tab): tab is ContextTab & { type: "text" } => tab.type === "text"
+  )
+  const fileContextTabs = contextTabs.filter(
+    (tab): tab is ContextTab & { type: "file" } => tab.type === "file"
+  )
+  const imageContextTabs = contextTabs.filter(
+    (tab): tab is ContextTab & { type: "image" } => tab.type === "image"
+  )
+
+  if (codeContextTabs.length > 0) {
+    const codeContexts = await Promise.all(
+      codeContextTabs.map((tab) =>
+        processCodeContext({ tab, queryClient, projectId, drafts })
+      )
+    )
+    contextMessages.push(...codeContexts)
+  }
+
+  textContextTabs.forEach((tab) => {
+    contextMessages.push(
+      `Text snippet ${tab.name}:\n\`\`\`text\n${tab.content}\n\`\`\``
+    )
+  })
+
+  fileContextTabs.forEach((tab) => {
+    const cleanContent = tab.content
+      .replace(/^```[\w-]*\n/, "")
+      .replace(/\n```$/, "")
+    const fileExt = tab.name.split(".").pop() || "txt"
+    contextMessages.push(
+      `File ${tab.name}:\n\`\`\`${fileExt}\n${cleanContent}\n\`\`\``
+    )
+  })
+
+  imageContextTabs.forEach((tab) => {
+    contextMessages.push(`Image ${tab.name}:\n${tab.content}`)
+  })
+
+  return contextMessages.join("\n\n")
 }
 
 /**
@@ -146,7 +193,7 @@ const stringifyContent = (content: any, seen = new WeakSet()): string => {
 
   return String(content)
 }
-export { getAllFiles, getCombinedContext, stringifyContent }
+
 /**
  * Normalize a path by trimming and converting backslashes to forward slashes.
  */
@@ -169,4 +216,23 @@ const pathMatchesTab = (
   )
 }
 
-export { normalizePath, pathMatchesTab }
+function shouldTreatAsContext(text: string) {
+  const long = text.length > 400
+  const paragraphs = text.split("\n").length > 2
+  const markdown = /[#>*`]|-{2,}|```/.test(text)
+  const code = /(function|\{|}|\(|\)|=>|class )/.test(text)
+  const lists = /^[0-9]+\./m.test(text) || /^[-*•]\s/m.test(text)
+
+  return long || paragraphs || markdown || code || lists
+}
+
+export {
+  formatLineInfo,
+  getAllFiles,
+  getCombinedContext,
+  normalizePath,
+  pathMatchesTab,
+  processCodeContext,
+  shouldTreatAsContext,
+  stringifyContent,
+}
