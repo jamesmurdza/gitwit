@@ -109,7 +109,6 @@ export function ChatHistory() {
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       )
   }, [threads, projectId])
-  console.log("Sorted Threads:", sortedThreads)
   const handleNewThread = () => {
     createThread(projectId)
   }

@@ -17,6 +17,7 @@ import {
   ChatScrollContainer,
   ScrollButton,
 } from "./components/chat-container"
+import { ChatHistory } from "./components/chat-history"
 import {
   ChatInput,
   ChatInputActionBar,
@@ -41,6 +42,7 @@ function AIChatBase({ onApplyCode, onRejectCode }: AIChatProps) {
       <ChatContainerHeader>
         <ChatContainerTitle>Chat</ChatContainerTitle>
         <ChatContainerActions>
+          <ChatHistory />
           <ChatContainerSettings />
           <ChatContainerMaximizeToggle />
           <ChatContainerCollapse />

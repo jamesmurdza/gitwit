@@ -414,6 +414,7 @@ function ChatContainerMaximizeToggle() {
 // #endregion Settings
 
 export {
+  ChatContainerAction,
   ChatContainerActions,
   ChatContainerContent,
   ChatContainerEmpty,

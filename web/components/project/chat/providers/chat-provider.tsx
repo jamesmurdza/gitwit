@@ -8,6 +8,7 @@ import React, {
   createContext,
   ReactNode,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -28,7 +29,6 @@ type ChatContextType = {
   activeFileContent?: string
   activeFileName?: string
   messages: Message[]
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   input: string
   setInput: React.Dispatch<React.SetStateAction<string>>
   isGenerating: boolean
@@ -54,7 +54,35 @@ function ChatProvider({
   const queryClient = useQueryClient()
   const drafts = useAppStore((s) => s.drafts)
 
-  const [messages, setMessages] = useState<Message[]>([])
+  // Thread management
+  const hasHydrated = useAppStore((s) => s._hasHydrated)
+  const threads = useAppStore((s) => s.threads)
+  const activeThreadId = useAppStore((s) => s.activeThreadId)
+  const createThread = useAppStore((s) => s.createThread)
+  const addMessage = useAppStore((s) => s.addMessage)
+  const updateMessage = useAppStore((s) => s.updateMessage)
+
+  // Get messages from active thread
+  const messages = useAppStore((s) =>
+    s.activeThreadId && s.threads[s.activeThreadId]
+      ? s.threads[s.activeThreadId].messages
+      : []
+  )
+
+  // Initialize thread on mount after hydration
+  useEffect(() => {
+    if (!hasHydrated) return
+
+    const projectThreads = Object.values(threads).filter(
+      (t) => t.projectId === projectId
+    )
+
+    // If no threads exist for this project or no active thread, create one
+    if (projectThreads.length === 0 || !activeThreadId) {
+      createThread(projectId)
+    }
+  }, [hasHydrated, projectId, threads, activeThreadId, createThread])
+
   const [input, setInput] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -73,25 +101,26 @@ function ChatProvider({
   const throttledSetMessages = useRef<ReturnType<typeof setTimeout> | null>(
     null
   )
-  const updateAssistantMessage = useCallback((buffer: string) => {
-    setMessages((prev) => {
-      const updated = [...prev]
-      updated[updated.length - 1].content = buffer
-      return updated
-    })
-  }, [])
+  const updateAssistantMessage = useCallback(
+    (buffer: string, messageIndex: number) => {
+      if (!activeThreadId) return
+      updateMessage(activeThreadId, messageIndex, buffer)
+    },
+    [activeThreadId, updateMessage]
+  )
 
   const sendMessage = useCallback(
     async (message: string) => {
-      if (!message.trim()) return
+      if (!message.trim() || !activeThreadId) return
       setIsGenerating(true)
       setIsLoading(true)
 
-      // Batch state updates
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: message, context: contextTabs },
-      ])
+      // Add user message to thread
+      addMessage(activeThreadId, {
+        role: "user",
+        content: message,
+        context: contextTabs,
+      })
       setInput("")
 
       const contextContent = await getCombinedContext({
@@ -103,6 +132,11 @@ function ChatProvider({
       setContextTabs([])
 
       abortControllerRef.current = new AbortController()
+
+      // Add empty assistant message
+      addMessage(activeThreadId, { role: "assistant", content: "" })
+      const assistantMessageIndex = messages.length + 1 // +1 for user message just added
+
       try {
         const { output } = await streamChat(
           [
@@ -118,7 +152,7 @@ function ChatProvider({
             fileName: activeFileName,
           }
         )
-        setMessages((prev) => [...prev, { role: "assistant", content: "" }])
+
         let buffer = ""
         let firstChunk = true
         for await (const chunk of readStreamableValue(output)) {
@@ -131,24 +165,22 @@ function ChatProvider({
           // Throttle updates to every 50ms
           if (!throttledSetMessages.current) {
             throttledSetMessages.current = setTimeout(() => {
-              updateAssistantMessage(buffer)
+              updateAssistantMessage(buffer, assistantMessageIndex)
               throttledSetMessages.current = null
             }, 50)
           }
         }
         // Final update after stream ends
-        updateAssistantMessage(buffer)
+        updateAssistantMessage(buffer, assistantMessageIndex)
       } catch (error: any) {
         if (error.name === "AbortError") {
           console.log("Generation aborted")
         } else {
           console.error("Error:", error)
-          setMessages((prev) => {
-            const updated = [...prev]
-            updated[updated.length - 1].content =
-              error.message || "Sorry, an error occurred."
-            return updated
-          })
+          updateAssistantMessage(
+            error.message || "Sorry, an error occurred.",
+            assistantMessageIndex
+          )
         }
       } finally {
         setIsGenerating(false)
@@ -161,6 +193,7 @@ function ChatProvider({
       }
     },
     [
+      activeThreadId,
       contextTabs,
       queryClient,
       projectId,
@@ -169,7 +202,9 @@ function ChatProvider({
       activeFileContent,
       fileTree,
       projectName,
+      activeFileName,
       messages,
+      addMessage,
       updateAssistantMessage,
     ]
   )
@@ -184,7 +219,6 @@ function ChatProvider({
       activeFileContent,
       activeFileName,
       messages,
-      setMessages,
       input,
       setInput,
       isGenerating,
@@ -207,8 +241,6 @@ function ChatProvider({
       removeContextTab,
       sendMessage,
       stopGeneration,
-      setMessages,
-      setInput,
     ]
   )
 
