@@ -19,7 +19,7 @@ import { ChatThread } from "@/store/slices/chat"
 import { formatDistanceToNow } from "date-fns"
 import { History, MessageSquare, Plus, Trash2 } from "lucide-react"
 import { useParams } from "next/navigation"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { ChatContainerAction } from "./chat-container"
 
 interface HistoryItemProps {
@@ -84,6 +84,8 @@ export function ChatHistory() {
   const createThread = useAppStore((s) => s.createThread)
   const projectId = params.id as string
   const threads = useAppStore((s) => s.threads)
+  const [open, setOpen] = useState(false)
+
   const sortedThreads = useMemo(() => {
     return Object.values(threads)
       .filter((t: ChatThread) => t.projectId === projectId)
@@ -101,6 +103,7 @@ export function ChatHistory() {
 
   const handleSwitchThread = (threadId: string) => {
     setActiveThread(threadId)
+    setOpen(false)
   }
 
   const handleDeleteThread = (threadId: string, e: React.MouseEvent) => {
@@ -109,7 +112,7 @@ export function ChatHistory() {
   }
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <ChatContainerAction label="Chat History">
           <History className="h-4 w-4" />
