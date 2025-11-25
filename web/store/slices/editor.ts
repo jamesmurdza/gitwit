@@ -1,5 +1,5 @@
 import { DiffSession, TTab } from "@/lib/types"
-import type { editor, Selection } from "monaco-editor"
+import type { editor } from "monaco-editor"
 import { StateCreator } from ".."
 
 interface EditorSlice {
@@ -33,7 +33,7 @@ interface EditorSlice {
   saveDiffSession: (fileId: string, session: DiffSession) => void
   getDiffSession: (fileId: string) => DiffSession | undefined
   clearDiffSession: (fileId: string) => void
-  setEditorRef: (ref: editor.IStandaloneCodeEditor | null) => void
+  setEditorRef: (ref: editor.IStandaloneCodeEditor | undefined) => void
   setDiffFunctions: (functions: {
     hasActiveWidgets: () => boolean
     getUnresolvedSnapshot: (fileId: string) => any
@@ -50,7 +50,7 @@ const createEditorSlice: StateCreator<EditorSlice> = (set, get) => ({
   unsavedAlert: false,
   drafts: {},
   diffSessions: {},
-diffFunctions: null,
+  diffFunctions: null,
   // #endregion
 
   //   #region Actions
