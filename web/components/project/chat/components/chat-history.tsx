@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import { ChatThread } from "@/store/slices/chat"
 import { formatDistanceToNow } from "date-fns"
-import { History, MessageSquare, Plus, RotateCcw, Trash2 } from "lucide-react"
+import { History, MessageSquare, Plus, Trash2 } from "lucide-react"
 import { useParams } from "next/navigation"
 import { useMemo } from "react"
 import { ChatContainerAction } from "./chat-container"
@@ -26,7 +26,6 @@ interface HistoryItemProps {
   thread: ChatThread
   isActive: boolean
   onSwitch: (threadId: string) => void
-  onClear: (threadId: string, e: React.MouseEvent) => void
   onDelete: (threadId: string, e: React.MouseEvent) => void
 }
 
@@ -34,7 +33,6 @@ function HistoryItem({
   thread,
   isActive,
   onSwitch,
-  onClear,
   onDelete,
 }: HistoryItemProps) {
   const messageCount = thread.messages.length
@@ -60,21 +58,6 @@ function HistoryItem({
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={(e) => onClear(thread.id, e)}
-                >
-                  <RotateCcw className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Clear messages</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -115,15 +98,9 @@ export function ChatHistory() {
   const activeThreadId = useAppStore((s) => s.activeThreadId)
   const setActiveThread = useAppStore((s) => s.setActiveThread)
   const deleteThread = useAppStore((s) => s.deleteThread)
-  const clearThread = useAppStore((s) => s.clearThread)
 
   const handleSwitchThread = (threadId: string) => {
     setActiveThread(threadId)
-  }
-
-  const handleClearThread = (threadId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    clearThread(threadId)
   }
 
   const handleDeleteThread = (threadId: string, e: React.MouseEvent) => {
@@ -169,7 +146,6 @@ export function ChatHistory() {
                   thread={thread}
                   isActive={thread.id === activeThreadId}
                   onSwitch={handleSwitchThread}
-                  onClear={handleClearThread}
                   onDelete={handleDeleteThread}
                 />
               ))}
