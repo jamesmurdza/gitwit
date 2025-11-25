@@ -63,7 +63,7 @@ import {
   TEXT_LIKE_MIMES,
 } from "../lib/constants"
 import { ContextTab } from "../lib/types"
-import { getAllFiles } from "../lib/utils"
+import { getAllFiles, shouldTreatAsContext } from "../lib/utils"
 import { useChat } from "../providers/chat-provider"
 
 type ChatInputContextType = {
@@ -122,7 +122,7 @@ function ChatInput({
     onValueChange?.(newValue)
   }
 
-  const handlePaste = (e: React.ClipboardEvent) => {
+  const handlePaste = async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items
     if (!items) return
 
@@ -173,6 +173,19 @@ function ChatInput({
           } else {
             reader.readAsDataURL(file)
           }
+        }
+      } else if (item.type === "text/plain") {
+        // Get text synchronously to check if it should be treated as context
+        const text = e.clipboardData.getData("text/plain")
+        if (shouldTreatAsContext(text)) {
+          e.preventDefault()
+
+          addContextTab({
+            id: nanoid(),
+            type: "text",
+            name: `Snippet ${nanoid(4)}`,
+            content: text,
+          })
         }
       }
     }
@@ -249,6 +262,7 @@ function ChatInputTextarea({
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
+      autoFocus
       className={cn(
         "w-full resize-none rounded-none border-none px-2 py-3 shadow-none outline-none ring-0",
         "field-sizing-content max-h-[6lh] bg-transparent dark:bg-transparent",
