@@ -8,6 +8,81 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Extracts the file path for a code block from various sources:
+ * 1. "File: /path" pattern in the code block itself
+ * 2. File path pattern in the code block
+ * 3. Most recent "File: /path" before this code block in the markdown
+ */
+export function extractFilePathFromCode(
+  code: string,
+  markdownText: string,
+  codeBlockFileMap: Map<string, string>
+): string | null {
+  // First, try to find "File: /path/to/file" pattern in the code block itself
+  const filePatternInCode = /^File:\s*([^\n]+)/m
+  const matchInCode = code.match(filePatternInCode)
+  if (matchInCode) {
+    return matchInCode[1].trim()
+  }
+
+  // Second, try to find file path pattern in the code block
+  const filePathPattern =
+    /(?:^|\n)([a-zA-Z0-9._\/-]+\.(?:html|js|ts|tsx|jsx|css|scss|sass|less|json|md|txt|py|java|cpp|c|h|php|rb|go|rs|swift|kt|dart|vue|svelte))(?:\s|$|\n)/i
+  const matchInCodePath = code.match(filePathPattern)
+  if (matchInCodePath) {
+    return matchInCodePath[1].trim()
+  }
+
+  // Third, use current markdown text to find the most recent "File: /path" before this code block
+  if (!markdownText) {
+    return null
+  }
+
+  // Check if we've already seen this code block
+  const codePrefix = code.substring(0, Math.min(100, code.length)).trim()
+  const codeHash = codePrefix.substring(0, 50) // Use first 50 chars as identifier
+
+  // Check cache first
+  if (codeBlockFileMap.has(codeHash)) {
+    return codeBlockFileMap.get(codeHash) || null
+  }
+
+  if (!codePrefix) {
+    return null
+  }
+
+  // Parse file paths from current markdown
+  const filePattern = /File:\s*([^\n]+)/g
+  const positions: Array<{
+    position: number
+    filePath: string
+  }> = []
+  let match
+  while ((match = filePattern.exec(markdownText)) !== null) {
+    positions.push({
+      position: match.index,
+      filePath: match[1].trim(),
+    })
+  }
+
+  // Find this code block in the markdown and look backwards for file path
+  const codeIndex = markdownText.indexOf(codePrefix)
+  if (codeIndex > 0) {
+    // Find the most recent file path before this position
+    for (let i = positions.length - 1; i >= 0; i--) {
+      if (positions[i].position < codeIndex) {
+        const intendedFile = positions[i].filePath
+        // Cache it for future renders
+        codeBlockFileMap.set(codeHash, intendedFile)
+        return intendedFile
+      }
+    }
+  }
+
+  return null
+}
+
 export function processFileType(file: string) {
   const extension = file.split(".").pop()
   const fileExtToLangMap = fileExtToLang as Record<string, string>

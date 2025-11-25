@@ -1,6 +1,6 @@
 import { bedrock } from "@ai-sdk/amazon-bedrock"
-import { anthropic } from "@ai-sdk/anthropic"
-import { openai } from "@ai-sdk/openai"
+import { anthropic, createAnthropic } from "@ai-sdk/anthropic"
+import { createOpenAI, openai } from "@ai-sdk/openai"
 import { generateText, LanguageModel, streamText, Tool, tool } from "ai"
 import { z } from "zod"
 import { AIProviderConfig, AIRequest, AITool } from "../types"
@@ -84,9 +84,27 @@ export class AIProvider {
 
     switch (config.provider) {
       case "anthropic":
+        if (config.apiKey) {
+          const customAnthropic = createAnthropic({
+            apiKey: config.apiKey,
+          })
+          return customAnthropic(config.modelId!)
+        }
         return anthropic(config.modelId!)
       case "openai":
+        if (config.apiKey) {
+          const customOpenAI = createOpenAI({
+            apiKey: config.apiKey,
+          })
+          return customOpenAI(config.modelId!)
+        }
         return openai(config.modelId!)
+      case "openrouter":
+        const openrouter = createOpenAI({
+          apiKey: config.apiKey,
+          baseURL: "https://openrouter.ai/api/v1",
+        })
+        return openrouter(config.modelId!)
       case "bedrock":
         if (!config.region) throw new Error("AWS region required for Bedrock")
         const modelId = config.modelId || process.env.AWS_MODEL_ID
@@ -250,17 +268,28 @@ export function createAIProvider(
       }
     }
   } else {
-    // Set the appropriate API key based on the explicitly chosen provider
-    if (overrides.provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
-      config.apiKey = process.env.ANTHROPIC_API_KEY
-    } else if (overrides.provider === "openai" && process.env.OPENAI_API_KEY) {
-      config.apiKey = process.env.OPENAI_API_KEY
-    } else if (overrides.provider === "bedrock") {
-      config.region = overrides.region || process.env.AWS_REGION || "us-east-1"
-      if (!config.modelId) {
-        config.modelId =
-          process.env.AWS_MODEL_ID ||
-          "anthropic.claude-3-sonnet-20240229-v1:0"
+    // If API key is provided in overrides, use it; otherwise fall back to env vars
+    if (!overrides.apiKey) {
+      if (overrides.provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
+        config.apiKey = process.env.ANTHROPIC_API_KEY
+      } else if (
+        overrides.provider === "openai" &&
+        process.env.OPENAI_API_KEY
+      ) {
+        config.apiKey = process.env.OPENAI_API_KEY
+      } else if (
+        overrides.provider === "openrouter" &&
+        process.env.OPENROUTER_API_KEY
+      ) {
+        config.apiKey = process.env.OPENROUTER_API_KEY
+      } else if (overrides.provider === "bedrock") {
+        config.region =
+          overrides.region || process.env.AWS_REGION || "us-east-1"
+        if (!config.modelId) {
+          config.modelId =
+            process.env.AWS_MODEL_ID ||
+            "anthropic.claude-3-sonnet-20240229-v1:0"
+        }
       }
     }
   }

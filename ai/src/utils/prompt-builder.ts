@@ -1,4 +1,5 @@
 import { AIRequest } from "../types"
+import { formatFileTree } from "./file-tree-formatter"
 
 /**
  * Prompt builder class that generates context-aware system prompts for AI interactions
@@ -53,17 +54,11 @@ export class PromptBuilder {
 
     if (templateConfig) {
       prompt += `
-      
-Project Template: ${templateConfig.name}
+File Tree:
+${formatFileTree(context.fileTree || [])}
 
 Conventions:
 ${templateConfig.conventions.join("\n")}
-
-Dependencies:
-${JSON.stringify(templateConfig.dependencies, null, 2)}
-
-Scripts:
-${JSON.stringify(templateConfig.scripts, null, 2)}
 `
     }
 
@@ -76,62 +71,90 @@ ${JSON.stringify(templateConfig.scripts, null, 2)}
 
     prompt += `
 
-🚨 CRITICAL INSTRUCTION: When providing code changes, show ONLY the modified sections, not the entire file.
+🚨 CRITICAL INSTRUCTION: When providing code changes, show ONLY the modified sections, not the entire file. Use the **aider diff** format with search/replace blocks inside code blocks.
 
 MANDATORY Rules for code changes:
-1. Show only the lines that need to be changed
-2. Include a few lines of context before and after the changes for clarity
-3. 🚨 ALWAYS use comments like "// ... existing code ..." to indicate unchanged sections in code even when unchanged code is boiler plate code similar to example formats.
-4. For deletions: Use comments like "// REMOVED: [description of what was removed]" to indicate deleted code
-5. For additions: Use comments like "// NEW: [description of what was added]" to indicate new code
-6. Format using triple backticks with the appropriate language identifier
-7. CRITICAL: Always specify the complete file path relative to the project root
-8. For new files, add "(new file)" after the path
-9. Before any code block, include a line like "File: /path/to/file.ext" to indicate which file the code belongs to
-10. Keep responses brief and to the point
+- Format using triple backticks with the appropriate language identifier
+- CRITICAL: Always specify the complete file path relative to the project root
+- For new files, add "(new file)" after the path
+- Before any code block, include a line like "File: /path/to/file.ext" to indicate which file the code belongs to
+- Keep responses brief and to the point
+- Use aider diff format: \`<<<<<<< SEARCH\` / \`=======\` / \`>>>>>>> REPLACE\` blocks inside code blocks
+- If multiple search/replace blocks are for the same file, group them in the same code block
 
 🚨 NEVER show complete files. ALWAYS use "// ... existing code ..." comments for unchanged sections.
 
 Example format for additions:
 File: /src/components/Button.tsx
 \`\`\`tsx
-// ... existing imports ...
-
+<<<<<<< SEARCH
 export function Button({ onClick, children }: ButtonProps) {
-  // ... existing code ...
+  return <button onClick={onClick}>{children}</button>
+}
+=======
+export function Button({ onClick, children }: ButtonProps) {
   const handleClick = () => {
     console.log('Button clicked'); // NEW: Added logging
     onClick?.();
   };
-  // ... existing code ...
+  return <button onClick={handleClick}>{children}</button>
 }
+>>>>>>> REPLACE
 \`\`\`
 
 Example format for deletions:
 File: /src/components/Button.tsx
 \`\`\`tsx
-// ... existing imports ...
-
+<<<<<<< SEARCH
 export function Button({ onClick, children }: ButtonProps) {
-  // ... existing code ...
-  // REMOVED: Old handleClick function with console.log
+  const handleClick = () => {
+    console.log('Button clicked');
+    onClick?.();
+  };
+  return <button onClick={handleClick}>{children}</button>
+}
+=======
+export function Button({ onClick, children }: ButtonProps) {
   const handleClick = () => {
     onClick?.();
   };
-  // ... existing code ...
+  return <button onClick={handleClick}>{children}</button>
 }
+>>>>>>> REPLACE
+\`\`\`
+
+Example for multiple changes in the same file (grouped in one code block):
+File: /src/components/Button.tsx
+\`\`\`tsx
+<<<<<<< SEARCH
+export function Button({ onClick, children }: ButtonProps) {
+  return <button onClick={onClick}>{children}</button>
+}
+=======
+export function Button({ onClick, children }: ButtonProps) {
+  const handleClick = () => {
+    console.log('Button clicked');
+    onClick?.();
+  };
+  return <button onClick={handleClick}>{children}</button>
+}
+>>>>>>> REPLACE
+
+<<<<<<< SEARCH
+  return <button onClick={handleClick}>{children}</button>
+=======
+  return <button onClick={handleClick} className="btn-primary">{children}</button>
+>>>>>>> REPLACE
 \`\`\`
 
 For HTML files, use:
+File: /index.html
 \`\`\`html
-// ... existing code ...
-<head>
-  // ... existing code ...
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My App</title>
-  // ... existing code ...
-</head>
-// ... existing code ...
+<<<<<<< SEARCH
+  <title>My App — Page Title</title>
+=======
+  <title>My App — Testing Code</title>
+>>>>>>> REPLACE
 \`\`\``
 
     return prompt

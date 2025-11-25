@@ -1,23 +1,24 @@
 "use client"
 
+import AboutModal from "@/components/dashboard/about"
+import NewProjectModal from "@/components/dashboard/new-project"
+import DashboardProjects from "@/components/dashboard/projects"
+import DashboardSettings from "@/components/dashboard/settings"
 import { Button } from "@/components/ui/button"
 import CustomButton from "@/components/ui/customButton"
-import { Sandbox } from "@/lib/types"
+import { Sandbox, User } from "@/lib/types"
 import { useRouter } from "@bprogress/next/app"
-import { Code2, FolderDot, HelpCircle, Plus } from "lucide-react"
+import { Code2, FolderDot, HelpCircle, Plus, Settings } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import AboutModal from "./about"
-import NewProjectModal from "./newProject"
-import DashboardProjects from "./projects"
-import DashboardSharedWithMe from "./shared"
 
 type TScreen = "projects" | "shared" | "settings" | "search"
 
 export default function Dashboard({
   sandboxes,
   shared,
+  userData,
 }: {
   sandboxes: Sandbox[]
   shared: {
@@ -28,20 +29,39 @@ export default function Dashboard({
     sharedOn: string
     authorAvatarUrl: string | null
   }[]
+  userData: User
 }) {
-  const [screen, setScreen] = useState<TScreen>("projects")
-
   const [newProjectModalOpen, setNewProjectModalOpen] = useState(false)
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
+
+  const searchParams = useSearchParams()
+  const q = searchParams.get("q")
+  const tab = searchParams.get("tab")
+  const router = useRouter()
+
+  // Derive screen from URL parameter
+  const screen: TScreen =
+    tab === "settings"
+      ? "settings"
+      : // : tab === "shared" ? "shared" // TODO: Uncomment when shared functionality is ready
+        "projects"
 
   const activeScreen = (s: TScreen) => {
     if (screen === s) return "justify-start"
     else return "justify-start font-normal text-muted-foreground"
   }
 
-  const searchParams = useSearchParams()
-  const q = searchParams.get("q")
-  const router = useRouter()
+  const navigateToScreen = (screen: TScreen) => {
+    if (screen === "settings") {
+      router.push("/dashboard?tab=settings")
+    }
+    // else if (screen === "shared") {
+    //   router.push("/dashboard?tab=shared")
+    // } // TODO: Uncomment when shared functionality is ready
+    else {
+      router.push("/dashboard")
+    }
+  }
 
   useEffect(() => {
     // update the dashboard to show a new project
@@ -55,7 +75,7 @@ export default function Dashboard({
         setOpen={setNewProjectModalOpen}
       />
       <AboutModal open={aboutModalOpen} setOpen={setAboutModalOpen} />
-      <div className="flex grow w-full">
+      <div className="flex grow w-full overflow-hidden">
         <div className="w-56 shrink-0 border-r border-border p-4 justify-between flex flex-col">
           <div className="flex flex-col">
             <CustomButton
@@ -73,28 +93,30 @@ export default function Dashboard({
             </CustomButton>
             <Button
               variant="ghost"
-              onClick={() => setScreen("projects")}
+              onClick={() => navigateToScreen("projects")}
               className={activeScreen("projects")}
             >
               <FolderDot className="w-4 h-4 mr-2" />
               My Projects
             </Button>
-            {/* <Button
+            {/* TODO: Uncomment when shared functionality is ready
+            <Button
               variant="ghost"
-              onClick={() => setScreen("shared")}
+              onClick={() => navigateToScreen("shared")}
               className={activeScreen("shared")}
             >
               <Users className="w-4 h-4 mr-2" />
-              Shared With Me
-            </Button> */}
-            {/* <Button
+              Shared with Me
+            </Button>
+            */}
+            <Button
               variant="ghost"
-              onClick={() => setScreen("settings")}
+              onClick={() => navigateToScreen("settings")}
               className={activeScreen("settings")}
             >
               <Settings className="w-4 h-4 mr-2" />
               Settings
-            </Button> */}
+            </Button>
           </div>
           <div className="flex flex-col">
             <a target="_blank" href="https://github.com/jamesmurdza/gitwit">
@@ -116,20 +138,30 @@ export default function Dashboard({
             </Button>
           </div>
         </div>
-        {screen === "projects" ? (
-          <>
-            {sandboxes ? (
-              <DashboardProjects sandboxes={sandboxes} q={q} />
-            ) : null}
-          </>
-        ) : screen === "shared" ? (
-          <DashboardSharedWithMe
-            shared={shared.map((item) => ({
-              ...item,
-              authorAvatarUrl: item.authorAvatarUrl || "",
-            }))}
-          />
-        ) : screen === "settings" ? null : null}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {(() => {
+            switch (screen) {
+              case "projects":
+                return sandboxes ? (
+                  <DashboardProjects sandboxes={sandboxes} q={q} />
+                ) : null
+              // TODO: Uncomment when shared functionality is ready
+              // case "shared":
+              //   return (
+              //     <DashboardSharedWithMe
+              //       shared={shared.map((item) => ({
+              //         ...item,
+              //         authorAvatarUrl: item.authorAvatarUrl || "",
+              //       }))}
+              //     />
+              //   )
+              case "settings":
+                return <DashboardSettings userData={userData} />
+              default:
+                return null
+            }
+          })()}
+        </div>
       </div>
     </>
   )
