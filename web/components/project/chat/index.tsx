@@ -12,7 +12,6 @@ import {
   ChatContainerHeader,
   ChatContainerMaximizeToggle,
   ChatContainerRoot,
-  ChatContainerSettings,
   ChatContainerTitle,
   ChatScrollContainer,
   ScrollButton,
@@ -43,7 +42,6 @@ function AIChatBase({ onApplyCode, onRejectCode }: AIChatProps) {
         <ChatContainerTitle>Chat</ChatContainerTitle>
         <ChatContainerActions>
           <ChatHistory />
-          <ChatContainerSettings />
           <ChatContainerMaximizeToggle />
           <ChatContainerCollapse />
         </ChatContainerActions>

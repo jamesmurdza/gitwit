@@ -354,36 +354,6 @@ function ScrollButton({
   )
 }
 
-function ChatContainerSettings() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <ChatContainerAction label="settings">
-          <SettingsIcon size={16} />
-        </ChatContainerAction>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem>
-          Profile
-          <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          Billing
-          <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          Settings
-          <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          Keyboard shortcuts
-          <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
 export function ChatContainerCollapse() {
   const { toggleAIChat } = useEditorLayout()
   const { maximized } = useChatContainerContext()
@@ -423,7 +393,6 @@ export {
   ChatContainerMaximizeToggle,
   ChatContainerRoot,
   ChatContainerScrollAnchor,
-  ChatContainerSettings,
   ChatContainerTitle,
   ChatScrollContainer,
   ScrollButton,

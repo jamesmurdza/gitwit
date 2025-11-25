@@ -19,7 +19,11 @@ export default async function DashboardPage() {
   return (
     <div className="w-screen h-screen flex flex-col overflow-hidden overscroll-none">
       <Navbar userData={userData} />
-      <Dashboard sandboxes={userData.sandbox} shared={shared} />
+      <Dashboard
+        sandboxes={userData.sandbox}
+        shared={shared}
+        userData={userData}
+      />
     </div>
   )
 }

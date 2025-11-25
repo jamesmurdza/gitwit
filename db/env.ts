@@ -6,8 +6,10 @@ export const env = {
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET as string,
   E2B_API_KEY: process.env.E2B_API_KEY as string,
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY as string,
+  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY as string | undefined,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY as string,
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY as string | undefined,
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID as string | undefined,
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY as
     | string

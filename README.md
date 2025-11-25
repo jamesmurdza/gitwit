@@ -14,8 +14,20 @@ A quick overview of the tech before we start: The deployment uses a **NextJS** a
 
 - [Clerk](https://clerk.com/): Used for user authentication.
 - [E2B](https://e2b.dev/): Used for the terminals and live preview.
-- [Anthropic](https://anthropic.com/) for code generation.
-- [OpenAI](https://openai.com/): API keys for applying AI-generated code diffs.
+
+**AI Provider Options:**
+
+GitWit supports multiple AI providers. You can either:
+
+- **Use system-level API keys** (set in `.env` - recommended for development)
+- **Let users configure their own API keys** via Dashboard Settings (recommended for production)
+
+Supported providers:
+
+- [Anthropic](https://anthropic.com/): Claude models for code generation and chat
+- [OpenAI](https://openai.com/): GPT models for code generation and chat
+- [OpenRouter](https://openrouter.ai/): Access to multiple AI models through a single API
+- [AWS Bedrock](https://aws.amazon.com/bedrock/): Claude models via AWS infrastructure
 
 ### 1. Clone the repository
 
@@ -89,18 +101,54 @@ Production migration files **are** committed to version control.
 
 ### 3. Configure environment variables
 
-Get API keys for E2B, Clerk, OpenAI, and Anthropic.
+Get API keys for E2B and Clerk (required), plus at least one AI provider (optional for system-level access).
 
 Add them to the `.env` file along with the database connection string.
+
+**Required:**
 
 ```
 DATABASE_URL='🔑'
 E2B_API_KEY='🔑'
 CLERK_SECRET_KEY='🔑'
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY='🔑'
+```
+
+**Optional (Custom API Keys Feature):**
+
+```
+ENCRYPTION_KEY='🔑'  # 32-byte hex string for encrypting user API keys
+```
+
+To enable the custom API keys feature (allowing users to configure their own API keys), set `ENCRYPTION_KEY`. Generate one using:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# or
+openssl rand -base64 32
+```
+
+**Optional (System-level AI providers):**
+
+```
 OPENAI_API_KEY='🔑'
 ANTHROPIC_API_KEY='🔑'
 ```
+
+**Optional (AWS Bedrock):**
+
+```
+AWS_ACCESS_KEY_ID='🔑'
+AWS_SECRET_ACCESS_KEY='🔑'
+AWS_REGION='us-east-1'
+AWS_MODEL_ID='qwen.qwen3-32b-v1:0'
+# AWS_MODEL_ID='qwen.qwen3-coder-30b-a3b-v1:0'
+```
+
+**Note:**
+
+- If `ENCRYPTION_KEY` is not set, the custom API keys feature will be disabled, but the app will still work using system-level API keys.
+- You must provide at least one of: `ENCRYPTION_KEY` (for user-configured keys) OR system-level API keys (`OPENAI_API_KEY`/`ANTHROPIC_API_KEY`).
 
 ### 4. Run the IDE
 
@@ -109,6 +157,59 @@ Start the web app and server in development mode:
 ```bash
 npm run dev
 ```
+
+## Features
+
+### Custom API Key Management
+
+Users can configure their own API keys for AI providers through **Dashboard Settings**:
+
+1. Navigate to Dashboard → Settings → API Keys
+2. Configure keys for any supported provider:
+   - **Anthropic**: Access to Claude models (Sonnet, Opus, Haiku)
+   - **OpenAI**: Access to GPT-4.1 series models
+   - **OpenRouter**: Access to multiple AI models with custom model IDs
+   - **AWS Bedrock**: Claude models via AWS infrastructure
+3. Optionally specify custom model IDs for each provider
+4. API keys are encrypted using AES-256-GCM before storage
+
+**Model Selection:**
+
+- The chat interface automatically shows available models based on configured API keys
+- Users can switch between models using the dropdown in the chat input
+- If no model is specified, sensible defaults are provided for each provider
+
+**Priority Order:**
+When multiple providers are configured, the system uses this priority: OpenRouter > Anthropic > OpenAI > AWS Bedrock
+
+### User Profiles & Dashboard
+
+Users have access to a comprehensive dashboard with:
+
+- **Profile Management**: Edit name, username, bio, personal website, and social links
+- **API Keys**: Securely configure and manage AI provider credentials
+- **Sandboxes**: View, manage visibility (public/private), and delete projects
+- **Public Profiles**: Each user gets a public profile page at `/@username` showing their public projects
+
+### Supported AI Models
+
+**Anthropic (Claude):**
+
+- Claude Sonnet 4.5
+- Claude Haiku 4.5
+- Claude Opus 4.1
+- Claude Sonnet 4
+- Claude Opus 4
+- Claude Sonnet 3.7
+- Claude Haiku 3.5
+
+**OpenAI (GPT):**
+
+- GPT-4.1
+- GPT-4.1 Nano
+- GPT-4.1 Mini
+
+**OpenRouter & AWS:** Custom model IDs supported
 
 ## Optional setup
 

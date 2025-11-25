@@ -13,7 +13,6 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -31,7 +30,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { fileRouter } from "@/lib/api"
+import { fileRouter, userRouter } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import {
   ArrowUp,
@@ -359,32 +358,104 @@ function ChatInputSubmit() {
     </ChatInputAction>
   )
 }
-const models = [
-  {
-    value: "gpt-4",
-    label: "GPT-4",
-  },
-  {
-    value: "gpt-3.5",
-    label: "GPT-3.5",
-  },
-  {
-    value: "llama-3",
-    label: "Llama 3",
-  },
-  {
-    value: "gemini",
-    label: "Gemini",
-  },
-  {
-    value: "mistral",
-    label: "Mistral",
-  },
-]
-
 function ChatInputModelSelect() {
   const [open, setOpen] = React.useState(false)
-  const [value, setValue] = React.useState(models[0].value)
+  const [value, setValue] = React.useState<string>("")
+
+  // Fetch available models from the API
+  const {
+    data: modelsData,
+    isLoading,
+    refetch,
+  } = userRouter.availableModels.useQuery({
+    variables: undefined,
+  })
+
+  // Mutation to update selected model
+  const updateModelMutation = userRouter.updateSelectedModel.useMutation({
+    onSuccess: () => {
+      refetch()
+    },
+  })
+
+  const models = React.useMemo(() => {
+    return (
+      modelsData?.models?.map((model) => ({
+        value: model.id,
+        label: model.name,
+        provider: model.provider,
+      })) || []
+    )
+  }, [modelsData])
+
+  // Set default value when models are loaded or when defaultModel changes
+  React.useEffect(() => {
+    if (modelsData?.defaultModel) {
+      setValue(modelsData.defaultModel)
+    }
+  }, [modelsData?.defaultModel])
+
+  // Group models by provider
+  const groupedModels = React.useMemo(() => {
+    const groups: Record<string, typeof models> = {}
+    models.forEach((model) => {
+      if (!groups[model.provider]) {
+        groups[model.provider] = []
+      }
+      groups[model.provider].push(model)
+    })
+    return groups
+  }, [models])
+
+  const selectedModel = models.find((model) => model.value === value)
+
+  // Handle model selection
+  const handleModelSelect = (modelId: string) => {
+    const model = models.find((m) => m.value === modelId)
+    if (model) {
+      setValue(modelId)
+      setOpen(false)
+
+      // Save the selected model to the backend
+      updateModelMutation.mutate({
+        provider: model.provider as
+          | "anthropic"
+          | "openai"
+          | "openrouter"
+          | "aws",
+        modelId: modelId,
+      })
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled
+        className="gap-2 max-w-[180px]"
+      >
+        <span className="truncate">Loading models...</span>
+        <ChevronDown size={16} className="opacity-50" />
+      </Button>
+    )
+  }
+
+  // If no models are available, show "Default"
+  if (models.length === 0 || modelsData?.defaultModel === "Default") {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled
+        className="gap-2 max-w-[180px]"
+      >
+        <span className="truncate">Default</span>
+        <ChevronDown size={16} className="opacity-50" />
+      </Button>
+    )
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -397,38 +468,38 @@ function ChatInputModelSelect() {
           className="gap-2 max-w-[180px]"
         >
           <span className="truncate">
-            {value
-              ? models.find((model) => model.value === value)?.label
-              : "Select models..."}
+            {selectedModel ? selectedModel.label : "Select model..."}
           </span>
           <ChevronDown size={16} className="opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent className="w-[250px] p-0">
         <Command>
           <CommandInput placeholder="Search models..." className="h-9" />
           <CommandList>
-            <CommandEmpty>No framework found.</CommandEmpty>
-            <CommandGroup>
-              {models.map((model) => (
-                <CommandItem
-                  key={model.value}
-                  value={model.value}
-                  onSelect={(currentValue) => {
-                    setValue(currentValue === value ? "" : currentValue)
-                    setOpen(false)
-                  }}
-                >
-                  {model.label}
-                  <Check
-                    className={cn(
-                      "ml-auto",
-                      value === model.value ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            <CommandEmpty>No model found.</CommandEmpty>
+            {Object.entries(groupedModels).map(([provider, providerModels]) => (
+              <CommandGroup
+                key={provider}
+                heading={provider.charAt(0).toUpperCase() + provider.slice(1)}
+              >
+                {providerModels.map((model) => (
+                  <CommandItem
+                    key={model.value}
+                    value={model.value}
+                    onSelect={() => handleModelSelect(model.value)}
+                  >
+                    {model.label}
+                    <Check
+                      className={cn(
+                        "ml-auto",
+                        value === model.value ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
           </CommandList>
         </Command>
       </PopoverContent>
@@ -528,7 +599,6 @@ function ChatInputContextMenu() {
         </ChatInputAction>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[200px]">
-        <DropdownMenuLabel>Add ...</DropdownMenuLabel>
         <DropdownMenuGroup>
           <DropdownMenuItem className="gap-2" onClick={handleImageUpload}>
             <FileImage size={16} />

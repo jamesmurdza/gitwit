@@ -21,6 +21,18 @@ export type UserLink = {
   url: string
   platform: KnownPlatform
 }
+export type UserApiKeys = {
+  anthropic?: string
+  anthropicModel?: string
+  openai?: string
+  openaiModel?: string
+  openrouter?: string
+  openrouterModel?: string
+  awsAccessKeyId?: string
+  awsSecretAccessKey?: string
+  awsRegion?: string
+  awsModel?: string
+}
 // #region Tables
 export const user = pgTable("user", {
   id: text("id")
@@ -42,6 +54,10 @@ export const user = pgTable("user", {
     .notNull()
     .$type<UserLink[]>()
     .default(sql`'[]'::json`),
+  apiKeys: json("apiKeys")
+    .notNull()
+    .$type<UserApiKeys>()
+    .default(sql`'{}'::json`),
   tier: varchar("tier", { enum: ["FREE", "PRO", "ENTERPRISE"] })
     .default("FREE")
     .notNull(),
@@ -113,6 +129,10 @@ export const userUpdateSchema = createUpdateSchema(user, {
   createdAt: (schema) =>
     schema.openapi({
       description: "Creation timestamp of the user",
+    }),
+  apiKeys: (schema) =>
+    schema.openapi({
+      description: "Encrypted API keys for AI providers",
     }),
   lastResetDate: z.coerce.date().optional().openapi({
     description: "Last reset date for the user",
