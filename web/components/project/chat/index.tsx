@@ -1,6 +1,9 @@
-import { cn } from "@/lib/utils"
+import { TTab } from "@/lib/types"
+import { cn, debounce } from "@/lib/utils"
+import { useAppStore } from "@/store/context"
 import { Brain } from "lucide-react"
-import React from "react"
+import * as monaco from "monaco-editor"
+import React, { useCallback, useEffect, useRef } from "react"
 import {
   ChatContainerActions,
   ChatContainerCollapse,
@@ -13,6 +16,7 @@ import {
   ChatScrollContainer,
   ScrollButton,
 } from "./components/chat-container"
+import { ChatHistory } from "./components/chat-history"
 import {
   ChatInput,
   ChatInputActionBar,
@@ -37,6 +41,7 @@ function AIChatBase({ onApplyCode, onRejectCode }: AIChatProps) {
       <ChatContainerHeader>
         <ChatContainerTitle>Chat</ChatContainerTitle>
         <ChatContainerActions>
+          <ChatHistory />
           <ChatContainerMaximizeToggle />
           <ChatContainerCollapse />
         </ChatContainerActions>
@@ -67,7 +72,7 @@ function MainChatContent({
     return <ChatContainerEmpty />
   }
   return (
-    <ChatScrollContainer className="flex-1 relative w-full">
+    <ChatScrollContainer className="flex-1 relative w-full max-w-5xl mx-auto">
       <ChatContainerContent className="px-2 py-4  overflow-x-hidden">
         {messages.map((message, i) => {
           return (
@@ -141,7 +146,77 @@ function MainChatInput() {
 }
 
 function ChatContexts() {
-  const { contextTabs, removeContextTab } = useChat()
+  const { contextTabs, removeContextTab, addContextTab } = useChat()
+  const activeTab = useAppStore((s) => s.activeTab)
+  const editorRef = useAppStore((s) => s.editorRef)
+  const previousTabIdRef = useRef<string | null>(null)
+
+  // Direct selection update handler
+  const updateSelection = useCallback(
+    (selection: monaco.Selection, activeTab?: TTab) => {
+      // Remove existing selection tab first
+      if (activeTab) {
+        const tabId = `selection-${activeTab.id}`
+        removeContextTab(tabId)
+      }
+
+      // Only add if there's an actual selection (not empty)
+      if (!selection.isEmpty() && activeTab) {
+        const tabId = `selection-${activeTab.id}`
+        const content = editorRef?.getModel()?.getValueInRange(selection)
+        console.log("Adding context tab with content:", content)
+        addContextTab({
+          id: tabId,
+          type: "code",
+          name: activeTab.name,
+          content,
+          lineRange: {
+            start: selection.startLineNumber,
+            end: selection.endLineNumber,
+          },
+        })
+      }
+    },
+    [editorRef, addContextTab, removeContextTab]
+  )
+
+  // Debounced variant for cursor selection changes
+  const debouncedUpdateSelection = useRef(
+    debounce((selection: monaco.Selection, activeTab?: TTab) => {
+      updateSelection(selection, activeTab)
+    }, 500)
+  ).current
+
+  useEffect(() => {
+    if (!activeTab) return
+
+    // Remove previous tab's selection context if it exists
+    if (previousTabIdRef.current) {
+      const previousSelectionId = `selection-${previousTabIdRef.current}`
+      removeContextTab(previousSelectionId)
+    }
+
+    // Update the ref with current tab ID
+    previousTabIdRef.current = activeTab.id
+
+    const editorSelection = editorRef?.getSelection()
+    if (!editorSelection) return
+    updateSelection(editorSelection, activeTab)
+  }, [activeTab?.id])
+
+  // Handle cursor selection changes
+  useEffect(() => {
+    if (!editorRef || !activeTab) return
+
+    const disposable = editorRef.onDidChangeCursorSelection((e) => {
+      debouncedUpdateSelection(e.selection, activeTab)
+    })
+
+    return () => {
+      disposable.dispose()
+    }
+  }, [editorRef, activeTab, debouncedUpdateSelection])
+
   return (
     <div className="flex gap-2 w-full flex-wrap">
       {contextTabs.map((tab) => (

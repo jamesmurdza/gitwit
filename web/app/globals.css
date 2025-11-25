@@ -357,3 +357,26 @@ html.dark .shiki span {
   font-weight: var(--shiki-dark-font-weight) !important;
   text-decoration: var(--shiki-dark-text-decoration) !important;
 }
+
+/* Chat Container View Transition Name */
+.chat-container-transition {
+  view-transition-name: chat-container;
+}
+
+/* View Transition Styles for Chat Container */
+@supports (view-transition-name: chat-container) {
+  ::view-transition-group(chat-container),
+  ::view-transition-group(chat-container-title) {
+    animation-timing-function: ease-out;
+    animation-duration: 0.4s;
+  }
+
+  /* Prevent overflow during transition */
+  ::view-transition-old(chat-container) {
+    overflow: clip;
+  }
+
+  ::view-transition-new(chat-container) {
+    overflow: clip;
+  }
+}

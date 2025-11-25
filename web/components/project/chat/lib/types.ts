@@ -22,7 +22,14 @@ export type ContextTab =
       id: string
       type: "code"
       name: string
+      content?: string
       lineRange?: { start: number; end: number }
+    }
+  | {
+      id: string
+      type: "text"
+      name: string
+      content: string
     }
 
 // AIChat props interface

@@ -37,6 +37,7 @@ import {
   Check,
   CheckIcon,
   ChevronDown,
+  Code2Icon,
   FileCode2,
   FileImage,
   FileUp,
@@ -60,7 +61,8 @@ import {
   ALLOWED_IMAGE_TYPES,
   TEXT_LIKE_MIMES,
 } from "../lib/constants"
-import { getAllFiles } from "../lib/utils"
+import { ContextTab } from "../lib/types"
+import { getAllFiles, shouldTreatAsContext } from "../lib/utils"
 import { useChat } from "../providers/chat-provider"
 
 type ChatInputContextType = {
@@ -112,10 +114,80 @@ function ChatInput({
 }: ChatInputProps) {
   const [internalValue, setInternalValue] = useState(value || "")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const { addContextTab } = useChat()
 
   const handleChange = (newValue: string) => {
     setInternalValue(newValue)
     onValueChange?.(newValue)
+  }
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+
+      // Handle images
+      if (item.type.startsWith("image/")) {
+        e.preventDefault()
+        const file = item.getAsFile()
+        if (
+          file &&
+          (ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)
+        ) {
+          const reader = new FileReader()
+          reader.onload = () => {
+            addContextTab({
+              id: nanoid(),
+              type: "image",
+              name: file.name || `pasted-image-${Date.now()}.png`,
+              content: reader.result as string,
+            })
+          }
+          reader.readAsDataURL(file)
+        }
+      }
+      // Handle files
+      else if (item.kind === "file") {
+        const file = item.getAsFile()
+        if (
+          file &&
+          (ALLOWED_FILE_TYPES as readonly string[]).some((type) =>
+            file.type.includes(type.replace("*", ""))
+          )
+        ) {
+          e.preventDefault()
+          const reader = new FileReader()
+          reader.onload = () => {
+            addContextTab({
+              id: nanoid(),
+              type: "file",
+              name: file.name,
+              content: reader.result as string,
+            })
+          }
+          if (TEXT_LIKE_MIMES.has(file.type)) {
+            reader.readAsDataURL(file)
+          } else {
+            reader.readAsDataURL(file)
+          }
+        }
+      } else if (item.type === "text/plain") {
+        // Get text synchronously to check if it should be treated as context
+        const text = e.clipboardData.getData("text/plain")
+        if (shouldTreatAsContext(text)) {
+          e.preventDefault()
+
+          addContextTab({
+            id: nanoid(),
+            type: "text",
+            name: `Snippet ${nanoid(4)}`,
+            content: text,
+          })
+        }
+      }
+    }
   }
 
   return (
@@ -134,10 +206,12 @@ function ChatInput({
           "border-input bg-background cursor-text border rounded p-2 shadow-xs",
           className
         )}
+        style={{ viewTransitionName: "chat-input" }}
         onSubmit={(e) => {
           e.preventDefault()
           onSubmit?.()
         }}
+        onPaste={handlePaste}
       >
         {children}
       </form>
@@ -187,6 +261,7 @@ function ChatInputTextarea({
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
+      autoFocus
       className={cn(
         "w-full resize-none rounded-none border-none px-2 py-3 shadow-none outline-none ring-0",
         "field-sizing-content max-h-[6lh] bg-transparent dark:bg-transparent",
@@ -433,7 +508,7 @@ function ChatInputModelSelect() {
 }
 function ChatInputContextMenu() {
   const { id: projectId } = useParams<{ id: string }>()
-  const { contextTabs, addContextTab } = useChat()
+  const { contextTabs, addContextTab, removeContextTab } = useChat()
   const { data: fileTree = [] } = fileRouter.fileTree.useQuery({
     variables: {
       projectId,
@@ -448,6 +523,18 @@ function ChatInputContextMenu() {
     [contextTabs]
   )
   const files = React.useMemo(() => getAllFiles(fileTree), [fileTree])
+  const toggleCodeContextTab = React.useCallback(
+    (tab: ContextTab) => {
+      return () => {
+        if (codeContextTabs.find((t) => t.id === tab.id)) {
+          removeContextTab(tab.id)
+        } else {
+          addContextTab(tab)
+        }
+      }
+    },
+    [codeContextTabs, addContextTab, removeContextTab]
+  )
   const handleFileUpload: React.MouseEventHandler<HTMLDivElement> = (event) => {
     event.preventDefault()
     const fileInput = document.createElement("input")
@@ -539,7 +626,12 @@ function ChatInputContextMenu() {
                   className="h-9"
                 />
                 <CommandList>
-                  <CommandEmpty>No label found.</CommandEmpty>
+                  <CommandEmpty className="flex flex-col justify-center items-center gap-1 py-12">
+                    <Code2Icon className="size-6" />
+                    <span className="text-center text-muted-foreground">
+                      No results found
+                    </span>
+                  </CommandEmpty>
                   <CommandGroup>
                     {files.map((file) => {
                       const imgSrc = `/icons/${getIconForFile(file.name)}`
@@ -550,13 +642,11 @@ function ChatInputContextMenu() {
                         <CommandItem
                           key={file.id}
                           value={file.name}
-                          onSelect={() => {
-                            addContextTab({
-                              id: file.id,
-                              type: "code",
-                              name: file.name,
-                            })
-                          }}
+                          onSelect={toggleCodeContextTab({
+                            id: file.id,
+                            type: "code",
+                            name: file.name,
+                          })}
                         >
                           <Image
                             src={imgSrc}
