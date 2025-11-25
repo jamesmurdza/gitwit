@@ -116,7 +116,6 @@ function ChatProvider({
             contextContent,
             projectName,
             fileName: activeFileName,
-            isEditMode: false,
           }
         )
         setMessages((prev) => [...prev, { role: "assistant", content: "" }])
