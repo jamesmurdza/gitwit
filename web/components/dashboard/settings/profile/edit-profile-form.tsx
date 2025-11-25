@@ -65,6 +65,11 @@ export default function EditProfileForm(props: {
     control: form.control,
   })
   useEffect(() => {
+    if (user?.id) {
+      form.setValue("id", user.id)
+    }
+  }, [user?.id, form])
+  useEffect(() => {
     const message = formState.message
     if (!Boolean(message)) return
     if ("error" in formState) {
@@ -72,6 +77,7 @@ export default function EditProfileForm(props: {
       return
     }
     toast.success(formState.message as String)
+    form.reset(form.getValues())
     toggleEdit()
     if (formState?.newRoute) {
       router.replace(formState.newRoute)
