@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useEditorLayout } from "@/context/EditorLayoutContext"
-import type { Sandbox } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { DragDropProvider, useDroppable } from "@dnd-kit/react"
 import { FilePlus, FolderPlus, MessageSquareMore, Sparkles } from "lucide-react"
@@ -13,10 +12,6 @@ import { useFileTree } from "../hooks/useFile"
 import SidebarFile from "./file"
 import SidebarFolder from "./folder"
 import New from "./new"
-
-interface FileExplorerProps {
-  sandboxData: Sandbox
-}
 
 export function FileExplorer() {
   const { id: projectId } = useParams<{ id: string }>()
@@ -28,7 +23,6 @@ export function FileExplorer() {
       onDragEnd={(event) => {
         if (event.canceled) return
         const { source, target } = event.operation
-
         if (source && target) {
           if (source.type === "file" && target.type === "folder") {
             const fileId = source.id.toString() // e.g. "/src/hello.ts"
@@ -36,7 +30,7 @@ export function FileExplorer() {
 
             // compute the file's current folder:
             const idx = fileId.lastIndexOf("/")
-            const currentFolderId = fileId.substring(0, idx)
+            const currentFolderId = fileId.substring(0, idx) || "/" // e.g /viteconfig.js
             if (currentFolderId === targetFolderId) return
             moveFile({
               projectId,
