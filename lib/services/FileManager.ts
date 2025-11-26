@@ -1,20 +1,23 @@
-import { Sandbox as Container, FilesystemEvent, WatchHandle } from "e2b"
+import {
+  Sandbox as Container,
+  FilesystemEvent,
+  FilesystemEventType,
+  WatchHandle,
+} from "e2b"
 import path from "path"
 import { MAX_BODY_SIZE } from "../utils/ratelimit"
 import { TFile, TFolder } from "../utils/types"
 
-// Local enum to avoid issues with const enums and isolatedModules
-enum LocalFilesystemEventType {
-  CREATE = "CREATE",
-  REMOVE = "REMOVE",
-  RENAME = "RENAME",
-}
+// Event types that should trigger a file tree refresh
+const RELEVANT_EVENT_TYPES = new Set([
+  FilesystemEventType.CREATE,
+  FilesystemEventType.REMOVE,
+  FilesystemEventType.RENAME,
+])
 
 // Type guard to check if the event type is one we care about
-function isRelevantEventType(
-  type: string
-): type is "CREATE" | "REMOVE" | "RENAME" {
-  return type === "CREATE" || type === "REMOVE" || type === "RENAME"
+function isRelevantEventType(type: FilesystemEventType): boolean {
+  return RELEVANT_EVENT_TYPES.has(type)
 }
 
 // FileManager class to handle file operations in a container
@@ -25,11 +28,8 @@ export class FileManager {
   private fileWatchCallback: ((files: (TFolder | TFile)[]) => void) | null =
     null
 
-  // Constructor to initialize the FileManager
   constructor(container: Container) {
     this.container = container
-    // Make the logged in user the owner of all project files
-    this.fixPermissions()
   }
 
   async getFileTree(): Promise<(TFolder | TFile)[]> {
@@ -95,10 +95,9 @@ export class FileManager {
 
   // Start watching the filesystem for changes
   async startWatching(callback: (files: (TFolder | TFile)[]) => void) {
-    // Set the refresh callback
+    await this.fixPermissions()
     this.fileWatchCallback = callback
 
-    // Watch the directories and subdirectories of the project directory
     await this.watchDirectory(this.dirName)
     await this.watchSubdirectories(this.dirName)
   }
@@ -119,24 +118,19 @@ export class FileManager {
         directory,
         async (event: FilesystemEvent) => {
           try {
-            // Tell the client to reload the file list
             if (isRelevantEventType(event.type)) {
               this.fileWatchCallback?.(await this.getFileTree())
             }
           } catch (error) {
-            console.error(
-              `Error handling ${event.type} event for ${event.name}:`,
-              error
-            )
+            console.error(`[FileManager] Error handling event:`, error)
           }
         },
-        // The timeout of zero means the watcher never times out
         { timeoutMs: 0 }
       )
       this.fileWatchers.push(handle)
       return handle
     } catch (error) {
-      console.error(`Error watching filesystem:`, error)
+      console.error(`[FileManager] Error watching ${directory}:`, error)
     }
   }
 
@@ -146,7 +140,6 @@ export class FileManager {
     await Promise.all(
       dirContent.map(async (item) => {
         if (item.type === "dir") {
-          console.log("Watching " + item.path)
           await this.watchDirectory(item.path)
         }
       })
