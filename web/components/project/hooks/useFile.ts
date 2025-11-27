@@ -1,5 +1,7 @@
+import { useSocket } from "@/context/SocketContext"
 import { useChangedFilesOptimistic } from "@/hooks/useChangedFilesOptimistic"
 import { fileRouter, FileTree } from "@/lib/api"
+import { TFile, TFolder } from "@/lib/types"
 import { sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import { useQueryClient } from "@tanstack/react-query"
@@ -12,6 +14,7 @@ export function useFileTree() {
   const queryClient = useQueryClient()
   const setTabs = useAppStore((s) => s.setTabs)
   const { updateChangedFilesOptimistically } = useChangedFilesOptimistic()
+  const { socket } = useSocket()
 
   const { data: fileTree = [], isLoading: isLoadingFileTree } =
     fileRouter.fileTree.useQuery({
@@ -64,10 +67,6 @@ export function useFileTree() {
 
   const { mutate: renameFile, isPending: isRenamingFile } =
     fileRouter.rename.useMutation({
-      onMutate: async ({ fileId, newName }) => {
-        // Optimistically update changed files - treat rename as update
-        updateChangedFilesOptimistically("update", fileId, "")
-      },
       onSuccess({ message }, { newName }) {
         return queryClient
           .invalidateQueries(
@@ -161,6 +160,22 @@ export function useFileTree() {
       error: "Error saving file",
     })
   }
+
+  React.useEffect(() => {
+    if (!socket) return
+    const handleRefreshFiles = (files: (TFolder | TFile)[]) => {
+      queryClient.setQueryData(fileTreeKey, {
+        data: files,
+        success: true,
+      })
+    }
+    socket.on("refreshFiles", handleRefreshFiles)
+
+    return () => {
+      socket.off("refreshFiles", handleRefreshFiles)
+    }
+  }, [socket])
+
   return {
     fileTree,
     deleteFolder,
