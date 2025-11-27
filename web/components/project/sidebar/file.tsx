@@ -6,6 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
+import { getParentPath, useFileExplorer } from "@/context/FileExplorerContext"
 import { fileRouter } from "@/lib/api"
 import { TFile } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -91,6 +92,9 @@ function useHoverPrefetch(
 function SidebarFile(props: TFile) {
   const { id: projectId } = useParams<{ id: string }>()
 
+  // File explorer context for active folder tracking
+  const { setActiveFolderPath } = useFileExplorer()
+
   // File tree operations
   const { deleteFile, renameFile, isDeletingFile, isRenamingFile } =
     useFileTree()
@@ -146,11 +150,15 @@ function SidebarFile(props: TFile) {
       return
     }
 
+    // Set the parent folder as active when clicking on a file
+    const parentPath = getParentPath(props.id)
+    setActiveFolderPath(parentPath)
+
     clickTimeoutRef.current = setTimeout(() => {
       clickTimeoutRef.current = null
       selectFile()
     }, DOUBLE_CLICK_DELAY)
-  }, [selectFile])
+  }, [selectFile, props.id, setActiveFolderPath])
 
   const handleDoubleClick = useCallback(() => {
     if (clickTimeoutRef.current) {

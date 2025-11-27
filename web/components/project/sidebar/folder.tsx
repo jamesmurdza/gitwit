@@ -6,30 +6,59 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
+import { useFileExplorer } from "@/context/FileExplorerContext"
 import { TFolder } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { useDraggable, useDroppable } from "@dnd-kit/react"
 import { AnimatePresence, motion } from "framer-motion"
-import { ChevronRight, Pencil, Trash2 } from "lucide-react"
+import {
+  ChevronRight,
+  FilePlus,
+  FolderPlus,
+  Pencil,
+  Trash2,
+} from "lucide-react"
 import Image from "next/image"
 import { useParams } from "next/navigation"
-import { LegacyRef, memo, useEffect, useRef, useState } from "react"
+import {
+  LegacyRef,
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import { mergeRefs } from "react-merge-refs"
 import { getIconForFolder, getIconForOpenFolder } from "vscode-icons-js"
 import { useFileTree } from "../hooks/useFile"
 import SidebarFile from "./file"
+import New from "./new"
 
 // Note: Renaming has not been implemented in the backend yet, so UI relating to renaming is commented out
-const SidebarFolder = memo((props: TFolder) => {
+const SidebarFolder = memo(function SidebarFolder(props: TFolder) {
   const { id: projectId } = useParams<{ id: string }>()
   const [isOpen, setIsOpen] = useState(false)
   const { deleteFolder, isDeletingFolder } = useFileTree()
+
+  // File explorer context for active folder tracking
+  const {
+    activeFolderPath,
+    setActiveFolderPath,
+    startCreating,
+    creationType,
+    stopCreating,
+  } = useFileExplorer()
+
+  // Check if this folder is the active folder for creation
+  const isActiveFolder = activeFolderPath === props.id
+  const showNewForm = isActiveFolder && creationType !== null
 
   const folder = isOpen
     ? getIconForOpenFolder(props.name)
     : getIconForFolder(props.name)
 
   const inputRef = useRef<HTMLInputElement>(null)
+  const newFormRef = useRef<HTMLInputElement>(null)
   const { ref: droppableRef, isDropTarget } = useDroppable({
     id: props.id,
     type: props.type,
@@ -45,6 +74,19 @@ const SidebarFolder = memo((props: TFolder) => {
     type: props.type,
     feedback: "clone",
   })
+
+  // Handle folder click - set as active and toggle open state
+  const handleClick = useCallback(() => {
+    setActiveFolderPath(props.id)
+    setIsOpen((prev) => !prev)
+  }, [props.id, setActiveFolderPath])
+
+  // Open folder automatically when it becomes active for creation
+  useEffect(() => {
+    if (showNewForm && !isOpen) {
+      setIsOpen(true)
+    }
+  }, [showNewForm, isOpen])
 
   useEffect(() => {
     let timeOut: NodeJS.Timeout | null = null
@@ -66,7 +108,7 @@ const SidebarFolder = memo((props: TFolder) => {
       <ContextMenu>
         <ContextMenuTrigger
           disabled={isDeletingFolder}
-          onClick={() => setIsOpen((prev) => !prev)}
+          onClick={handleClick}
           className={cn(
             "rounded-sm w-full flex items-center h-7 px-1 transition-colors hover:bg-secondary cursor-pointer min-w-0"
           )}
@@ -99,7 +141,35 @@ const SidebarFolder = memo((props: TFolder) => {
             </form>
           )}
         </ContextMenuTrigger>
-        <ContextMenuContent>
+        <ContextMenuContent
+          onCloseAutoFocus={(event) => {
+            // Focus the new form input after context menu closes
+            if (newFormRef.current) {
+              newFormRef.current.focus()
+              event.preventDefault()
+            }
+          }}
+        >
+          <ContextMenuItem
+            disabled={!!creationType}
+            onClick={() => {
+              setActiveFolderPath(props.id)
+              startCreating("file")
+            }}
+          >
+            <FilePlus className="w-4 h-4 mr-2" />
+            New File
+          </ContextMenuItem>
+          <ContextMenuItem
+            disabled={!!creationType}
+            onClick={() => {
+              setActiveFolderPath(props.id)
+              startCreating("folder")
+            }}
+          >
+            <FolderPlus className="w-4 h-4 mr-2" />
+            New Folder
+          </ContextMenuItem>
           <ContextMenuItem disabled>
             <Pencil className="w-4 h-4 mr-2" />
             Rename
@@ -143,6 +213,15 @@ const SidebarFolder = memo((props: TFolder) => {
                 ) : (
                   <SidebarFolder key={child.id} {...child} />
                 )
+              )}
+              {showNewForm && creationType !== null && (
+                <New
+                  ref={newFormRef}
+                  projectId={projectId}
+                  type={creationType}
+                  basePath={props.id}
+                  stopEditing={stopCreating}
+                />
               )}
             </motion.div>
           ) : null}
