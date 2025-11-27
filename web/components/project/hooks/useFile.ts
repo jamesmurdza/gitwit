@@ -67,10 +67,6 @@ export function useFileTree() {
 
   const { mutate: renameFile, isPending: isRenamingFile } =
     fileRouter.rename.useMutation({
-      onMutate: async ({ fileId, newName }) => {
-        // Optimistically update changed files - treat rename as update
-        updateChangedFilesOptimistically("update", fileId, "")
-      },
       onSuccess({ message }, { newName }) {
         return queryClient
           .invalidateQueries(
