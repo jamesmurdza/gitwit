@@ -24,6 +24,7 @@ export default function DashboardNavbarSearch() {
     <div className="relative h-9 w-44 flex items-center justify-start">
       <Search className="w-4 h-4 absolute left-2 text-muted-foreground" />
       <Input
+        autoComplete="off"
         // value={search}
         // onChange={(e) => setSearch(e.target.value)}
         onChange={(e) => {

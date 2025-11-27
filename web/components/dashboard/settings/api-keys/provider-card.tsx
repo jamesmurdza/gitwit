@@ -182,6 +182,7 @@ export default function ProviderCard({
                     placeholder="AKIA..."
                     value={awsAccessKeyId}
                     onChange={(e) => setAwsAccessKeyId(e.target.value)}
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -196,6 +197,7 @@ export default function ProviderCard({
                       value={awsSecretAccessKey}
                       onChange={(e) => setAwsSecretAccessKey(e.target.value)}
                       className="pr-10"
+                      autoComplete="off"
                     />
                     <Button
                       type="button"
@@ -220,6 +222,7 @@ export default function ProviderCard({
                     placeholder="us-east-1"
                     value={awsRegion}
                     onChange={(e) => setAwsRegion(e.target.value)}
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -233,6 +236,7 @@ export default function ProviderCard({
                     placeholder={config.modelPlaceholder}
                     value={modelId}
                     onChange={(e) => setModelId(e.target.value)}
+                    autoComplete="off"
                   />
                   <p className="text-xs text-muted-foreground">
                     Leave empty to use default model
@@ -251,6 +255,7 @@ export default function ProviderCard({
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       className="pr-10"
+                      autoComplete="off"
                     />
                     <Button
                       type="button"
@@ -278,6 +283,7 @@ export default function ProviderCard({
                     placeholder={config.modelPlaceholder}
                     value={modelId}
                     onChange={(e) => setModelId(e.target.value)}
+                    autoComplete="off"
                   />
                   <p className="text-xs text-muted-foreground">
                     Leave empty to use default model

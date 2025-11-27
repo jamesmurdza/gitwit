@@ -17,7 +17,7 @@ import { updateUser } from "@/lib/api/actions"
 import { socialIcons } from "@/lib/data"
 import { editUserSchema, EditUserSchema } from "@/lib/schema"
 import { UserLink } from "@/lib/types"
-import { cn, parseSocialLink } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { useRouter } from "@bprogress/next/app"
 import { useUser } from "@clerk/nextjs"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -184,13 +184,20 @@ export default function EditProfileForm(props: {
                     <FormControl>
                       <div className="flex gap-2">
                         <div className="relative flex-1">
+                          <input
+                            type="hidden"
+                            name={`links.${index}`}
+                            value={value.url}
+                          />
                           <Input
                             {...field}
                             className="peer ps-9"
                             value={value.url}
-                            onChange={(e) =>
-                              onChange(parseSocialLink(e.currentTarget.value))
-                            }
+                            onChange={(e) => {
+                              const newValue = e.currentTarget.value
+                              // Store raw value - prefix will be added on save if needed
+                              onChange({ url: newValue, platform: "generic" })
+                            }}
                           />
                           <div className="pointer-events-none absolute inset-y-0 start-0 flex items-center justify-center ps-3 text-muted-foreground/80 peer-disabled:opacity-50">
                             <Icon
