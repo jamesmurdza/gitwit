@@ -31,6 +31,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useState,
 } from "react"
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom"
@@ -60,13 +61,18 @@ export type ChatContainerRootProps = {
 function ChatContainerRoot({
   children,
   className,
+  style,
   ...props
 }: ChatContainerRootProps) {
   const [maximized, setMaximized] = useState(false)
-  const toggleMaximized = useCallback(
-    () => document.startViewTransition(() => setMaximized((prev) => !prev)),
-    []
-  )
+  const toggleMaximized = useCallback(() => {
+    if (document.startViewTransition) {
+      document.startViewTransition(() => setMaximized((prev) => !prev))
+    } else {
+      setMaximized((prev) => !prev)
+    }
+  }, [])
+
   useEffect(() => {
     // when escape is pressed, toggle preview maximize state
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -79,7 +85,11 @@ function ChatContainerRoot({
           "input, textarea, [contenteditable]"
         )
       ) {
-        document.startViewTransition(() => setMaximized(false))
+        if (document.startViewTransition) {
+          document.startViewTransition(() => setMaximized(false))
+        } else {
+          setMaximized(false)
+        }
       }
     }
     window.addEventListener("keydown", handleKeyDown)
@@ -105,15 +115,13 @@ function ChatContainerRoot({
       </AnimatePresence>
       <div
         className={cn(
-          "flex flex-col bg-background",
+          "chat-container-transition flex flex-col bg-background",
           maximized
             ? "fixed inset-4 z-50 rounded-lg shadow-[0_0_0_1px_hsl(var(--muted-foreground)_/_0.4)]"
             : "h-full",
           className
         )}
-        style={{
-          viewTransitionName: "chat-container",
-        }}
+        style={style}
         {...props}
       >
         {children}
@@ -212,11 +220,13 @@ function ChatContainerHeader({
 // #region Title
 function ChatContainerTitle({
   className,
+  style,
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h2
       className={cn("font-medium leading-none tracking-tight", className)}
+      style={{ viewTransitionName: "chat-container-title", ...style }}
       {...props}
     />
   )
@@ -228,7 +238,13 @@ function ChatContainerActions({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex space-x-2", className)} {...props} />
+  return (
+    <div
+      className={cn("flex space-x-2", className)}
+      style={{ viewTransitionName: "chat-container-actions" }}
+      {...props}
+    />
+  )
 }
 // #endregion
 
@@ -246,9 +262,11 @@ function ChatContainerAction({
   variant = "ghost",
   size = "smIcon",
   asChild = false,
+  style,
   ...props
 }: ChatContainerActionProps) {
   const Comp = asChild ? Slot : "button"
+  const id = useId()
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -257,6 +275,7 @@ function ChatContainerAction({
             buttonVariants({ variant, size, className }),
             "h-6 w-6"
           )}
+          style={{ viewTransitionName: `chat-action-${id}`, ...style }}
           {...props}
         />
       </TooltipTrigger>
@@ -338,11 +357,13 @@ function ScrollButton({
 export function ChatContainerCollapse() {
   const { toggleAIChat } = useEditorLayout()
   const { maximized } = useChatContainerContext()
-  if (maximized) {
-    return null
-  }
+
   return (
-    <ChatContainerAction label="Collapse chat" onClick={toggleAIChat}>
+    <ChatContainerAction
+      disabled={maximized}
+      label="Collapse chat"
+      onClick={toggleAIChat}
+    >
       <FoldHorizontal size={16} />
     </ChatContainerAction>
   )
@@ -363,6 +384,7 @@ function ChatContainerMaximizeToggle() {
 // #endregion Settings
 
 export {
+  ChatContainerAction,
   ChatContainerActions,
   ChatContainerContent,
   ChatContainerEmpty,

@@ -1,12 +1,18 @@
 "use client"
 
+import {
+  combinePaths,
+  normalizePath,
+  validateName,
+} from "@/context/FileExplorerContext"
 import { useChangedFilesOptimistic } from "@/hooks/useChangedFilesOptimistic"
 import { fileRouter, githubRouter } from "@/lib/api"
-import { validateName } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { Loader2 } from "lucide-react"
 import Image from "next/image"
-import { useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { mergeRefs } from "react-merge-refs"
 import { toast } from "sonner"
 import {
   DEFAULT_FILE,
@@ -15,24 +21,39 @@ import {
   getIconForFolder,
 } from "vscode-icons-js"
 
+interface NewProps {
+  projectId: string
+  type: "file" | "folder"
+  /** The base folder path where this item will be created (e.g., "/src" or "/") */
+  basePath: string
+  stopEditing: () => void
+  /** Ref to the input element */
+  ref?: React.Ref<HTMLInputElement>
+}
+
 export default function New({
   projectId,
   type,
+  basePath,
   stopEditing,
-}: {
-  projectId: string
-  type: "file" | "folder"
-  stopEditing: () => void
-}) {
+  ref,
+}: NewProps) {
   const [value, setValue] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const internalRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const { updateChangedFilesOptimistically } = useChangedFilesOptimistic()
+
+  // Auto-focus the input when mounted
+  useEffect(() => {
+    internalRef.current?.focus()
+  }, [])
+
   const { mutate: createFile, isPending: isCreatingFile } =
     fileRouter.createFile.useMutation({
       onMutate: async ({ name }) => {
         // Optimistically update changed files
-        const filePath = name // For new files, the path is just the name
-        updateChangedFilesOptimistically("create", filePath, "")
+        updateChangedFilesOptimistically("create", name, "")
       },
       onSuccess() {
         return queryClient
@@ -49,6 +70,7 @@ export default function New({
         toast.error("Failed to create file")
       },
     })
+
   const { mutate: createFolder, isPending: isCreatingFolder } =
     fileRouter.createFolder.useMutation({
       onSuccess() {
@@ -72,48 +94,99 @@ export default function New({
         toast.error("Failed to create folder")
       },
     })
-  const isPending = isCreatingFile || isCreatingFolder
-  const icon =
-    type == "file"
-      ? getIconForFile(value) ?? DEFAULT_FILE
-      : getIconForFolder(value) ?? DEFAULT_FOLDER
 
-  function createNew() {
-    const name = value
-    if (!name || !validateName(name, "", type).status) {
-      toast.info("Use a valid file name")
+  const isPending = isCreatingFile || isCreatingFolder
+
+  // Get the display name (last segment) for icon lookup
+  const displayName = value.split("/").filter(Boolean).pop() || ""
+  const icon =
+    type === "file"
+      ? getIconForFile(displayName) ?? DEFAULT_FILE
+      : getIconForFolder(displayName) ?? DEFAULT_FOLDER
+
+  // Validate and create the new item
+  const createNew = useCallback(() => {
+    const trimmedValue = value.trim()
+
+    // If empty, just close
+    if (!trimmedValue) {
       stopEditing()
       return
     }
-    const createItem = type == "file" ? createFile : createFolder
+
+    // Validate the name/path
+    const validation = validateName(trimmedValue, type)
+    if (!validation.isValid) {
+      setError(validation.error ?? "Invalid name")
+      toast.error(validation.error ?? "Invalid name")
+      return
+    }
+
+    // Combine with base path to get the full path
+    // For files: basePath="/src", value="components/Button.tsx" → "/src/components/Button.tsx"
+    // For folders: basePath="/src", value="components/ui" → "/src/components/ui"
+    const fullPath = combinePaths(basePath, trimmedValue)
+
+    // The API expects the path without leading slash for creation
+    const nameForApi = normalizePath(fullPath)
+
+    const createItem = type === "file" ? createFile : createFolder
     createItem({
-      name,
+      name: nameForApi,
       projectId,
     })
-  }
+  }, [value, type, basePath, projectId, createFile, createFolder, stopEditing])
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        stopEditing()
+      }
+    },
+    [stopEditing]
+  )
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setValue(e.currentTarget.value)
+    setError(null) // Clear error on change
+  }, [])
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      createNew()
+    },
+    [createNew]
+  )
 
   return (
     <div className="w-full flex items-center gap-2 h-7 px-1 hover:bg-secondary rounded-sm cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
       {isPending ? (
-        <Loader2 className="animate-spin size-[1.125rem]" />
+        <Loader2 className="animate-spin size-[1.125rem] shrink-0" />
       ) : (
-        <Image src={`/icons/${icon}`} alt="File Icon" width={18} height={18} />
+        <Image
+          src={`/icons/${icon}`}
+          alt={`${type} Icon`}
+          width={18}
+          height={18}
+          className="shrink-0"
+        />
       )}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          createNew()
-        }}
-      >
+      <form onSubmit={handleSubmit} className="flex-1 min-w-0">
         <input
+          ref={mergeRefs([internalRef, ref])}
           value={value}
-          onChange={(e) => setValue(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              stopEditing()
-            }
-          }}
-          className="bg-transparent transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring rounded-sm w-full"
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          placeholder={
+            type === "file"
+              ? "filename or path/to/file"
+              : "folder or nested/folder"
+          }
+          className={cn(
+            "bg-transparent transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring rounded-sm w-full truncate",
+            error && "ring-2 ring-destructive"
+          )}
           autoFocus
           disabled={isPending}
           onBlur={createNew}

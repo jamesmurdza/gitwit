@@ -27,7 +27,7 @@ export default function Project({
     <div className="max-h-full overflow-hidden w-full h-full">
       <ChangesAlert />
       <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel defaultSize={20} minSize={22} className="h-full">
+        <ResizablePanel minSize={15} defaultSize={17} className="h-full">
           <Sidebar userId={sandboxData.userId} />
         </ResizablePanel>
         <ResizableHandle />
