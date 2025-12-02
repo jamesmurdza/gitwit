@@ -1,5 +1,4 @@
 import { useEditorLayout } from "@/context/EditorLayoutContext"
-import { fileRouter } from "@/lib/api"
 import { useAppStore } from "@/store/context"
 import { useParams } from "next/navigation"
 import { useEffect } from "react"
@@ -15,16 +14,6 @@ export function useEditorShortcuts() {
   const draft = useAppStore((s) => s.drafts[activeFileId ?? ""] || "")
   const { saveFile } = useFileTree()
   const { toggleAIChat } = useEditorLayout()
-  const { data: serverActiveFile = "" } = fileRouter.fileContent.useQuery({
-    enabled: !!activeFileId,
-    variables: {
-      fileId: activeFileId ?? "",
-      projectId,
-    },
-    select(data) {
-      return data.data
-    },
-  })
 
   // Handle browser beforeunload event for unsaved changes
   useEffect(() => {
@@ -47,7 +36,6 @@ export function useEditorShortcuts() {
       // Ctrl+S or Cmd+S: Save file
       if (e.key === "s" && (e.metaKey || e.ctrlKey) && activeFileId) {
         e.preventDefault()
-        if (draft === serverActiveFile) return
         saveFile({
           fileId: activeFileId,
           projectId,
@@ -63,7 +51,7 @@ export function useEditorShortcuts() {
 
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [activeFileId, saveFile, toggleAIChat, draft, serverActiveFile])
+  }, [activeFileId, saveFile, toggleAIChat, draft])
 
   return {}
 }
