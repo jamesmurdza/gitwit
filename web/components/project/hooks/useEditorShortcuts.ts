@@ -12,7 +12,7 @@ export function useEditorShortcuts() {
   const { id: projectId } = useParams<{ id: string }>()
   const { id: activeFileId } = useAppStore((s) => s.activeTab) ?? {}
   const hasUnsavedFiles = useAppStore((s) => s.tabs.some((tab) => !tab.saved))
-  const draft = useAppStore((s) => s.drafts[activeFileId ?? ""])
+  const draft = useAppStore((s) => s.drafts[activeFileId ?? ""] || "")
   const { saveFile } = useFileTree()
   const { toggleAIChat } = useEditorLayout()
   const { data: serverActiveFile = "" } = fileRouter.fileContent.useQuery({
