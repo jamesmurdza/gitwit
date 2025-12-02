@@ -1,4 +1,4 @@
-import { mergeCode } from "@/app/actions/ai"
+import { logFileDetected, mergeCode } from "@/app/actions/ai"
 import { fileRouter } from "@/lib/api"
 import { TTab } from "@/lib/types"
 import { useAppStore } from "@/store/context"
@@ -132,6 +132,10 @@ export function useAIFileActions({
       code,
     }: PrecomputeMergeArgs): Promise<FileMergeResult> => {
       const normalizedPath = normalizePath(filePath)
+
+      // Log when file is detected from AI response
+      await logFileDetected(normalizedPath)
+
       const originalCode = await getCurrentFileContent(normalizedPath)
 
       try {

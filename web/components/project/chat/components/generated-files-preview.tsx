@@ -66,14 +66,27 @@ export function GeneratedFilesPreview({
 
   const providedFiles = files ?? []
   const shouldUseDerived = providedFiles.length === 0
-  const generatedFiles = shouldUseDerived ? extractedFiles : providedFiles
+
+  // Memoize generatedFiles to prevent unnecessary re-renders
+  const generatedFiles = React.useMemo(() => {
+    return shouldUseDerived ? extractedFiles : providedFiles
+  }, [shouldUseDerived, extractedFiles, providedFiles])
+
   const batchKey = React.useMemo(() => {
     if (shouldUseDerived && sourceKey) return sourceKey
     if (!generatedFiles.length) return null
     return generatedFiles
       .map((file) => `${file.id}:${file.code?.length ?? 0}`)
       .join("|")
-  }, [generatedFiles, sourceKey])
+  }, [generatedFiles, sourceKey, shouldUseDerived])
+
+  // Create a stable key from file paths to track when new files arrive
+  const filesKey = React.useMemo(() => {
+    return generatedFiles
+      .map((file) => file.path)
+      .sort()
+      .join("|")
+  }, [generatedFiles])
 
   const mergeStatusRef = React.useRef(mergeStatuses)
   React.useEffect(() => {
@@ -82,52 +95,119 @@ export function GeneratedFilesPreview({
 
   const mergeJobsRef = React.useRef(new Map<string, Promise<FileMergeResult>>())
   const batchRef = React.useRef<string | null>(batchKey)
+  const processedFilesRef = React.useRef(new Set<string>())
+  const mergeStartedForBatchRef = React.useRef<string | null>(null)
+  const generatedFilesRef = React.useRef(generatedFiles)
+  // Use sourceKey as the stable batch identifier (only changes on new AI response)
+  const stableBatchIdRef = React.useRef<string | null>(sourceKey)
 
   React.useEffect(() => {
-    batchRef.current = batchKey
-    mergeJobsRef.current.clear()
-    setMergeStatuses({})
-    mergeStatusRef.current = {}
-    setApplyingMap({})
-    applyingRef.current = {}
-    setRejectingMap({})
-    rejectingRef.current = {}
-    setResolvedFiles({})
-  }, [batchKey])
+    generatedFilesRef.current = generatedFiles
+  }, [generatedFiles])
+
+  React.useEffect(() => {
+    // Only reset if sourceKey changed (truly new AI response)
+    // Don't reset when files are added incrementally to the same response
+    if (stableBatchIdRef.current !== sourceKey) {
+      // New batch - reset everything
+      batchRef.current = batchKey
+      mergeJobsRef.current.clear()
+      processedFilesRef.current.clear()
+      mergeStartedForBatchRef.current = null
+      setMergeStatuses({})
+      mergeStatusRef.current = {}
+      setApplyingMap({})
+      applyingRef.current = {}
+      setRejectingMap({})
+      rejectingRef.current = {}
+      setResolvedFiles({})
+      stableBatchIdRef.current = sourceKey
+    } else {
+      // Same batch, just update batchKey ref (files being added incrementally)
+      batchRef.current = batchKey
+    }
+  }, [batchKey, sourceKey])
 
   React.useEffect(() => {
     setMergeStatuses((prev) => {
       const next: Record<string, any> = {}
       generatedFiles.forEach((file) => {
+        // Only set to idle if it doesn't exist, preserve existing statuses
         next[file.path] = prev[file.path] ?? { status: "idle" }
       })
       return next
     })
   }, [generatedFiles])
 
+  // Store precomputeMerge in ref to prevent effect re-runs
+  const precomputeMergeRef = React.useRef(precomputeMerge)
   React.useEffect(() => {
-    if (!precomputeMerge) return
-    generatedFiles.forEach((file) => {
+    precomputeMergeRef.current = precomputeMerge
+  }, [precomputeMerge])
+
+  React.useEffect(() => {
+    if (!precomputeMergeRef.current || !batchKey) return
+
+    // Store current batch to check against during async operations
+    const currentBatch = batchKey
+    const currentPrecomputeMerge = precomputeMergeRef.current
+
+    // Collect all files to process first, then start ALL merges in parallel
+    const filesToProcess: Array<{ key: string; code: string }> = []
+
+    generatedFilesRef.current.forEach((file) => {
       if (!file.code) return
       const key = file.path
-      if (mergeJobsRef.current.has(key)) return
+
+      // Skip if already processed in this batch (prevents duplicates)
+      if (processedFilesRef.current.has(key)) return
+
+      // Skip if merge job is already in progress
+      if (mergeJobsRef.current.has(key)) {
+        processedFilesRef.current.add(key)
+        return
+      }
+
+      // Check current status from ref (updated by separate effect)
       const currentStatus = mergeStatusRef.current[key]?.status
+
+      // Skip if merge is already ready or pending
+      if (currentStatus === "ready" || currentStatus === "pending") {
+        processedFilesRef.current.add(key)
+        return
+      }
+
+      // Only process if idle or error (retry on error)
       if (
         currentStatus &&
         currentStatus !== "idle" &&
         currentStatus !== "error"
-      )
+      ) {
+        processedFilesRef.current.add(key)
         return
+      }
 
-      const mergePromise = precomputeMerge({
-        filePath: key,
-        code: file.code,
-      })
-      mergeJobsRef.current.set(key, mergePromise)
+      // Mark as processed immediately to prevent duplicates
+      processedFilesRef.current.add(key)
+      filesToProcess.push({ key, code: file.code })
+    })
+
+    // Only proceed if there are files to process
+    if (filesToProcess.length === 0) return
+
+    // Start ALL merges in parallel (not sequential)
+    filesToProcess.forEach(({ key, code }) => {
+      // Set pending status immediately
       setMergeStatuses((prev) => ({
         ...prev,
         [key]: { status: "pending" },
       }))
+
+      const mergePromise = currentPrecomputeMerge({
+        filePath: key,
+        code: code,
+      })
+      mergeJobsRef.current.set(key, mergePromise)
       const jobBatch = batchRef.current
       mergePromise
         .then((result) => {
@@ -151,7 +231,9 @@ export function GeneratedFilesPreview({
           mergeJobsRef.current.delete(key)
         })
     })
-  }, [generatedFiles, precomputeMerge])
+    // Depend on filesKey to process new files as they stream in
+    // But processedFilesRef ensures each file is only processed once
+  }, [sourceKey, filesKey])
 
   const handleKeepFile = React.useCallback(
     (file: GeneratedFile) => {
@@ -215,53 +297,10 @@ export function GeneratedFilesPreview({
 
       startLoading()
 
-      // If we have a ready merge, check if file content has changed
+      // If we have a ready merge, use it directly (skip file content check to avoid delay)
       if (currentStatus?.status === "ready") {
-        const checkAndApply = async () => {
-          if (!getCurrentFileContent || !precomputeMerge) {
-            // If we can't check, just use the precomputed merge
-            applyWithResult(currentStatus.result)
-            return
-          }
-
-          try {
-            // Get current file content
-            const currentContent = await Promise.resolve(
-              getCurrentFileContent(key)
-            )
-
-            // Compare with original code used in merge
-            if (currentContent !== currentStatus.result.originalCode) {
-              // Content has changed, re-calculate merge with current content
-              if (!file.code || !precomputeMerge) {
-                // Can't re-calculate, use precomputed merge
-                applyWithResult(currentStatus.result)
-                return
-              }
-
-              setMergeStatuses((prev) => ({
-                ...prev,
-                [key]: { status: "pending" },
-              }))
-
-              const newJob = precomputeMerge({ filePath: key, code: file.code })
-              mergeJobsRef.current.set(key, newJob)
-              waitForJob(newJob)
-            } else {
-              // Content hasn't changed, use precomputed merge
-              applyWithResult(currentStatus.result)
-            }
-          } catch (error) {
-            console.warn(
-              "Failed to check current file content, using precomputed merge:",
-              error
-            )
-            // On error, fall back to precomputed merge
-            applyWithResult(currentStatus.result)
-          }
-        }
-
-        checkAndApply()
+        // Use precomputed merge directly - no need to check file content again
+        applyWithResult(currentStatus.result)
         return
       }
 
@@ -471,6 +510,7 @@ export function GeneratedFilesPreview({
           const isApplying = applyingMap[file.path]
           const isRejecting = rejectingMap[file.path]
           const isProcessing = isApplying || isRejecting
+          const isPreparing = status === "pending"
           return (
             <div
               key={file.id}
@@ -481,6 +521,11 @@ export function GeneratedFilesPreview({
                 <span className="text-[11px] font-medium text-foreground">
                   {file.name}
                 </span>
+                {isPreparing && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">
+                    preparing
+                  </span>
+                )}
               </div>
               <div
                 className={cn(
