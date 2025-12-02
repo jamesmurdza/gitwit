@@ -18,6 +18,7 @@ type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   language: BundledLanguage
   filename?: string
   showToolbar?: boolean
+  isNewFile?: boolean
 }
 
 type CodeBlockContextType = {
@@ -43,6 +44,7 @@ const CodeBlock = ({
   language,
   filename,
   showToolbar = false,
+  isNewFile = false,
   className,
   children,
   ...props
@@ -68,8 +70,13 @@ const CodeBlock = ({
       <div className="group relative my-4 rounded-lg border overflow-hidden">
         {showToolbar && (
           <div className="flex items-center justify-between px-3 py-1 border-b bg-muted/40">
-            <div className="text-xs font-medium truncate max-w-[60%]">
-              {filename ?? "code"}
+            <div className="text-xs font-medium truncate max-w-[60%] flex items-center gap-2">
+              <span>{filename ?? "code"}</span>
+              {isNewFile && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">
+                  new file
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1">{children}</div>
           </div>
