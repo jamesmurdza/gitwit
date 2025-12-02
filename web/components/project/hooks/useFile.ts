@@ -115,9 +115,6 @@ export function useFileTree() {
         tabs.map((tab) => (tab.id === fileId ? { ...tab, saved: true } : tab))
       )
     },
-    onError() {
-      toast.error("Error saving file")
-    },
   })
 
   const fileTreeKey = fileRouter.fileTree.getKey({ projectId })
@@ -179,7 +176,7 @@ export function useFileTree() {
       success: (data) => {
         return data.message
       },
-      error: "Error saving file",
+      error: (error: Error) => error.message || "Error saving file",
     })
   }
 

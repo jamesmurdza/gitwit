@@ -318,7 +318,8 @@ export const fileRouter = router("file", {
         json: options,
       })
       if (!res.ok) {
-        throw new Error("Failed to save file")
+        const data = await res.json()
+        throw new Error(data.message || "Failed to save file")
       }
       const data = await res.json()
 
