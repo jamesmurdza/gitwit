@@ -12,6 +12,7 @@ import { toast } from "sonner"
 export function useFileTree() {
   const { id: projectId } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
+  const setActiveTab = useAppStore((s) => s.setActiveTab)
   const setTabs = useAppStore((s) => s.setTabs)
   const { updateChangedFilesOptimistically } = useChangedFilesOptimistic()
   const { socket } = useSocket()
@@ -27,7 +28,23 @@ export function useFileTree() {
     })
   const { mutate: deleteFolder, isPending: isDeletingFolder } =
     fileRouter.deleteFolder.useMutation({
-      onSuccess({ message }) {
+      onMutate({ folderId }) {
+        setTabs((tabs) =>
+          tabs.filter(
+            (tab) => tab.id !== folderId && !tab.id.startsWith(folderId + "/")
+          )
+        )
+        setActiveTab((activeTab) => {
+          if (
+            activeTab?.id === folderId ||
+            activeTab?.id.startsWith(folderId + "/")
+          ) {
+            return undefined
+          }
+          return activeTab
+        })
+      },
+      onSuccess({ message }, { folderId }) {
         return queryClient
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
@@ -46,8 +63,13 @@ export function useFileTree() {
   const { mutate: deleteFile, isPending: isDeletingFile } =
     fileRouter.deleteFile.useMutation({
       onMutate: async ({ fileId }) => {
-        // Optimistically update changed files
-        updateChangedFilesOptimistically("delete", fileId)
+        setTabs((tabs) => tabs.filter((tab) => tab.id !== fileId))
+        setActiveTab((activeTab) => {
+          if (activeTab?.id === fileId) {
+            return undefined
+          }
+          return activeTab
+        })
       },
       onSuccess({ message }) {
         return queryClient

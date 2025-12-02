@@ -392,7 +392,8 @@ export const fileRouter = router("file", {
         },
       })
       if (!res.ok) {
-        throw new Error("Failed to delete file")
+        const data = await res.json()
+        throw new Error(data.message || "Failed to delete file")
       }
       return res.json()
     },

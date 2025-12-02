@@ -170,6 +170,13 @@ export class FileManager {
 
     // Save to container filesystem
     const filePath = path.posix.join(this.dirName, fileId)
+
+    // Check if the file exists before saving
+    const existingContent = await this.safeReadFile(filePath)
+    if (existingContent === null) {
+      throw new Error("File does not exist. It may have been deleted.")
+    }
+
     await this.container.files.write(filePath, body)
 
     // Refresh the file tree in case saving creates a new file
