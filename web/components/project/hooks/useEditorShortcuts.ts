@@ -51,7 +51,7 @@ export function useEditorShortcuts() {
         saveFile({
           fileId: activeFileId,
           projectId,
-          content: draft,
+          content: draft || "",
         })
       }
       // Ctrl+L or Cmd+L: Toggle AI chat
