@@ -14,6 +14,7 @@ import React, {
   useRef,
   useState,
 } from "react"
+import { toast } from "sonner"
 import type { ContextTab, FileMergeResult, Message } from "../lib/types"
 import { getCombinedContext, normalizePath } from "../lib/utils"
 
@@ -117,7 +118,30 @@ function ChatProvider({
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const addContextTab = useCallback((newTab: ContextTab) => {
-    setContextTabs((prev) => [...prev, newTab])
+    setContextTabs((prev) => {
+      // Check for duplicate by type and content
+      const isDuplicate = prev.some((tab) => {
+        if (tab.type !== newTab.type) return false
+        if (tab.type === "file" || tab.type === "image") {
+          return tab.name === newTab.name
+        }
+        if (tab.content === newTab.content) {
+          return true
+        }
+        return false
+      })
+
+      if (isDuplicate) {
+        const isSnippet = newTab.type === "text" || newTab.type === "code"
+        const message = isSnippet
+          ? "Snippet is already added"
+          : `"${newTab.name}" is already added`
+        toast.info(message)
+        return prev
+      }
+
+      return [...prev, newTab]
+    })
   }, [])
 
   const removeContextTab = useCallback((id: string) => {
