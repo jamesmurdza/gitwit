@@ -91,6 +91,13 @@ export async function processEdit(
   })
 }
 
+export async function logFileDetected(filePath: string) {
+  console.log(
+    "📄 [SERVER] File detected from AI response and added to preview:",
+    filePath
+  )
+}
+
 export async function mergeCode(
   partialCode: string,
   originalCode: string,
@@ -102,7 +109,6 @@ export async function mergeCode(
     throw new Error("Unauthorized")
   }
 
-  // Log the merge request
   console.log("🔀 Code Merge - Starting merge for file:", fileName)
   console.log("🔀 Code Merge - Partial Code:", partialCode)
   console.log("🔀 Code Merge - Original Code Length:", originalCode.length)

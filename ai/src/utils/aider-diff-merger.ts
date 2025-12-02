@@ -231,7 +231,9 @@ function parseBlocks(blockContent: string): Omit<AiderDiffBlock, "filePath">[] {
     // Only remove completely empty lines at the very start/end if they exist
     // But preserve internal empty lines and all indentation
 
-    if (searchLines.length > 0) {
+    // Allow empty search blocks for new files (searchLines.length === 0)
+    // This means the entire file is new and should be created from replaceLines
+    if (searchLines.length >= 0 && replaceLines.length > 0) {
       blocks.push({
         searchLines,
         replaceLines,
@@ -247,10 +249,12 @@ function parseBlocks(blockContent: string): Omit<AiderDiffBlock, "filePath">[] {
 /**
  * Finds the starting index of a block in the code
  * Tries exact match first (including whitespace), then normalized match (ignoring leading whitespace)
+ * Returns -1 for empty search blocks (new files) instead of null
  */
 function findBlockInCode(code: string, searchLines: string[]): number | null {
+  // Empty search block means it's a new file - return -1 as a special marker
   if (searchLines.length === 0) {
-    return null
+    return -1
   }
 
   const codeLines = code.split("\n")
@@ -361,6 +365,18 @@ export function mergeAiderDiff(
     const block = blocks[blockIdx]
 
     const searchStart = findBlockInCode(result, block.searchLines)
+
+    // Handle new files: empty SEARCH block means entire file is new
+    if (searchStart === -1) {
+      // For new files, just return the replace content
+      // If originalCode is empty, this is a new file
+      if (result.trim().length === 0) {
+        result = block.replaceLines.join("\n")
+        continue
+      }
+      // If originalCode exists but search is empty, skip (shouldn't happen for new files)
+      continue
+    }
 
     if (searchStart === null) {
       continue

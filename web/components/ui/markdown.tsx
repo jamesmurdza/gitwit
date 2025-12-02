@@ -1,6 +1,6 @@
 "use client"
 
-import { cn, extractFilePathFromCode } from "@/lib/utils"
+import { cn, extractFilePathFromCode, isNewFile } from "@/lib/utils"
 import {
   type ComponentProps,
   isValidElement,
@@ -86,12 +86,20 @@ export const Markdown = memo(
               ? intendedFile.split("/").pop() || intendedFile
               : undefined
 
+            // Check if this is a new file
+            const fileIsNew = isNewFile(
+              intendedFile,
+              code,
+              markdownTextRef.current
+            )
+
             return (
               <CodeBlock
                 className={cn(className)}
                 code={code}
                 language={language}
                 filename={filename}
+                isNewFile={fileIsNew}
                 showToolbar
               >
                 {/* Toolbar actions (Apply, Reject, Copy) */}

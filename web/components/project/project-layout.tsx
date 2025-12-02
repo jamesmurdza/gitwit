@@ -1,6 +1,5 @@
 "use client"
 
-import { mergeCode } from "@/app/actions/ai"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -24,12 +23,14 @@ import AIEditElements from "./ai-edit/ai-edit-elements"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
 import { ChatProvider } from "./chat/providers/chat-provider"
+import { useAIFileActions } from "./hooks/useAIFileActions"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
 import { useDiffSessionManager } from "./hooks/useDiffSessionManager"
 import { useEditorSocket } from "./hooks/useEditorSocket"
 import { useMonacoEditor } from "./hooks/useMonacoEditor"
 import PreviewWindow from "./preview"
 import Terminals from "./terminals"
+
 export interface ProjectLayoutProps {
   isOwner: boolean
   projectName: string
@@ -58,6 +59,7 @@ export default function ProjectLayout({
   const setEditorRef = useAppStore((s) => s.setEditorRef)
   const draft = useAppStore((s) => s.drafts[activeTab?.id ?? ""])
   const setDraft = useAppStore((s) => s.setDraft)
+  const getDraft = useAppStore((s) => s.getDraft)
   const editorLanguage = activeTab?.name
     ? processFileType(activeTab.name)
     : "plaintext"
@@ -131,6 +133,12 @@ export default function ProjectLayout({
     setIsAIChatOpen,
   })
 
+  // Keep a ref to editorRef so callbacks can access the latest value
+  const editorRefRef = useRef(editorRef)
+  useEffect(() => {
+    editorRefRef.current = editorRef
+  }, [editorRef])
+
   // Set editor ref in store so sidebar can access it
   useEffect(() => {
     if (editorRef) {
@@ -190,40 +198,98 @@ export default function ProjectLayout({
     [handleApplyCode]
   )
 
-  const updateActiveFileContent = (content?: string) => {
-    if (!activeTab) {
-      return
-    }
-    setDraft(activeTab.id, content ?? "")
-  }
+  const updateFileDraft = useCallback(
+    (fileId: string, content?: string) => {
+      setDraft(fileId, content ?? "")
+    },
+    [setDraft]
+  )
 
-  // Handler for applying code from chat
-  const handleApplyCodeFromChat = useCallback(
-    async (code: string, language?: string) => {
-      if (!activeTab) {
+  const handleEditorChange = useCallback(
+    (value?: string) => {
+      if (!activeTab?.id) {
         return
       }
-      try {
-        // First, merge the partial code with the original using AI
-        const originalCode = activeFileContent
-        const mergedCode = await mergeCode(
-          code,
-          originalCode,
-          activeTab.name,
-          projectId
-        )
-
-        // Then apply the diff view with the merged code
-        handleApplyCodeWithDecorations(mergedCode, originalCode)
-      } catch (error) {
-        console.error("📝 Apply Code - Failed to merge code:", error)
-        // Fallback: apply the partial code directly
-        const originalCode = activeFileContent
-        handleApplyCodeWithDecorations(code, originalCode)
-      }
+      updateFileDraft(activeTab.id, value)
     },
-    [activeTab, activeFileContent, handleApplyCodeWithDecorations, projectId]
+    [activeTab?.id, updateFileDraft]
   )
+
+  const waitForEditorModel = useCallback(async () => {
+    if (!activeTab?.id) {
+      return null
+    }
+
+    const editorRefMaxAttempts = 100
+    const delayMs = 50
+    const uri = monaco.Uri.parse(activeTab.id)
+
+    for (let attempt = 0; attempt < editorRefMaxAttempts; attempt++) {
+      // Check the ref which always has the latest value
+      const currentEditorRef = editorRefRef.current
+      if (currentEditorRef) {
+        const maxAttempts = 60
+
+        for (let modelAttempt = 0; modelAttempt < maxAttempts; modelAttempt++) {
+          // Try getting model from editor first
+          let model = currentEditorRef.getModel()
+
+          // If not found, try getting it by URI (might be created but not set yet)
+          if (!model) {
+            model = monaco.editor.getModel(uri)
+          }
+
+          // Verify the model is set on the editor and matches the expected URI
+          if (model) {
+            const editorModel = currentEditorRef.getModel()
+            if (
+              editorModel === model &&
+              model.uri.toString() === uri.toString()
+            ) {
+              return model
+            }
+            // If model exists in registry but not on editor yet, wait a bit more
+            // @monaco-editor/react should set it automatically
+            if (modelAttempt % 10 === 0) {
+            }
+          } else if (modelAttempt % 10 === 0) {
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+        }
+
+        // If we got here, the editor exists but model never appeared
+        // This might mean the Editor component hasn't fully initialized
+        return null
+      }
+
+      // Editor not mounted yet, wait and retry
+      if (attempt % 20 === 0) {
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+
+    // Editor never mounted
+    return null
+  }, [activeTab?.id])
+
+  const {
+    getCurrentFileContent,
+    precomputeMergeForFile,
+    handleApplyCodeFromChat,
+    applyPrecomputedMerge,
+    restoreOriginalFile,
+  } = useAIFileActions({
+    projectId,
+    activeTab,
+    tabs,
+    setActiveTab,
+    editorRef,
+    waitForEditorModel,
+    handleApplyCodeWithDecorations,
+    updateFileDraft,
+  })
 
   // Handler for rejecting code from chat
   const handleRejectCodeFromChat = useCallback(() => {
@@ -346,7 +412,7 @@ export default function ProjectLayout({
                       beforeMount={handleEditorWillMount}
                       onMount={handleEditorMount}
                       path={activeTab.id}
-                      onChange={updateActiveFileContent}
+                      onChange={handleEditorChange}
                       theme={theme === "light" ? "vs" : "vs-dark"}
                       options={defaultEditorOptions}
                       value={activeFileContent}
@@ -440,6 +506,10 @@ export default function ProjectLayout({
               <AIChat
                 onApplyCode={handleApplyCodeFromChat}
                 onRejectCode={handleRejectCodeFromChat}
+                precomputeMergeForFile={precomputeMergeForFile}
+                applyPrecomputedMerge={applyPrecomputedMerge}
+                restoreOriginalFile={restoreOriginalFile}
+                getCurrentFileContent={getCurrentFileContent}
               />
             </ResizablePanel>
           </>

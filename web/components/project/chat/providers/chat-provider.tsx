@@ -3,6 +3,7 @@ import { TFile, TFolder } from "@/lib/types"
 import { useAppStore } from "@/store/context"
 import { useQueryClient } from "@tanstack/react-query"
 import { readStreamableValue } from "ai/rsc"
+import { nanoid } from "nanoid"
 import { useParams } from "next/navigation"
 import React, {
   createContext,
@@ -13,8 +14,8 @@ import React, {
   useRef,
   useState,
 } from "react"
-import type { ContextTab, Message } from "../lib/types"
-import { getCombinedContext } from "../lib/utils"
+import type { ContextTab, FileMergeResult, Message } from "../lib/types"
+import { getCombinedContext, normalizePath } from "../lib/utils"
 
 type ChatProviderProps = {
   activeFileContent: string
@@ -24,6 +25,12 @@ type ChatProviderProps = {
   projectName: string
   children: ReactNode
 }
+
+export type MergeState =
+  | { status: "idle" }
+  | { status: "pending" }
+  | { status: "ready"; result: FileMergeResult }
+  | { status: "error"; error: string }
 
 type ChatContextType = {
   activeFileContent?: string
@@ -38,6 +45,17 @@ type ChatContextType = {
   removeContextTab: (id: string) => void
   sendMessage: (message: string, context?: string) => Promise<void>
   stopGeneration: () => void
+  fileActionStatuses: Record<string, Record<string, "applied" | "rejected">>
+  markFileActionStatus: (
+    messageId: string,
+    filePath: string,
+    status: "applied" | "rejected"
+  ) => void
+  latestAssistantId?: string
+  mergeStatuses: Record<string, MergeState>
+  setMergeStatuses: React.Dispatch<
+    React.SetStateAction<Record<string, MergeState>>
+  >
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
@@ -87,6 +105,15 @@ function ChatProvider({
   const [isGenerating, setIsGenerating] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [contextTabs, setContextTabs] = useState<ContextTab[]>([])
+  const [fileActionStatuses, setFileActionStatuses] = useState<
+    Record<string, Record<string, "applied" | "rejected">>
+  >({})
+  const [latestAssistantId, setLatestAssistantId] = useState<string | null>(
+    null
+  )
+  const [mergeStatuses, setMergeStatuses] = useState<
+    Record<string, MergeState>
+  >({})
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const addContextTab = useCallback((newTab: ContextTab) => {
@@ -136,6 +163,10 @@ function ChatProvider({
       // Add empty assistant message
       addMessage(activeThreadId, { role: "assistant", content: "" })
       const assistantMessageIndex = messages.length + 1 // +1 for user message just added
+
+      // Track latest assistant message ID for HEAD compatibility
+      const assistantMessageId = nanoid()
+      setLatestAssistantId(assistantMessageId)
 
       try {
         const { output } = await streamChat(
@@ -213,6 +244,21 @@ function ChatProvider({
     abortControllerRef.current?.abort()
   }, [])
 
+  const markFileActionStatus = useCallback(
+    (messageId: string, filePath: string, status: "applied" | "rejected") => {
+      if (!messageId) return
+      const normalized = normalizePath(filePath)
+      setFileActionStatuses((prev) => ({
+        ...prev,
+        [messageId]: {
+          ...(prev[messageId] ?? {}),
+          [normalized]: status,
+        },
+      }))
+    },
+    []
+  )
+
   // Memoize context value to avoid unnecessary re-renders
   const contextValue = useMemo(
     () => ({
@@ -228,6 +274,11 @@ function ChatProvider({
       removeContextTab,
       sendMessage,
       stopGeneration,
+      fileActionStatuses,
+      markFileActionStatus,
+      latestAssistantId: latestAssistantId ?? undefined,
+      mergeStatuses,
+      setMergeStatuses,
     }),
     [
       activeFileContent,
@@ -241,6 +292,11 @@ function ChatProvider({
       removeContextTab,
       sendMessage,
       stopGeneration,
+      fileActionStatuses,
+      markFileActionStatus,
+      latestAssistantId,
+      mergeStatuses,
+      setMergeStatuses,
     ]
   )
 

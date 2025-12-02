@@ -27,15 +27,37 @@ import {
   ChatInputTextarea,
 } from "./components/chat-input"
 import { ContextTab } from "./components/context-tab"
+import { GeneratedFilesPreview } from "./components/generated-files-preview"
 import { Message, MessageContent } from "./components/message"
+import type {
+  ApplyMergedFileArgs,
+  FileMergeResult,
+  GetCurrentFileContentFn,
+  PrecomputeMergeArgs,
+} from "./lib/types"
 import { useChat } from "./providers/chat-provider"
+
+type PrecomputeMergeFn = (args: PrecomputeMergeArgs) => Promise<FileMergeResult>
+type ApplyPrecomputedMergeFn = (args: ApplyMergedFileArgs) => Promise<void>
+type RestorePrecomputedMergeFn = (args: ApplyMergedFileArgs) => Promise<void>
 
 type AIChatProps = {
   onApplyCode?: (code: string, language?: string) => Promise<void>
   onRejectCode?: () => void
+  precomputeMergeForFile?: PrecomputeMergeFn
+  applyPrecomputedMerge?: ApplyPrecomputedMergeFn
+  restoreOriginalFile?: RestorePrecomputedMergeFn
+  getCurrentFileContent?: GetCurrentFileContentFn
 }
 
-function AIChatBase({ onApplyCode, onRejectCode }: AIChatProps) {
+function AIChatBase({
+  onApplyCode,
+  onRejectCode,
+  precomputeMergeForFile,
+  applyPrecomputedMerge,
+  restoreOriginalFile,
+  getCurrentFileContent,
+}: AIChatProps) {
   return (
     <ChatContainerRoot>
       <ChatContainerHeader>
@@ -46,8 +68,17 @@ function AIChatBase({ onApplyCode, onRejectCode }: AIChatProps) {
           <ChatContainerCollapse />
         </ChatContainerActions>
       </ChatContainerHeader>
-      <MainChatContent onApplyCode={onApplyCode} onRejectCode={onRejectCode} />
-      <MainChatInput />
+      <MainChatContent
+        onApplyCode={onApplyCode}
+        onRejectCode={onRejectCode}
+        getCurrentFileContent={getCurrentFileContent}
+      />
+      <MainChatInput
+        precomputeMergeForFile={precomputeMergeForFile}
+        applyPrecomputedMerge={applyPrecomputedMerge}
+        restoreOriginalFile={restoreOriginalFile}
+        getCurrentFileContent={getCurrentFileContent}
+      />
     </ChatContainerRoot>
   )
 }
@@ -56,17 +87,54 @@ export const AIChat = React.memo(
   AIChatBase,
   (prev, next) =>
     prev.onApplyCode === next.onApplyCode &&
-    prev.onRejectCode === next.onRejectCode
+    prev.onRejectCode === next.onRejectCode &&
+    prev.precomputeMergeForFile === next.precomputeMergeForFile &&
+    prev.applyPrecomputedMerge === next.applyPrecomputedMerge &&
+    prev.restoreOriginalFile === next.restoreOriginalFile &&
+    prev.getCurrentFileContent === next.getCurrentFileContent
 )
 function MainChatContent({
   onApplyCode,
   onRejectCode,
+  getCurrentFileContent,
 }: {
-  onApplyCode?: (code: string, language?: string) => Promise<void>
+  onApplyCode?: (
+    code: string,
+    language?: string,
+    options?: {
+      mergeStatuses?: Record<
+        string,
+        { status: string; result?: any; error?: string }
+      >
+      getCurrentFileContent?: (filePath: string) => Promise<string> | string
+      getMergeStatus?: (
+        filePath: string
+      ) => { status: string; result?: any; error?: string } | undefined
+    }
+  ) => Promise<void>
   onRejectCode?: () => void
+  getCurrentFileContent?: GetCurrentFileContentFn
 }) {
-  const { messages, isLoading } = useChat()
+  const { messages, isLoading, mergeStatuses } = useChat()
   const isEmpty = messages.length === 0
+  const mergeStatusesRef = React.useRef(mergeStatuses)
+  React.useEffect(() => {
+    mergeStatusesRef.current = mergeStatuses
+  }, [mergeStatuses])
+
+  const wrappedOnApplyCode = React.useCallback(
+    async (code: string, language?: string): Promise<void> => {
+      if (onApplyCode) {
+        await onApplyCode(code, language, {
+          mergeStatuses,
+          getCurrentFileContent,
+          getMergeStatus: (filePath: string) =>
+            mergeStatusesRef.current[filePath],
+        })
+      }
+    },
+    [onApplyCode, mergeStatuses, getCurrentFileContent]
+  )
 
   if (isEmpty) {
     return <ChatContainerEmpty />
@@ -77,10 +145,11 @@ function MainChatContent({
         {messages.map((message, i) => {
           return (
             <Message
+              messageId={message.id ?? `${message.role}-${i}`}
               role={message.role}
               context={message.context}
               key={i}
-              onApplyCode={onApplyCode}
+              onApplyCode={wrappedOnApplyCode}
               onRejectCode={onRejectCode}
             >
               <MessageContent>{message.content}</MessageContent>
@@ -112,7 +181,17 @@ function ChatLoading() {
     </div>
   )
 }
-function MainChatInput() {
+function MainChatInput({
+  precomputeMergeForFile,
+  applyPrecomputedMerge,
+  restoreOriginalFile,
+  getCurrentFileContent,
+}: {
+  precomputeMergeForFile?: PrecomputeMergeFn
+  applyPrecomputedMerge?: ApplyPrecomputedMergeFn
+  restoreOriginalFile?: RestorePrecomputedMergeFn
+  getCurrentFileContent?: GetCurrentFileContentFn
+}) {
   const { input, setInput, isLoading, isGenerating, sendMessage } = useChat()
   const handleSubmit = () => {
     console.log("Submitting message:", input)
@@ -124,6 +203,12 @@ function MainChatInput() {
 
   return (
     <div className="from-transparent via-background to-background bg-gradient-to-b px-2 pb-4 bottom-0">
+      <GeneratedFilesPreview
+        precomputeMerge={precomputeMergeForFile}
+        applyPrecomputedMerge={applyPrecomputedMerge}
+        restoreOriginalFile={restoreOriginalFile}
+        getCurrentFileContent={getCurrentFileContent}
+      />
       <ChatInput
         value={input}
         onValueChange={handleValueChange}
