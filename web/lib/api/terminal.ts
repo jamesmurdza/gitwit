@@ -23,19 +23,22 @@ export const createTerminal = ({
   setCreatingTerminal: React.Dispatch<React.SetStateAction<boolean>>
   command?: string
   socket: Socket
-}) => {
-  setCreatingTerminal(true)
-  const id = createId()
+}): Promise<void> => {
+  return new Promise((resolve) => {
+    setCreatingTerminal(true)
+    const id = createId()
 
-  setTerminals((prev) => [...prev, { id, terminal: null }])
-  setActiveTerminalId(id)
+    setTerminals((prev) => [...prev, { id, terminal: null }])
+    setActiveTerminalId(id)
 
-  setTimeout(() => {
-    socket.emit("createTerminal", { id }, () => {
-      setCreatingTerminal(false)
-      if (command) socket.emit("terminalData", { id, data: command + "\n" })
-    })
-  }, 1000)
+    setTimeout(() => {
+      socket.emit("createTerminal", { id }, () => {
+        setCreatingTerminal(false)
+        if (command) socket.emit("terminalData", { id, data: command + "\n" })
+        resolve()
+      })
+    }, 1000)
+  })
 }
 
 export const closeTerminal = ({
@@ -67,34 +70,40 @@ export const closeTerminal = ({
   setClosingTerminal: React.Dispatch<React.SetStateAction<string>>
   socket: Socket
   activeTerminalId: string
-}) => {
-  const numTerminals = terminals.length
-  const index = terminals.findIndex((t) => t.id === term.id)
-  if (index === -1) return
-
-  setClosingTerminal(term.id)
-
-  socket.emit("closeTerminal", { id: term.id }, () => {
-    setClosingTerminal("")
-
-    const nextId =
-      activeTerminalId === term.id
-        ? numTerminals === 1
-          ? null
-          : index < numTerminals - 1
-          ? terminals[index + 1].id
-          : terminals[index - 1].id
-        : activeTerminalId
-
-    setTerminals((prev) => prev.filter((t) => t.id !== term.id))
-
-    if (!nextId) {
-      setActiveTerminalId("")
-    } else {
-      const nextTerminal = terminals.find((t) => t.id === nextId)
-      if (nextTerminal) {
-        setActiveTerminalId(nextTerminal.id)
-      }
+}): Promise<void> => {
+  return new Promise((resolve) => {
+    const numTerminals = terminals.length
+    const index = terminals.findIndex((t) => t.id === term.id)
+    if (index === -1) {
+      resolve()
+      return
     }
+
+    setClosingTerminal(term.id)
+
+    socket.emit("closeTerminal", { id: term.id }, () => {
+      setClosingTerminal("")
+
+      const nextId =
+        activeTerminalId === term.id
+          ? numTerminals === 1
+            ? null
+            : index < numTerminals - 1
+            ? terminals[index + 1].id
+            : terminals[index - 1].id
+          : activeTerminalId
+
+      setTerminals((prev) => prev.filter((t) => t.id !== term.id))
+
+      if (!nextId) {
+        setActiveTerminalId("")
+      } else {
+        const nextTerminal = terminals.find((t) => t.id === nextId)
+        if (nextTerminal) {
+          setActiveTerminalId(nextTerminal.id)
+        }
+      }
+      resolve()
+    })
   })
 }

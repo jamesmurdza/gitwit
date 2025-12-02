@@ -22,7 +22,9 @@ interface EditorSlice {
 
   // Actions
   setTabs: (tabs: TTab[] | ((previousTabs: TTab[]) => TTab[])) => void
-  setActiveTab: (tabs: TTab | ((previousTabs?: TTab) => TTab)) => void
+  setActiveTab: (
+    tabs: TTab | ((previousTabs?: TTab) => TTab | undefined)
+  ) => void
   addTab: (tab: TTab) => void
   removeTab: (tab: TTab, override?: boolean) => void
   setActiveTabContent: (text: string) => void
