@@ -27,7 +27,29 @@ export function GeneratedFilesPreview({
   applyPrecomputedMerge,
   restoreOriginalFile,
   getCurrentFileContent,
-}: GeneratedFilesPreviewProps) {
+  activeFileId,
+  onApplyCode,
+  onOpenFile,
+}: GeneratedFilesPreviewProps & {
+  activeFileId?: string
+  onApplyCode?: (
+    code: string,
+    language?: string,
+    options?: {
+      mergeStatuses?: Record<
+        string,
+        { status: string; result?: FileMergeResult; error?: string }
+      >
+      getCurrentFileContent?: (filePath: string) => Promise<string> | string
+      getMergeStatus?: (
+        filePath: string
+      ) =>
+        | { status: string; result?: FileMergeResult; error?: string }
+        | undefined
+    }
+  ) => Promise<void>
+  onOpenFile?: (filePath: string) => void
+}) {
   const {
     messages,
     markFileActionStatus,
@@ -101,6 +123,9 @@ export function GeneratedFilesPreview({
   // Use sourceKey as the stable batch identifier (only changes on new AI response)
   const stableBatchIdRef = React.useRef<string | null>(sourceKey)
 
+  // Track which files have been auto-previewed to avoid repeated calls
+  const autoPreviewedRef = React.useRef(new Set<string>())
+
   React.useEffect(() => {
     generatedFilesRef.current = generatedFiles
   }, [generatedFiles])
@@ -121,6 +146,7 @@ export function GeneratedFilesPreview({
       setRejectingMap({})
       rejectingRef.current = {}
       setResolvedFiles({})
+      autoPreviewedRef.current.clear()
       stableBatchIdRef.current = sourceKey
     } else {
       // Same batch, just update batchKey ref (files being added incrementally)
@@ -234,6 +260,32 @@ export function GeneratedFilesPreview({
     // Depend on filesKey to process new files as they stream in
     // But processedFilesRef ensures each file is only processed once
   }, [sourceKey, filesKey])
+
+  // Auto-apply diff view when ready and active
+  React.useEffect(() => {
+    if (!onApplyCode) return
+
+    generatedFiles.forEach((file) => {
+      const key = file.path
+      
+      if (autoPreviewedRef.current.has(key)) return
+
+      const status = mergeStatuses[key]
+      if (status?.status === "ready" && status.result && file.code) {
+        // If file is active, apply diff
+        if (key === activeFileId) {
+          autoPreviewedRef.current.add(key)
+          onApplyCode(file.code, undefined, {
+            getMergeStatus: (path) => mergeStatusRef.current[path],
+          })
+        } 
+        // If file is NOT active, open it (which will trigger this effect again when activeFileId changes)
+        else if (onOpenFile) {
+          onOpenFile(key)
+        }
+      }
+    })
+  }, [generatedFiles, mergeStatuses, activeFileId, onApplyCode, onOpenFile])
 
   const handleKeepFile = React.useCallback(
     (file: GeneratedFile) => {

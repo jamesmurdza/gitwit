@@ -102,5 +102,5 @@ export function extractFilesFromMessages(messages: Message[]): {
     })
   )
 
-  return { files, sourceKey: latestAssistant.content }
+  return { files, sourceKey: latestAssistant.id || latestAssistant.content }
 }

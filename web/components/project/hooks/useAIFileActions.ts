@@ -63,6 +63,29 @@ export function useAIFileActions({
     editorRefRef.current = editorRef
   }, [editorRef])
 
+  const openFile = useCallback(
+    (filePath: string) => {
+      const normalizedPath = normalizePath(filePath)
+      const matchBy = (tab: TTab) => pathMatchesTab(normalizedPath, tab)
+      let targetTab = tabs.find(matchBy)
+      
+      if (!targetTab) {
+        targetTab = {
+          id: normalizedPath,
+          name: normalizedPath.split("/").pop() || normalizedPath,
+          type: "file",
+          saved: true,
+        }
+      }
+
+      const isAlreadyActive = activeTab ? matchBy(activeTab) : false
+      if (!isAlreadyActive) {
+        setActiveTab(targetTab)
+      }
+    },
+    [tabs, activeTab, setActiveTab]
+  )
+
   const processNextInQueue = useCallback(() => {
     if (
       isProcessingQueueRef.current ||
@@ -78,22 +101,10 @@ export function useAIFileActions({
     pendingPreviewApplyRef.current = next
     setPendingApplyTick((tick) => tick + 1)
 
-    const matchBy = (tab: TTab) => pathMatchesTab(next.filePath, tab)
-    let targetTab = tabs.find(matchBy)
-    if (!targetTab) {
-      targetTab = {
-        id: next.filePath,
-        name: next.filePath.split("/").pop() || next.filePath,
-        type: "file",
-        saved: true,
-      }
-    }
+    setPendingApplyTick((tick) => tick + 1)
 
-    const isAlreadyActive = activeTab ? matchBy(activeTab) : false
-    if (!isAlreadyActive) {
-      setActiveTab(targetTab)
-    }
-  }, [activeTab, setActiveTab, tabs])
+    openFile(next.filePath)
+  }, [openFile])
 
   // --- Helper: Get Content ---
   const getCurrentFileContent = useCallback(
@@ -180,7 +191,6 @@ export function useAIFileActions({
 
         // 1. Check Precomputed Status
         const mergeStatus = options?.getMergeStatus?.(normalizedPath)
-
         // 2. If ready, verify content matches
         if (mergeStatus?.status === "ready" && mergeStatus.result) {
           const currentContent = await getCurrentFileContent(normalizedPath)
@@ -352,5 +362,6 @@ export function useAIFileActions({
     handleApplyCodeFromChat,
     applyPrecomputedMerge,
     restoreOriginalFile,
+    openFile,
   }
 }
