@@ -11,7 +11,6 @@ import {
 import { BundledLanguage } from "shiki"
 import { Streamdown } from "streamdown"
 import { CodeBlock, CodeBlockCopyButton } from "./code-block"
-import { CodeBlockActions } from "./code-block-actions"
 type MarkdownProps = ComponentProps<typeof Streamdown>
 
 export const Markdown = memo(
@@ -102,13 +101,6 @@ export const Markdown = memo(
                 isNewFile={fileIsNew}
                 showToolbar
               >
-                {/* Toolbar actions (Apply, Reject, Copy) */}
-                <CodeBlockActions
-                  code={code}
-                  language={language}
-                  intendedFile={intendedFile}
-                  placement="toolbar"
-                />
                 <CodeBlockCopyButton className="size-7" />
               </CodeBlock>
             )

@@ -42,12 +42,31 @@ type ApplyPrecomputedMergeFn = (args: ApplyMergedFileArgs) => Promise<void>
 type RestorePrecomputedMergeFn = (args: ApplyMergedFileArgs) => Promise<void>
 
 type AIChatProps = {
-  onApplyCode?: (code: string, language?: string) => Promise<void>
+  onApplyCode?: (
+    code: string,
+    language?: string,
+    options?: {
+      mergeStatuses?: Record<
+        string,
+        { status: string; result?: FileMergeResult; error?: string }
+      >
+      getCurrentFileContent?: (filePath: string) => Promise<string> | string
+      getMergeStatus?: (
+        filePath: string
+      ) =>
+        | { status: string; result?: FileMergeResult; error?: string }
+        | undefined
+    }
+  ) => Promise<void>
   onRejectCode?: () => void
   precomputeMergeForFile?: PrecomputeMergeFn
   applyPrecomputedMerge?: ApplyPrecomputedMergeFn
   restoreOriginalFile?: RestorePrecomputedMergeFn
+
   getCurrentFileContent?: GetCurrentFileContentFn
+
+  activeFileId?: string
+  onOpenFile?: (filePath: string) => void
 }
 
 function AIChatBase({
@@ -56,7 +75,11 @@ function AIChatBase({
   precomputeMergeForFile,
   applyPrecomputedMerge,
   restoreOriginalFile,
+
+
   getCurrentFileContent,
+  activeFileId,
+  onOpenFile,
 }: AIChatProps) {
   return (
     <ChatContainerRoot>
@@ -78,6 +101,9 @@ function AIChatBase({
         applyPrecomputedMerge={applyPrecomputedMerge}
         restoreOriginalFile={restoreOriginalFile}
         getCurrentFileContent={getCurrentFileContent}
+        activeFileId={activeFileId}
+        onApplyCode={onApplyCode}
+        onOpenFile={onOpenFile}
       />
     </ChatContainerRoot>
   )
@@ -91,7 +117,9 @@ export const AIChat = React.memo(
     prev.precomputeMergeForFile === next.precomputeMergeForFile &&
     prev.applyPrecomputedMerge === next.applyPrecomputedMerge &&
     prev.restoreOriginalFile === next.restoreOriginalFile &&
-    prev.getCurrentFileContent === next.getCurrentFileContent
+    prev.getCurrentFileContent === next.getCurrentFileContent &&
+    prev.activeFileId === next.activeFileId &&
+    prev.onOpenFile === next.onOpenFile
 )
 function MainChatContent({
   onApplyCode,
@@ -186,11 +214,18 @@ function MainChatInput({
   applyPrecomputedMerge,
   restoreOriginalFile,
   getCurrentFileContent,
+  activeFileId,
+  onApplyCode,
+  onOpenFile,
 }: {
   precomputeMergeForFile?: PrecomputeMergeFn
   applyPrecomputedMerge?: ApplyPrecomputedMergeFn
+
   restoreOriginalFile?: RestorePrecomputedMergeFn
   getCurrentFileContent?: GetCurrentFileContentFn
+  activeFileId?: string
+  onApplyCode?: (code: string, language?: string) => Promise<void>
+  onOpenFile?: (filePath: string) => void
 }) {
   const { input, setInput, isLoading, isGenerating, sendMessage } = useChat()
   const handleSubmit = () => {
@@ -208,6 +243,9 @@ function MainChatInput({
         applyPrecomputedMerge={applyPrecomputedMerge}
         restoreOriginalFile={restoreOriginalFile}
         getCurrentFileContent={getCurrentFileContent}
+        activeFileId={activeFileId}
+        onApplyCode={onApplyCode}
+        onOpenFile={onOpenFile}
       />
       <ChatInput
         value={input}

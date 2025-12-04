@@ -278,8 +278,9 @@ export default function ProjectLayout({
     getCurrentFileContent,
     precomputeMergeForFile,
     handleApplyCodeFromChat,
-    applyPrecomputedMerge,
-    restoreOriginalFile,
+    applyPrecomputedMerge: baseApplyPrecomputedMerge,
+    restoreOriginalFile: baseRestoreOriginalFile,
+    openFile,
   } = useAIFileActions({
     projectId,
     activeTab,
@@ -290,6 +291,26 @@ export default function ProjectLayout({
     handleApplyCodeWithDecorations,
     updateFileDraft,
   })
+
+  const applyPrecomputedMerge = useCallback(
+    async (args: any) => {
+      if (baseApplyPrecomputedMerge) {
+        await baseApplyPrecomputedMerge(args)
+        forceClearAllDecorations()
+      }
+    },
+    [baseApplyPrecomputedMerge, forceClearAllDecorations]
+  )
+
+  const restoreOriginalFile = useCallback(
+    async (args: any) => {
+      if (baseRestoreOriginalFile) {
+        await baseRestoreOriginalFile(args)
+        forceClearAllDecorations()
+      }
+    },
+    [baseRestoreOriginalFile, forceClearAllDecorations]
+  )
 
   // Handler for rejecting code from chat
   const handleRejectCodeFromChat = useCallback(() => {
@@ -510,6 +531,8 @@ export default function ProjectLayout({
                 applyPrecomputedMerge={applyPrecomputedMerge}
                 restoreOriginalFile={restoreOriginalFile}
                 getCurrentFileContent={getCurrentFileContent}
+                activeFileId={activeTab?.id}
+                onOpenFile={openFile}
               />
             </ResizablePanel>
           </>
