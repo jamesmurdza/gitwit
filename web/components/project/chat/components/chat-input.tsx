@@ -54,6 +54,7 @@ import React, {
   useRef,
   useState,
 } from "react"
+import { toast } from "sonner"
 import { getIconForFile } from "vscode-icons-js"
 import { Button } from "../../../ui/button"
 import {
@@ -134,7 +135,7 @@ function ChatInput({
         const file = item.getAsFile()
         if (
           file &&
-          (ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)
+          ALLOWED_IMAGE_TYPES.includes(file.type)
         ) {
           const reader = new FileReader()
           reader.onload = () => {
@@ -153,7 +154,7 @@ function ChatInput({
         const file = item.getAsFile()
         if (
           file &&
-          (ALLOWED_FILE_TYPES as readonly string[]).some((type) =>
+          ALLOWED_FILE_TYPES.some((type) =>
             file.type.includes(type.replace("*", ""))
           )
         ) {
@@ -523,6 +524,10 @@ function ChatInputContextMenu() {
     [contextTabs]
   )
   const files = React.useMemo(() => getAllFiles(fileTree), [fileTree])
+  const isAllowedFileType = (type: string) =>
+    ALLOWED_FILE_TYPES.includes(type)
+  const isAllowedImageType = (type: string) =>
+    ALLOWED_IMAGE_TYPES.includes(type)
   const toggleCodeContextTab = React.useCallback(
     (tab: ContextTab) => {
       return () => {
@@ -543,6 +548,15 @@ function ChatInputContextMenu() {
     fileInput.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
+        const fileType = file.type
+        if (!fileType || !isAllowedFileType(fileType)) {
+          toast.error("Unsupported file type. Select a valid document or code file.")
+          return
+        }
+        if (isAllowedImageType(fileType)) {
+          toast.error("Use the Images option to upload image files.")
+          return
+        }
         const reader = new FileReader()
         reader.onload = () => {
           addContextTab({
@@ -572,6 +586,11 @@ function ChatInputContextMenu() {
     fileInput.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
+        const fileType = file.type
+        if (!fileType || !isAllowedImageType(fileType)) {
+          toast.error("Only image files are supported in the Images section.")
+          return
+        }
         const reader = new FileReader()
         reader.onload = () => {
           addContextTab({
@@ -682,5 +701,5 @@ export {
   ChatInputContextMenu,
   ChatInputModelSelect,
   ChatInputSubmit,
-  ChatInputTextarea,
+  ChatInputTextarea
 }
