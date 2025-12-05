@@ -450,9 +450,9 @@ function ChatInputContextMenu() {
   )
   const files = React.useMemo(() => getAllFiles(fileTree), [fileTree])
   const isAllowedFileType = (type: string) =>
-    ALLOWED_FILE_TYPES.some((allowed) => allowed === type)
+    (ALLOWED_FILE_TYPES as readonly string[]).includes(type)
   const isAllowedImageType = (type: string) =>
-    ALLOWED_IMAGE_TYPES.some((allowed) => allowed === type)
+    (ALLOWED_IMAGE_TYPES as readonly string[]).includes(type)
   const handleFileUpload: React.MouseEventHandler<HTMLDivElement> = (event) => {
     event.preventDefault()
     const fileInput = document.createElement("input")
@@ -464,12 +464,10 @@ function ChatInputContextMenu() {
         const fileType = file.type
         if (!fileType || !isAllowedFileType(fileType)) {
           toast.error("Unsupported file type. Select a valid document or code file.")
-          ;(e.target as HTMLInputElement).value = ""
           return
         }
         if (isAllowedImageType(fileType)) {
           toast.error("Use the Images option to upload image files.")
-          ;(e.target as HTMLInputElement).value = ""
           return
         }
         const reader = new FileReader()
@@ -504,7 +502,6 @@ function ChatInputContextMenu() {
         const fileType = file.type
         if (!fileType || !isAllowedImageType(fileType)) {
           toast.error("Only image files are supported in the Images section.")
-          ;(e.target as HTMLInputElement).value = ""
           return
         }
         const reader = new FileReader()
