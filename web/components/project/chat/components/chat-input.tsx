@@ -450,9 +450,9 @@ function ChatInputContextMenu() {
   )
   const files = React.useMemo(() => getAllFiles(fileTree), [fileTree])
   const isAllowedFileType = (type: string) =>
-    (ALLOWED_FILE_TYPES as readonly string[]).includes(type)
+    ALLOWED_FILE_TYPES.includes(type)
   const isAllowedImageType = (type: string) =>
-    (ALLOWED_IMAGE_TYPES as readonly string[]).includes(type)
+    ALLOWED_IMAGE_TYPES.includes(type)
   const handleFileUpload: React.MouseEventHandler<HTMLDivElement> = (event) => {
     event.preventDefault()
     const fileInput = document.createElement("input")
