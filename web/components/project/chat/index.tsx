@@ -1,6 +1,9 @@
-import { cn } from "@/lib/utils"
+import { TTab } from "@/lib/types"
+import { cn, debounce } from "@/lib/utils"
+import { useAppStore } from "@/store/context"
 import { Brain } from "lucide-react"
-import React from "react"
+import * as monaco from "monaco-editor"
+import React, { useCallback, useEffect, useRef } from "react"
 import {
   ChatContainerActions,
   ChatContainerCollapse,
@@ -13,6 +16,7 @@ import {
   ChatScrollContainer,
   ScrollButton,
 } from "./components/chat-container"
+import { ChatHistory } from "./components/chat-history"
 import {
   ChatInput,
   ChatInputActionBar,
@@ -23,26 +27,84 @@ import {
   ChatInputTextarea,
 } from "./components/chat-input"
 import { ContextTab } from "./components/context-tab"
+import { GeneratedFilesPreview } from "./components/generated-files-preview"
 import { Message, MessageContent } from "./components/message"
+import type {
+  ApplyMergedFileArgs,
+  FileMergeResult,
+  GetCurrentFileContentFn,
+  PrecomputeMergeArgs,
+} from "./lib/types"
 import { useChat } from "./providers/chat-provider"
 
+type PrecomputeMergeFn = (args: PrecomputeMergeArgs) => Promise<FileMergeResult>
+type ApplyPrecomputedMergeFn = (args: ApplyMergedFileArgs) => Promise<void>
+type RestorePrecomputedMergeFn = (args: ApplyMergedFileArgs) => Promise<void>
+
 type AIChatProps = {
-  onApplyCode?: (code: string, language?: string) => Promise<void>
+  onApplyCode?: (
+    code: string,
+    language?: string,
+    options?: {
+      mergeStatuses?: Record<
+        string,
+        { status: string; result?: FileMergeResult; error?: string }
+      >
+      getCurrentFileContent?: (filePath: string) => Promise<string> | string
+      getMergeStatus?: (
+        filePath: string
+      ) =>
+        | { status: string; result?: FileMergeResult; error?: string }
+        | undefined
+    }
+  ) => Promise<void>
   onRejectCode?: () => void
+  precomputeMergeForFile?: PrecomputeMergeFn
+  applyPrecomputedMerge?: ApplyPrecomputedMergeFn
+  restoreOriginalFile?: RestorePrecomputedMergeFn
+
+  getCurrentFileContent?: GetCurrentFileContentFn
+
+  activeFileId?: string
+  onOpenFile?: (filePath: string) => void
 }
 
-function AIChatBase({ onApplyCode, onRejectCode }: AIChatProps) {
+function AIChatBase({
+  onApplyCode,
+  onRejectCode,
+  precomputeMergeForFile,
+  applyPrecomputedMerge,
+  restoreOriginalFile,
+
+
+  getCurrentFileContent,
+  activeFileId,
+  onOpenFile,
+}: AIChatProps) {
   return (
     <ChatContainerRoot>
       <ChatContainerHeader>
         <ChatContainerTitle>Chat</ChatContainerTitle>
         <ChatContainerActions>
+          <ChatHistory />
           <ChatContainerMaximizeToggle />
           <ChatContainerCollapse />
         </ChatContainerActions>
       </ChatContainerHeader>
-      <MainChatContent onApplyCode={onApplyCode} onRejectCode={onRejectCode} />
-      <MainChatInput />
+      <MainChatContent
+        onApplyCode={onApplyCode}
+        onRejectCode={onRejectCode}
+        getCurrentFileContent={getCurrentFileContent}
+      />
+      <MainChatInput
+        precomputeMergeForFile={precomputeMergeForFile}
+        applyPrecomputedMerge={applyPrecomputedMerge}
+        restoreOriginalFile={restoreOriginalFile}
+        getCurrentFileContent={getCurrentFileContent}
+        activeFileId={activeFileId}
+        onApplyCode={onApplyCode}
+        onOpenFile={onOpenFile}
+      />
     </ChatContainerRoot>
   )
 }
@@ -51,31 +113,71 @@ export const AIChat = React.memo(
   AIChatBase,
   (prev, next) =>
     prev.onApplyCode === next.onApplyCode &&
-    prev.onRejectCode === next.onRejectCode
+    prev.onRejectCode === next.onRejectCode &&
+    prev.precomputeMergeForFile === next.precomputeMergeForFile &&
+    prev.applyPrecomputedMerge === next.applyPrecomputedMerge &&
+    prev.restoreOriginalFile === next.restoreOriginalFile &&
+    prev.getCurrentFileContent === next.getCurrentFileContent &&
+    prev.activeFileId === next.activeFileId &&
+    prev.onOpenFile === next.onOpenFile
 )
 function MainChatContent({
   onApplyCode,
   onRejectCode,
+  getCurrentFileContent,
 }: {
-  onApplyCode?: (code: string, language?: string) => Promise<void>
+  onApplyCode?: (
+    code: string,
+    language?: string,
+    options?: {
+      mergeStatuses?: Record<
+        string,
+        { status: string; result?: any; error?: string }
+      >
+      getCurrentFileContent?: (filePath: string) => Promise<string> | string
+      getMergeStatus?: (
+        filePath: string
+      ) => { status: string; result?: any; error?: string } | undefined
+    }
+  ) => Promise<void>
   onRejectCode?: () => void
+  getCurrentFileContent?: GetCurrentFileContentFn
 }) {
-  const { messages, isLoading } = useChat()
+  const { messages, isLoading, mergeStatuses } = useChat()
   const isEmpty = messages.length === 0
+  const mergeStatusesRef = React.useRef(mergeStatuses)
+  React.useEffect(() => {
+    mergeStatusesRef.current = mergeStatuses
+  }, [mergeStatuses])
+
+  const wrappedOnApplyCode = React.useCallback(
+    async (code: string, language?: string): Promise<void> => {
+      if (onApplyCode) {
+        await onApplyCode(code, language, {
+          mergeStatuses,
+          getCurrentFileContent,
+          getMergeStatus: (filePath: string) =>
+            mergeStatusesRef.current[filePath],
+        })
+      }
+    },
+    [onApplyCode, mergeStatuses, getCurrentFileContent]
+  )
 
   if (isEmpty) {
     return <ChatContainerEmpty />
   }
   return (
-    <ChatScrollContainer className="flex-1 relative w-full">
+    <ChatScrollContainer className="flex-1 relative w-full max-w-5xl mx-auto">
       <ChatContainerContent className="px-2 py-4  overflow-x-hidden">
         {messages.map((message, i) => {
           return (
             <Message
+              messageId={message.id ?? `${message.role}-${i}`}
               role={message.role}
               context={message.context}
               key={i}
-              onApplyCode={onApplyCode}
+              onApplyCode={wrappedOnApplyCode}
               onRejectCode={onRejectCode}
             >
               <MessageContent>{message.content}</MessageContent>
@@ -107,7 +209,24 @@ function ChatLoading() {
     </div>
   )
 }
-function MainChatInput() {
+function MainChatInput({
+  precomputeMergeForFile,
+  applyPrecomputedMerge,
+  restoreOriginalFile,
+  getCurrentFileContent,
+  activeFileId,
+  onApplyCode,
+  onOpenFile,
+}: {
+  precomputeMergeForFile?: PrecomputeMergeFn
+  applyPrecomputedMerge?: ApplyPrecomputedMergeFn
+
+  restoreOriginalFile?: RestorePrecomputedMergeFn
+  getCurrentFileContent?: GetCurrentFileContentFn
+  activeFileId?: string
+  onApplyCode?: (code: string, language?: string) => Promise<void>
+  onOpenFile?: (filePath: string) => void
+}) {
   const { input, setInput, isLoading, isGenerating, sendMessage } = useChat()
   const handleSubmit = () => {
     console.log("Submitting message:", input)
@@ -119,6 +238,15 @@ function MainChatInput() {
 
   return (
     <div className="from-transparent via-background to-background bg-gradient-to-b px-2 pb-4 bottom-0">
+      <GeneratedFilesPreview
+        precomputeMerge={precomputeMergeForFile}
+        applyPrecomputedMerge={applyPrecomputedMerge}
+        restoreOriginalFile={restoreOriginalFile}
+        getCurrentFileContent={getCurrentFileContent}
+        activeFileId={activeFileId}
+        onApplyCode={onApplyCode}
+        onOpenFile={onOpenFile}
+      />
       <ChatInput
         value={input}
         onValueChange={handleValueChange}
@@ -141,7 +269,77 @@ function MainChatInput() {
 }
 
 function ChatContexts() {
-  const { contextTabs, removeContextTab } = useChat()
+  const { contextTabs, removeContextTab, addContextTab } = useChat()
+  const activeTab = useAppStore((s) => s.activeTab)
+  const editorRef = useAppStore((s) => s.editorRef)
+  const previousTabIdRef = useRef<string | null>(null)
+
+  // Direct selection update handler
+  const updateSelection = useCallback(
+    (selection: monaco.Selection, activeTab?: TTab) => {
+      // Remove existing selection tab first
+      if (activeTab) {
+        const tabId = `selection-${activeTab.id}`
+        removeContextTab(tabId)
+      }
+
+      // Only add if there's an actual selection (not empty)
+      if (!selection.isEmpty() && activeTab) {
+        const tabId = `selection-${activeTab.id}`
+        const content = editorRef?.getModel()?.getValueInRange(selection)
+        console.log("Adding context tab with content:", content)
+        addContextTab({
+          id: tabId,
+          type: "code",
+          name: activeTab.name,
+          content,
+          lineRange: {
+            start: selection.startLineNumber,
+            end: selection.endLineNumber,
+          },
+        })
+      }
+    },
+    [editorRef, addContextTab, removeContextTab]
+  )
+
+  // Debounced variant for cursor selection changes
+  const debouncedUpdateSelection = useRef(
+    debounce((selection: monaco.Selection, activeTab?: TTab) => {
+      updateSelection(selection, activeTab)
+    }, 500)
+  ).current
+
+  useEffect(() => {
+    if (!activeTab) return
+
+    // Remove previous tab's selection context if it exists
+    if (previousTabIdRef.current) {
+      const previousSelectionId = `selection-${previousTabIdRef.current}`
+      removeContextTab(previousSelectionId)
+    }
+
+    // Update the ref with current tab ID
+    previousTabIdRef.current = activeTab.id
+
+    const editorSelection = editorRef?.getSelection()
+    if (!editorSelection) return
+    updateSelection(editorSelection, activeTab)
+  }, [activeTab?.id])
+
+  // Handle cursor selection changes
+  useEffect(() => {
+    if (!editorRef || !activeTab) return
+
+    const disposable = editorRef.onDidChangeCursorSelection((e) => {
+      debouncedUpdateSelection(e.selection, activeTab)
+    })
+
+    return () => {
+      disposable.dispose()
+    }
+  }, [editorRef, activeTab, debouncedUpdateSelection])
+
   return (
     <div className="flex gap-2 w-full flex-wrap">
       {contextTabs.map((tab) => (

@@ -130,7 +130,6 @@ export async function updateUser(
     })
 
     const responseData = await res.json()
-
     // Validate the response using our error schema
     const parseResult = UpdateErrorSchema.safeParse(responseData)
 
@@ -141,12 +140,22 @@ export async function updateUser(
         fields: validatedData,
       }
     }
-
+    if (parseResult.data.error) {
+      return {
+        message:
+          typeof parseResult.data.error === "string"
+            ? parseResult.data.error
+            : "Failed to update profile",
+        error: parseResult.data.error,
+        fields: validatedData,
+      }
+    }
     if (changedUsername) {
       const newRoute = `/@${validatedData.username}`
       return { message: "Successfully updated", newRoute }
     }
     revalidatePath(`/[username]`, "page")
+    revalidatePath("/dashboard", "layout")
     return { message: "Successfully updated" }
   } catch (error) {
     if (error instanceof z.ZodError) {

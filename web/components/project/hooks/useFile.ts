@@ -1,5 +1,7 @@
+import { useSocket } from "@/context/SocketContext"
 import { useChangedFilesOptimistic } from "@/hooks/useChangedFilesOptimistic"
 import { fileRouter, FileTree } from "@/lib/api"
+import { TFile, TFolder } from "@/lib/types"
 import { sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import { useQueryClient } from "@tanstack/react-query"
@@ -10,8 +12,10 @@ import { toast } from "sonner"
 export function useFileTree() {
   const { id: projectId } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
+  const setActiveTab = useAppStore((s) => s.setActiveTab)
   const setTabs = useAppStore((s) => s.setTabs)
   const { updateChangedFilesOptimistically } = useChangedFilesOptimistic()
+  const { socket } = useSocket()
 
   const { data: fileTree = [], isLoading: isLoadingFileTree } =
     fileRouter.fileTree.useQuery({
@@ -24,7 +28,23 @@ export function useFileTree() {
     })
   const { mutate: deleteFolder, isPending: isDeletingFolder } =
     fileRouter.deleteFolder.useMutation({
-      onSuccess({ message }) {
+      onMutate({ folderId }) {
+        setTabs((tabs) =>
+          tabs.filter(
+            (tab) => tab.id !== folderId && !tab.id.startsWith(folderId + "/")
+          )
+        )
+        setActiveTab((activeTab) => {
+          if (
+            activeTab?.id === folderId ||
+            activeTab?.id.startsWith(folderId + "/")
+          ) {
+            return undefined
+          }
+          return activeTab
+        })
+      },
+      onSuccess({ message }, { folderId }) {
         return queryClient
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
@@ -43,8 +63,13 @@ export function useFileTree() {
   const { mutate: deleteFile, isPending: isDeletingFile } =
     fileRouter.deleteFile.useMutation({
       onMutate: async ({ fileId }) => {
-        // Optimistically update changed files
-        updateChangedFilesOptimistically("delete", fileId)
+        setTabs((tabs) => tabs.filter((tab) => tab.id !== fileId))
+        setActiveTab((activeTab) => {
+          if (activeTab?.id === fileId) {
+            return undefined
+          }
+          return activeTab
+        })
       },
       onSuccess({ message }) {
         return queryClient
@@ -64,10 +89,6 @@ export function useFileTree() {
 
   const { mutate: renameFile, isPending: isRenamingFile } =
     fileRouter.rename.useMutation({
-      onMutate: async ({ fileId, newName }) => {
-        // Optimistically update changed files - treat rename as update
-        updateChangedFilesOptimistically("update", fileId, "")
-      },
       onSuccess({ message }, { newName }) {
         return queryClient
           .invalidateQueries(
@@ -93,9 +114,6 @@ export function useFileTree() {
       setTabs((tabs) =>
         tabs.map((tab) => (tab.id === fileId ? { ...tab, saved: true } : tab))
       )
-    },
-    onError() {
-      toast.error("Error saving file")
     },
   })
 
@@ -158,9 +176,25 @@ export function useFileTree() {
       success: (data) => {
         return data.message
       },
-      error: "Error saving file",
+      error: (error: Error) => error.message || "Error saving file",
     })
   }
+
+  React.useEffect(() => {
+    if (!socket) return
+    const handleRefreshFiles = (files: (TFolder | TFile)[]) => {
+      queryClient.setQueryData(fileTreeKey, {
+        data: files,
+        success: true,
+      })
+    }
+    socket.on("refreshFiles", handleRefreshFiles)
+
+    return () => {
+      socket.off("refreshFiles", handleRefreshFiles)
+    }
+  }, [socket])
+
   return {
     fileTree,
     deleteFolder,

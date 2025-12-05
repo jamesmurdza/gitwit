@@ -24,6 +24,7 @@ import { stringifyContent } from "../lib/utils"
 import { ContextTab } from "./context-tab"
 
 export type MessageProps = {
+  messageId?: string
   role: "user" | "assistant"
   children: React.ReactNode
   className?: string
@@ -35,6 +36,7 @@ export type MessageProps = {
 export type MessageContextValue = {
   role: "user" | "assistant"
   context?: ContextTab[]
+  messageId?: string
 }
 
 const MessageContext = React.createContext<MessageContextValue | undefined>(
@@ -48,6 +50,7 @@ const useMessage = () => {
   return context
 }
 const Message = ({
+  messageId,
   children,
   className,
   role,
@@ -56,7 +59,7 @@ const Message = ({
   onRejectCode,
   ...props
 }: MessageProps) => (
-  <MessageContext.Provider value={{ role, context }}>
+  <MessageContext.Provider value={{ role, context, messageId }}>
     <div
       className={cn(
         "flex gap-3",
@@ -69,6 +72,7 @@ const Message = ({
         <CodeApplyProvider
           onApplyCode={onApplyCode}
           onRejectCode={onRejectCode}
+          messageId={messageId}
         >
           {children}
         </CodeApplyProvider>
@@ -282,3 +286,4 @@ const MessageAction = ({
 }
 
 export { Message, MessageAction, MessageActions, MessageAvatar, MessageContent }
+

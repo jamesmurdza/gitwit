@@ -81,8 +81,10 @@ MANDATORY Rules for code changes:
 - Keep responses brief and to the point
 - Use aider diff format: \`<<<<<<< SEARCH\` / \`=======\` / \`>>>>>>> REPLACE\` blocks inside code blocks
 - If multiple search/replace blocks are for the same file, group them in the same code block
+- For NEW FILES: Use an empty SEARCH block (just \`<<<<<<< SEARCH\` followed immediately by \`=======\`) and put the entire file content in the REPLACE block
 
-🚨 NEVER show complete files. ALWAYS use "// ... existing code ..." comments for unchanged sections.
+🚨 NEVER show complete files for EXISTING files. ALWAYS use "// ... existing code ..." comments for unchanged sections.
+🚨 For NEW FILES: Show the complete file content in the REPLACE block with an empty SEARCH block.
 
 Example format for additions:
 File: /src/components/Button.tsx
@@ -154,6 +156,25 @@ File: /index.html
   <title>My App — Page Title</title>
 =======
   <title>My App — Testing Code</title>
+>>>>>>> REPLACE
+\`\`\`
+
+Example for NEW FILES (empty SEARCH block):
+File: /src/utils/helpers.ts (new file)
+\`\`\`ts
+<<<<<<< SEARCH
+=======
+export function formatDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+export function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 >>>>>>> REPLACE
 \`\`\``
 

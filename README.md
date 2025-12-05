@@ -135,6 +135,44 @@ OPENAI_API_KEY='🔑'
 ANTHROPIC_API_KEY='🔑'
 ```
 
+**Optional (AWS Bedrock):**
+
+```
+AWS_ACCESS_KEY_ID='🔑'
+AWS_SECRET_ACCESS_KEY='🔑'
+AWS_REGION='us-east-1'
+AWS_MODEL_ID='qwen.qwen3-32b-v1:0'
+# AWS_MODEL_ID='qwen.qwen3-coder-30b-a3b-v1:0'
+```
+
+#### Setting up AWS Bedrock keys
+
+Follow these steps to call the `qwen.qwen3-32b-v1:0` model through Amazon Bedrock:
+
+1. **Create an AWS account** – Sign up at [aws.amazon.com](https://aws.amazon.com/) if needed.
+2. **Create an IAM user with programmatic access** – In the AWS Console, open IAM → `Users` → `Add users`, choose a name, and enable "Programmatic access".
+3. **Attach Bedrock permissions** – Assign a policy similar to:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": [
+           "bedrock:*",
+           "kms:GenerateDataKey",
+           "kms:Decrypt"
+         ],
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
+4. **Create and store the access keys** – Download the access key ID and secret access key once, keep them in a password manager, and map them to `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
+5. **Configure your environment** – Set `AWS_REGION`, optionally override `AWS_MODEL_ID`, and confirm your Bedrock calls reference `qwen.qwen3-32b-v1:0` (or another valid Qwen model ID you prefer).
+
+Once complete, restart the app so the updated credentials are loaded.
+
 **Note:**
 
 - If `ENCRYPTION_KEY` is not set, the custom API keys feature will be disabled, but the app will still work using system-level API keys.

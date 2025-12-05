@@ -5,7 +5,7 @@ import { useEditorLayout } from "@/context/EditorLayoutContext"
 import { useTerminal } from "@/context/TerminalContext"
 import { Sandbox } from "@/lib/types"
 import { templateConfigs } from "@gitwit/templates"
-import { Play, StopCircle } from "lucide-react"
+import { LoaderCircle, Play, StopCircle } from "lucide-react"
 import { useEffect, useRef } from "react"
 import { toast } from "sonner"
 
@@ -18,10 +18,18 @@ export default function RunButtonModal({
   setIsRunning: (running: boolean) => void
   sandboxData: Sandbox
 }) {
-  const { createNewTerminal, closeTerminal, terminals } = useTerminal()
+  const {
+    createNewTerminal,
+    closeTerminal,
+    terminals,
+    creatingTerminal,
+    closingTerminal,
+  } = useTerminal()
   const { setIsPreviewCollapsed, previewPanelRef } = useEditorLayout()
   // Ref to keep track of the last created terminal's ID
   const lastCreatedTerminalRef = useRef<string | null>(null)
+  // Disable button when creating or closing a terminal
+  const isTransitioning = creatingTerminal || !!closingTerminal
 
   // Effect to update the lastCreatedTerminalRef when a new terminal is added
   useEffect(() => {
@@ -37,6 +45,9 @@ export default function RunButtonModal({
   }, [terminals, isRunning])
   // commands to run in the terminal
   const handleRun = async () => {
+    // Guard against rapid clicks during state transitions
+    if (isTransitioning) return
+
     if (isRunning && lastCreatedTerminalRef.current) {
       await closeTerminal(lastCreatedTerminalRef.current)
       lastCreatedTerminalRef.current = null
@@ -68,11 +79,13 @@ export default function RunButtonModal({
   }
 
   return (
-    <Button variant="outline" onClick={handleRun}>
-      {isRunning ? (
-        <StopCircle className="w-4 h-4 mr-2" />
+    <Button variant="outline" onClick={handleRun} disabled={isTransitioning}>
+      {isTransitioning ? (
+        <LoaderCircle className="size-4 mr-2 animate-spin" />
+      ) : isRunning ? (
+        <StopCircle className="size-4 mr-2" />
       ) : (
-        <Play className="w-4 h-4 mr-2" />
+        <Play className="size-4 mr-2" />
       )}
       {isRunning ? "Stop" : "Run"}
     </Button>

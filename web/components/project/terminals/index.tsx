@@ -5,7 +5,7 @@ import Tab from "@/components/ui/tab"
 import { useSocket } from "@/context/SocketContext"
 import { useTerminal } from "@/context/TerminalContext"
 import { Terminal } from "@xterm/xterm"
-import { Loader2, Plus, SquareTerminal, TerminalSquare } from "lucide-react"
+import { Plus, SquareTerminal, TerminalSquare } from "lucide-react"
 import { useEffect } from "react"
 import { toast } from "sonner"
 import EditorTerminal from "./terminal"
@@ -46,7 +46,6 @@ export default function Terminals() {
         {terminals.map((term) => (
           <Tab
             key={term.id}
-            creating={creatingTerminal}
             onClick={() => setActiveTerminalId(term.id)}
             onClose={() => closeTerminal(term.id)}
             selected={activeTerminalId === term.id}
@@ -62,11 +61,7 @@ export default function Terminals() {
           variant={"secondary"}
           className={`font-normal shrink-0 select-none text-muted-foreground disabled:opacity-50`}
         >
-          {creatingTerminal ? (
-            <Loader2 className="animate-spin w-4 h-4" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
+          <Plus className="w-4 h-4" />
         </Button>
       </div>
       {socket && activeTerminal ? (

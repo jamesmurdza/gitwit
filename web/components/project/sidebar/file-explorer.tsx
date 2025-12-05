@@ -3,7 +3,10 @@
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useEditorLayout } from "@/context/EditorLayoutContext"
-import type { Sandbox } from "@/lib/types"
+import {
+  FileExplorerProvider,
+  useFileExplorer,
+} from "@/context/FileExplorerContext"
 import { cn } from "@/lib/utils"
 import { DragDropProvider, useDroppable } from "@dnd-kit/react"
 import { FilePlus, FolderPlus, MessageSquareMore, Sparkles } from "lucide-react"
@@ -14,51 +17,53 @@ import SidebarFile from "./file"
 import SidebarFolder from "./folder"
 import New from "./new"
 
-interface FileExplorerProps {
-  sandboxData: Sandbox
-}
-
 export function FileExplorer() {
   const { id: projectId } = useParams<{ id: string }>()
 
   const { moveFile } = useFileTree()
 
   return (
-    <DragDropProvider
-      onDragEnd={(event) => {
-        if (event.canceled) return
-        const { source, target } = event.operation
+    <FileExplorerProvider>
+      <DragDropProvider
+        onDragEnd={(event) => {
+          if (event.canceled) return
+          const { source, target } = event.operation
+          if (source && target) {
+            if (source.type === "file" && target.type === "folder") {
+              const fileId = source.id.toString() // e.g. "/src/hello.ts"
+              const targetFolderId = target.id.toString() // e.g. "/src"
 
-        if (source && target) {
-          if (source.type === "file" && target.type === "folder") {
-            const fileId = source.id.toString() // e.g. "/src/hello.ts"
-            const targetFolderId = target.id.toString() // e.g. "/src"
-
-            // compute the file's current folder:
-            const idx = fileId.lastIndexOf("/")
-            const currentFolderId = fileId.substring(0, idx)
-            if (currentFolderId === targetFolderId) return
-            moveFile({
-              projectId,
-              folderId: targetFolderId,
-              fileId,
-            })
+              // compute the file's current folder:
+              const idx = fileId.lastIndexOf("/")
+              const currentFolderId = fileId.substring(0, idx) || "/" // e.g /viteconfig.js
+              if (currentFolderId === targetFolderId) return
+              moveFile({
+                projectId,
+                folderId: targetFolderId,
+                fileId,
+              })
+            }
           }
-        }
-      }}
-    >
-      <RootFolder />
-      <AIChatControl />
-    </DragDropProvider>
+        }}
+      >
+        <RootFolder />
+        <AIChatControl />
+      </DragDropProvider>
+    </FileExplorerProvider>
   )
 }
 
 function RootFolder() {
   const { id: projectId } = useParams<{ id: string }>()
-  const [creatingNew, setCreatingNew] = React.useState<
-    "file" | "folder" | null
-  >(null)
   const { fileTree, isLoadingFileTree } = useFileTree()
+
+  // Use the file explorer context for creation state
+  const { activeFolderPath, creationType, startCreating, stopCreating } =
+    useFileExplorer()
+
+  // Check if we should show the New form at root level
+  const showNewFormAtRoot = activeFolderPath === "/" && creationType !== null
+
   const { ref: droppableRef, isDropTarget } = useDroppable({
     id: "/",
     type: "folder",
@@ -87,15 +92,15 @@ function RootFolder() {
         <h2 className="font-medium">Explorer</h2>
         <div className="flex space-x-1">
           <button
-            disabled={!!creatingNew}
-            onClick={() => setCreatingNew("file")}
+            disabled={!!creationType}
+            onClick={() => startCreating("file")}
             className="h-6 w-6 text-muted-foreground ml-0.5 flex items-center justify-center translate-x-1 bg-transparent hover:bg-muted-foreground/25 cursor-pointer rounded-sm transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 disabled:hover:bg-background"
           >
             <FilePlus className="w-4 h-4" />
           </button>
           <button
-            disabled={!!creatingNew}
-            onClick={() => setCreatingNew("folder")}
+            disabled={!!creationType}
+            onClick={() => startCreating("folder")}
             className="h-6 w-6 text-muted-foreground ml-0.5 flex items-center justify-center translate-x-1 bg-transparent hover:bg-muted-foreground/25 cursor-pointer rounded-sm transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 disabled:hover:bg-background"
           >
             <FolderPlus className="w-4 h-4" />
@@ -118,15 +123,14 @@ function RootFolder() {
                 <SidebarFolder key={child.id} {...child} />
               )
             )}
-            {creatingNew !== null ? (
+            {showNewFormAtRoot && creationType !== null && (
               <New
                 projectId={projectId}
-                type={creatingNew}
-                stopEditing={() => {
-                  setCreatingNew(null)
-                }}
+                type={creationType}
+                basePath="/"
+                stopEditing={stopCreating}
               />
-            ) : null}
+            )}
           </>
         )}
       </div>

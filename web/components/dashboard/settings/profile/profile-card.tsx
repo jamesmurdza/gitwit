@@ -62,13 +62,13 @@ export default function ProfileCard({
   return (
     <Card className="mb-6 md:mb-0 sticky top-6">
       <CardContent className="flex flex-col gap-4 pt-6">
-        <div className="flex flex-col gap-2 items-center">
+        <div className="flex flex-col gap-2 items-center w-full max-w-full overflow-hidden">
           <Avatar name={name} avatarUrl={avatarUrl} className="size-36" />
-          <div className="space-y-1">
-            <CardTitle className="text-2xl text-center">{name}</CardTitle>
-            <CardDescription className="text-center">{`@${username}`}</CardDescription>
+          <div className="space-y-1 w-full max-w-full px-2">
+            <CardTitle className="text-2xl text-center break-words">{name}</CardTitle>
+            <CardDescription className="text-center break-words">{`@${username}`}</CardDescription>
           </div>
-          {bio && <p className="text-sm text-center">{bio}</p>}
+          {bio && <p className="text-sm text-center break-words px-2 w-full max-w-full">{bio}</p>}
           {((Array.isArray(socialLinks) && socialLinks.length > 0) ||
             personalWebsite) && (
             <div className="flex gap-2 justify-center">

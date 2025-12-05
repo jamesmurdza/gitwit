@@ -8,6 +8,7 @@ import { Check, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useCodeApply } from "../project/chat/contexts/code-apply-context"
 import { normalizePath, pathMatchesTab } from "../project/chat/lib/utils"
+import { useChat } from "../project/chat/providers/chat-provider"
 
 export interface CodeBlockActionsProps {
   code: string
@@ -37,7 +38,8 @@ export function CodeBlockActions({
   const activeTab = useAppStore((s) => s.activeTab)
   const tabs = useAppStore((s) => s.tabs)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
-  const { onApplyCode, onRejectCode } = useCodeApply()
+  const { onApplyCode, onRejectCode, messageId } = useCodeApply()
+  const { fileActionStatuses, mergeStatuses } = useChat()
 
   const applyHandler = onApply ?? onApplyCode
   const rejectHandler = onReject ?? onRejectCode
@@ -63,20 +65,23 @@ export function CodeBlockActions({
       const codeToApply = pending.code
       pendingApplyRef.current = null
       setIsLoading(true)
-      const applyPromise = latestApplyRef.current?.(codeToApply)
-      if (applyPromise) {
-        applyPromise
-          .then(() => {
-            setIsApplied(true)
-            setIsLoading(false)
-          })
-          .catch((error) => {
-            console.error("Apply failed:", error)
-            setIsLoading(false)
-          })
-      } else {
-        setIsLoading(false)
-      }
+
+      setTimeout(() => {
+        const applyPromise = latestApplyRef.current?.(codeToApply)
+        if (applyPromise) {
+          applyPromise
+            .then(() => {
+              setIsApplied(true)
+              setIsLoading(false)
+            })
+            .catch((error) => {
+              console.error("Apply failed:", error)
+              setIsLoading(false)
+            })
+        } else {
+          setIsLoading(false)
+        }
+      }, 100) // Small delay to allow Editor component to mount
     }
   }, [activeTab?.id, activeTab?.name])
   const isActiveForPath = useMemo(
@@ -89,6 +94,32 @@ export function CodeBlockActions({
     const normalized = normalizePath(intendedFile)
     return isActiveForPath(normalized)
   }, [isForCurrentFile, intendedFile, isActiveForPath])
+
+  const normalizedIntendedFile = useMemo(
+    () => (intendedFile ? normalizePath(intendedFile) : undefined),
+    [intendedFile]
+  )
+
+  const externalStatus =
+    messageId && normalizedIntendedFile
+      ? fileActionStatuses[messageId]?.[normalizedIntendedFile]
+      : undefined
+
+  // Check if merge is in progress for this file
+  const mergeStatus = normalizedIntendedFile
+    ? mergeStatuses[normalizedIntendedFile]
+    : undefined
+  const isMergePending = mergeStatus?.status === "pending"
+
+  useEffect(() => {
+    if (externalStatus === "applied") {
+      setIsApplied(true)
+      setIsRejected(false)
+    } else if (externalStatus === "rejected") {
+      setIsRejected(true)
+      setIsApplied(false)
+    }
+  }, [externalStatus])
 
   const handleApply = async () => {
     if (isApplied || isRejected || isLoading) return

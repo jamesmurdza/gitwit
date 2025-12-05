@@ -1,6 +1,6 @@
 "use client"
 
-import { cn, extractFilePathFromCode } from "@/lib/utils"
+import { cn, extractFilePathFromCode, isNewFile } from "@/lib/utils"
 import {
   type ComponentProps,
   isValidElement,
@@ -11,7 +11,6 @@ import {
 import { BundledLanguage } from "shiki"
 import { Streamdown } from "streamdown"
 import { CodeBlock, CodeBlockCopyButton } from "./code-block"
-import { CodeBlockActions } from "./code-block-actions"
 type MarkdownProps = ComponentProps<typeof Streamdown>
 
 export const Markdown = memo(
@@ -86,21 +85,22 @@ export const Markdown = memo(
               ? intendedFile.split("/").pop() || intendedFile
               : undefined
 
+            // Check if this is a new file
+            const fileIsNew = isNewFile(
+              intendedFile,
+              code,
+              markdownTextRef.current
+            )
+
             return (
               <CodeBlock
                 className={cn(className)}
                 code={code}
                 language={language}
                 filename={filename}
+                isNewFile={fileIsNew}
                 showToolbar
               >
-                {/* Toolbar actions (Apply, Reject, Copy) */}
-                <CodeBlockActions
-                  code={code}
-                  language={language}
-                  intendedFile={intendedFile}
-                  placement="toolbar"
-                />
                 <CodeBlockCopyButton className="size-7" />
               </CodeBlock>
             )

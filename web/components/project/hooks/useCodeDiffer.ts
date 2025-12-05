@@ -42,6 +42,12 @@ export function useCodeDiffer({
   const lastWidgetCountRef = useRef<number>(0)
   const suppressZeroNotifyRef = useRef<boolean>(false)
 
+  // Keep a ref to editorRef so callbacks can access the latest value
+  const editorRefRef = useRef(editorRef)
+  useEffect(() => {
+    editorRefRef.current = editorRef
+  }, [editorRef])
+
   /**
    * Applies a diff view to the Monaco editor with interactive accept/reject buttons
    *
@@ -54,9 +60,10 @@ export function useCodeDiffer({
       mergedCode: string,
       originalCode: string
     ): monaco.editor.IEditorDecorationsCollection | null => {
-      if (!editorRef) return null
-
-      const model = editorRef.getModel()
+      // Use the ref to get the latest editorRef value
+      const currentEditorRef = editorRefRef.current
+      if (!currentEditorRef) return null
+      const model = currentEditorRef.getModel()
       if (!model)
         return null
 
@@ -81,7 +88,7 @@ export function useCodeDiffer({
       model.setEOL(eolSequence)
 
       // Create and return decorations collection
-      const newDecorations = editorRef.createDecorationsCollection(
+      const newDecorations = currentEditorRef.createDecorationsCollection(
         diffResult.decorations
       )
 
@@ -93,7 +100,7 @@ export function useCodeDiffer({
         widgetManagerRef.current.cleanupAllWidgets()
       }
       widgetManagerRef.current = new WidgetManager(
-        editorRef,
+        currentEditorRef,
         model,
         (count) => {
           lastWidgetCountRef.current = count
@@ -116,7 +123,7 @@ export function useCodeDiffer({
 
       return newDecorations
     },
-    [editorRef]
+    [] // editorRef is accessed via ref, so no dependency needed
   )
 
   /**
@@ -130,7 +137,8 @@ export function useCodeDiffer({
           widgetManagerRef.current = null
         }
 
-        const cleanup = (editorRef as any)?.cleanupDiffWidgets as
+        const currentEditorRef = editorRefRef.current
+        const cleanup = (currentEditorRef as any)?.cleanupDiffWidgets as
           | (() => void)
           | undefined
         if (cleanup) cleanup()
@@ -138,7 +146,7 @@ export function useCodeDiffer({
         console.warn("Failed to cleanup diff widgets:", error)
       }
     }
-  }, [editorRef])
+  }, []) // editorRef is accessed via ref
 
   // Memoize functions to prevent unnecessary re-renders
   const hasActiveWidgets = useCallback(() => {
@@ -151,8 +159,9 @@ export function useCodeDiffer({
 
   const getUnresolvedSnapshot = useCallback(
     (fileId: string) => {
-      if (!editorRef) return null
-      const model = editorRef.getModel()
+      const currentEditorRef = editorRefRef.current
+      if (!currentEditorRef) return null
+      const model = currentEditorRef.getModel()
       if (!model) return null
       const decorationManager = new DecorationManager(model)
       const maxLines = model.getLineCount()
@@ -200,13 +209,14 @@ export function useCodeDiffer({
         unresolvedBlocks: unresolved,
       }
     },
-    [editorRef]
+    [] // editorRef is accessed via ref
   )
 
   const restoreFromSnapshot = useCallback(
     (session: DiffSession) => {
-      if (!editorRef) return
-      const model = editorRef.getModel()
+      const currentEditorRef = editorRefRef.current
+      if (!currentEditorRef) return
+      const model = currentEditorRef.getModel()
       if (!model) return
       // Set combined text and EOL exactly as before
       model.setValue(session.combinedText)
@@ -243,14 +253,14 @@ export function useCodeDiffer({
         }
       }
 
-      editorRef.createDecorationsCollection(decorations)
+      currentEditorRef.createDecorationsCollection(decorations)
 
       // Rebuild widgets for current decorations
       if (widgetManagerRef.current) {
         widgetManagerRef.current.cleanupAllWidgets()
       }
       widgetManagerRef.current = new WidgetManager(
-        editorRef,
+        currentEditorRef,
         model,
         (count) => {
           lastWidgetCountRef.current = count
@@ -268,7 +278,7 @@ export function useCodeDiffer({
       )
       widgetManagerRef.current.buildAllWidgetsFromDecorations()
     },
-    [editorRef]
+    [] // editorRef is accessed via ref
   )
 
   const clearVisuals = useCallback(() => {

@@ -18,8 +18,9 @@ interface TerminalContextType {
   setActiveTerminalId: React.Dispatch<React.SetStateAction<string>>
   creatingTerminal: boolean
   setCreatingTerminal: React.Dispatch<React.SetStateAction<boolean>>
+  closingTerminal: string
   createNewTerminal: (command?: string) => Promise<void>
-  closeTerminal: (id: string) => void
+  closeTerminal: (id: string) => Promise<void>
   deploy: (callback: () => void) => void
   getAppExists:
     | ((appName: string) => Promise<{ success: boolean; exists?: boolean }>)
@@ -39,6 +40,7 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
   >([])
   const [activeTerminalId, setActiveTerminalId] = useState<string>("")
   const [creatingTerminal, setCreatingTerminal] = useState<boolean>(false)
+  const [closingTerminal, setClosingTerminal] = useState<string>("")
   const [isSocketReady, setIsSocketReady] = useState<boolean>(false)
 
   // Listen for the "ready" signal from the socket
@@ -55,9 +57,9 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const createNewTerminal = async (command?: string): Promise<void> => {
     if (!socket) return
-    setCreatingTerminal(true)
+    if (creatingTerminal) return // Guard against creating while another create is in progress
     try {
-      createTerminalHelper({
+      await createTerminalHelper({
         setTerminals,
         setActiveTerminalId,
         setCreatingTerminal,
@@ -68,21 +70,20 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
       toast.error(
         error instanceof Error ? error.message : "Failed to create new terminal"
       )
-    } finally {
-      setCreatingTerminal(false)
     }
   }
 
-  const closeTerminal = (id: string) => {
+  const closeTerminal = async (id: string): Promise<void> => {
     if (!socket) return
+    if (closingTerminal) return // Guard against closing while another close is in progress
     const terminalToClose = terminals.find((term) => term.id === id)
     if (terminalToClose) {
-      closeTerminalHelper({
+      await closeTerminalHelper({
         term: terminalToClose,
         terminals,
         setTerminals,
         setActiveTerminalId,
-        setClosingTerminal: () => {},
+        setClosingTerminal,
         socket,
         activeTerminalId,
       })
@@ -116,6 +117,7 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
     setActiveTerminalId,
     creatingTerminal,
     setCreatingTerminal,
+    closingTerminal,
     createNewTerminal,
     closeTerminal,
     deploy,

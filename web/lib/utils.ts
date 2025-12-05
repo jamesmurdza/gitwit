@@ -9,21 +9,59 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Checks if a file path indicates a new file (contains "(new file)" marker)
+ */
+export function isNewFile(
+  filePath: string | null,
+  code: string,
+  markdownText: string
+): boolean {
+  if (!filePath) return false
+
+  // Check in code block itself
+  const filePatternInCode = /^File:\s*([^\n]+)/m
+  const matchInCode = code.match(filePatternInCode)
+  if (matchInCode) {
+    const rawPath = matchInCode[1].trim()
+    return /\s*\(new file\)\s*$/i.test(rawPath)
+  }
+
+  // Check in markdown text
+  const filePattern = /File:\s*([^\n]+)/g
+  let match
+  while ((match = filePattern.exec(markdownText)) !== null) {
+    const rawPath = match[1].trim()
+    const cleanPath = rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
+    if (cleanPath === filePath && /\s*\(new file\)\s*$/i.test(rawPath)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
  * Extracts the file path for a code block from various sources:
  * 1. "File: /path" pattern in the code block itself
  * 2. File path pattern in the code block
  * 3. Most recent "File: /path" before this code block in the markdown
+ *
+ * Strips "(new file)" marker from the path and returns clean path
  */
 export function extractFilePathFromCode(
   code: string,
   markdownText: string,
-  codeBlockFileMap: Map<string, string>
+  codeBlockFileMap: Map<string, string>,
+  codeBlockIndex?: number,
+  previousCodeBlockEnd?: number
 ): string | null {
   // First, try to find "File: /path/to/file" pattern in the code block itself
   const filePatternInCode = /^File:\s*([^\n]+)/m
   const matchInCode = code.match(filePatternInCode)
   if (matchInCode) {
-    return matchInCode[1].trim()
+    const rawPath = matchInCode[1].trim()
+    // Strip "(new file)" marker from the path
+    return rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
   }
 
   // Second, try to find file path pattern in the code block
@@ -33,7 +71,6 @@ export function extractFilePathFromCode(
   if (matchInCodePath) {
     return matchInCodePath[1].trim()
   }
-
   // Third, use current markdown text to find the most recent "File: /path" before this code block
   if (!markdownText) {
     return null
@@ -43,8 +80,8 @@ export function extractFilePathFromCode(
   const codePrefix = code.substring(0, Math.min(100, code.length)).trim()
   const codeHash = codePrefix.substring(0, 50) // Use first 50 chars as identifier
 
-  // Check cache first
-  if (codeBlockFileMap.has(codeHash)) {
+  // Check cache first (but only if we don't have a specific index)
+  if (codeBlockIndex === undefined && codeBlockFileMap.has(codeHash)) {
     return codeBlockFileMap.get(codeHash) || null
   }
 
@@ -60,21 +97,39 @@ export function extractFilePathFromCode(
   }> = []
   let match
   while ((match = filePattern.exec(markdownText)) !== null) {
+    const rawPath = match[1].trim()
+    // Strip "(new file)" marker from the path
+    const cleanPath = rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
     positions.push({
       position: match.index,
-      filePath: match[1].trim(),
+      filePath: cleanPath,
     })
   }
 
-  // Find this code block in the markdown and look backwards for file path
-  const codeIndex = markdownText.indexOf(codePrefix)
+  // Use the provided code block index, or find it in the markdown
+  let codeIndex: number
+  if (codeBlockIndex !== undefined) {
+    codeIndex = codeBlockIndex
+  } else {
+    // Fallback: find this code block in the markdown
+    codeIndex = markdownText.indexOf(codePrefix)
+  }
+
   if (codeIndex > 0) {
     // Find the most recent file path before this position
+    // If previousCodeBlockEnd is provided, only look for file paths after it
+    const searchStart =
+      previousCodeBlockEnd !== undefined ? previousCodeBlockEnd : 0
     for (let i = positions.length - 1; i >= 0; i--) {
-      if (positions[i].position < codeIndex) {
+      if (
+        positions[i].position >= searchStart &&
+        positions[i].position < codeIndex
+      ) {
         const intendedFile = positions[i].filePath
-        // Cache it for future renders
-        codeBlockFileMap.set(codeHash, intendedFile)
+        // Cache it for future renders (only if we don't have a specific index)
+        if (codeBlockIndex === undefined) {
+          codeBlockFileMap.set(codeHash, intendedFile)
+        }
         return intendedFile
       }
     }

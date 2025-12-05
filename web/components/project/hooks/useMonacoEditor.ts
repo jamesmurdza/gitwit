@@ -7,6 +7,7 @@ import {
 import { parseTSConfigToMonacoOptions } from "@/lib/monaco/parse-tsconfig"
 import { TFile, TFolder } from "@/lib/types"
 import { debounce, deepMerge } from "@/lib/utils"
+import { useAppStore } from "@/store/context"
 import { BeforeMount, OnMount } from "@monaco-editor/react"
 import * as monaco from "monaco-editor"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -76,12 +77,13 @@ export const useMonacoEditor = ({
     },
   })
   // Editor state
-  const [editorRef, setEditorRef] =
-    useState<monaco.editor.IStandaloneCodeEditor>()
+
   const [cursorLine, setCursorLine] = useState(0)
   const [isSelected, setIsSelected] = useState(false)
   const [showSuggestion, setShowSuggestion] = useState(false)
   const { socket } = useSocket()
+  const editorRef = useAppStore((s) => s.editorRef)
+  const setEditorRef = useAppStore((s) => s.setEditorRef)
   // AI Copilot state
   const [generate, setGenerate] = useState<GenerateState>({
     show: false,
@@ -180,11 +182,10 @@ export const useMonacoEditor = ({
       // Store the last copied range in the editor to be used in the AIChat component
       editor.onDidChangeCursorSelection((e) => {
         const selection = editor.getSelection()
-        if (selection) {
-          lastCopiedRangeRef.current = {
-            startLine: selection.startLineNumber,
-            endLine: selection.endLineNumber,
-          }
+        if (!selection) return
+        lastCopiedRangeRef.current = {
+          startLine: selection.startLineNumber,
+          endLine: selection.endLineNumber,
         }
       })
     },
@@ -322,7 +323,8 @@ export const useMonacoEditor = ({
         run: (editor) => handleAiEdit(editor),
       })
 
-      // Add Cmd/Ctrl+L command for AI chat toggle
+      // Add Cmd/Ctrl+L command for AI chat toggle (editor-focused shortcut)
+      // Note: Global shortcut (works outside editor) is handled in useEditorShortcuts hook
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyL, () => {
         setIsAIChatOpen((prev) => !prev)
       })

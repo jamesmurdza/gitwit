@@ -1,26 +1,22 @@
 "use client"
 
-import { Loader2, X } from "lucide-react"
+import { X } from "lucide-react"
 import * as React from "react"
 import { MouseEventHandler } from "react"
 import { Button } from "./button"
 
 export default function Tab({
   children,
-  creating = false,
   saved = true,
   selected = false,
   onClick,
   onClose,
-  closing = false,
 }: {
   children: React.ReactNode
-  creating?: boolean
   saved?: boolean
   selected?: boolean
   onClick?: MouseEventHandler<HTMLButtonElement>
   onClose?: () => void
-  closing?: boolean
 }) {
   const tabRef = React.useRef<HTMLButtonElement>(null)
 
@@ -49,7 +45,7 @@ export default function Tab({
       {children}
       <div
         onClick={
-          onClose && !closing
+          onClose
             ? (e) => {
                 e.stopPropagation()
                 e.preventDefault()
@@ -59,9 +55,7 @@ export default function Tab({
         }
         className="h-5 w-5 ml-0.5 group flex items-center justify-center translate-x-1 transition-colors bg-transparent hover:bg-muted-foreground/25 cursor-pointer rounded-sm"
       >
-        {closing || creating ? (
-          <Loader2 className="animate-spin w-3 h-3" />
-        ) : saved ? (
+        {saved ? (
           <X className="w-3 h-3" />
         ) : (
           <>

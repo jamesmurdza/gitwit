@@ -1,3 +1,4 @@
+import { useEditorLayout } from "@/context/EditorLayoutContext"
 import { useAppStore } from "@/store/context"
 import { useParams } from "next/navigation"
 import { useEffect } from "react"
@@ -10,11 +11,10 @@ export function useEditorShortcuts() {
   const { id: projectId } = useParams<{ id: string }>()
   const { id: activeFileId } = useAppStore((s) => s.activeTab) ?? {}
   const hasUnsavedFiles = useAppStore((s) => s.tabs.some((tab) => !tab.saved))
-  const draft = useAppStore((s) => s.drafts[activeFileId ?? ""])
+  const draft = useAppStore((s) => s.drafts[activeFileId ?? ""] || "")
   const { saveFile } = useFileTree()
+  const { toggleAIChat } = useEditorLayout()
 
-  // TODO: SOLVE THE CHAT UI
-  const toggleAIChat = () => {}
   // Handle browser beforeunload event for unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -34,12 +34,12 @@ export function useEditorShortcuts() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+S or Cmd+S: Save file
-      if (e.key === "s" && (e.metaKey || e.ctrlKey) && activeFileId && draft) {
+      if (e.key === "s" && (e.metaKey || e.ctrlKey) && activeFileId) {
         e.preventDefault()
         saveFile({
           fileId: activeFileId,
           projectId,
-          content: draft,
+          content: draft || "",
         })
       }
       // Ctrl+L or Cmd+L: Toggle AI chat
@@ -51,7 +51,7 @@ export function useEditorShortcuts() {
 
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [activeFileId, saveFile, toggleAIChat])
+  }, [activeFileId, saveFile, toggleAIChat, draft])
 
   return {}
 }
