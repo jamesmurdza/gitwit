@@ -7,6 +7,7 @@ import { WidgetManager } from "./lib/widget-manager"
 
 export interface UseCodeDifferProps {
   editorRef: monaco.editor.IStandaloneCodeEditor | null
+  onDiffChange?: (session: DiffSession | null) => void
 }
 
 export interface UseCodeDifferReturn {
@@ -19,6 +20,10 @@ export interface UseCodeDifferReturn {
   getUnresolvedSnapshot: (fileId: string) => DiffSession | null
   restoreFromSnapshot: (session: DiffSession) => void
   clearVisuals: () => void
+  acceptAll: () => void
+  rejectAll: () => void
+  scrollToNextDiff: () => void
+  scrollToPrevDiff: () => void
 }
 
 /**
@@ -37,6 +42,7 @@ export interface UseCodeDifferReturn {
  */
 export function useCodeDiffer({
   editorRef,
+  onDiffChange,
 }: UseCodeDifferProps): UseCodeDifferReturn {
   const widgetManagerRef = useRef<WidgetManager | null>(null)
   const lastWidgetCountRef = useRef<number>(0)
@@ -47,6 +53,11 @@ export function useCodeDiffer({
   useEffect(() => {
     editorRefRef.current = editorRef
   }, [editorRef])
+
+  // Internal getUnresolvedSnapshot ref to use inside callback
+  const getUnresolvedSnapshotRef = useRef<
+    ((fileId: string) => DiffSession | null) | null
+  >(null)
 
   /**
    * Applies a diff view to the Monaco editor with interactive accept/reject buttons
@@ -104,6 +115,14 @@ export function useCodeDiffer({
         model,
         (count) => {
           lastWidgetCountRef.current = count
+
+          // Notify about diff changes
+          if (onDiffChange && getUnresolvedSnapshotRef.current) {
+            const fileId = model.uri.path || model.uri.toString()
+            const session = getUnresolvedSnapshotRef.current(fileId)
+            onDiffChange(session)
+          }
+
           if (count === 0) {
             if (suppressZeroNotifyRef.current) {
               suppressZeroNotifyRef.current = false
@@ -112,6 +131,7 @@ export function useCodeDiffer({
             try {
               // No unresolved diffs left; clear any saved session for this file
               const fileId = model.uri.path || model.uri.toString()
+              console.log("clearing")
               ;(window as any).__clearDiffSession?.(fileId)
             } catch {}
           }
@@ -212,6 +232,9 @@ export function useCodeDiffer({
     [] // editorRef is accessed via ref
   )
 
+  // Update ref for internal access
+  getUnresolvedSnapshotRef.current = getUnresolvedSnapshot
+
   const restoreFromSnapshot = useCallback(
     (session: DiffSession) => {
       const currentEditorRef = editorRefRef.current
@@ -271,6 +294,7 @@ export function useCodeDiffer({
             }
             try {
               const fileId = model.uri.path || model.uri.toString()
+              console.log("clearing")
               ;(window as any).__clearDiffSession?.(fileId)
             } catch {}
           }
@@ -294,5 +318,46 @@ export function useCodeDiffer({
     getUnresolvedSnapshot,
     restoreFromSnapshot,
     clearVisuals,
+    acceptAll: useCallback(() => widgetManagerRef.current?.acceptAll(), []),
+    rejectAll: useCallback(() => widgetManagerRef.current?.rejectAll(), []),
+    scrollToNextDiff: useCallback(() => {
+      const currentEditorRef = editorRefRef.current
+      if (!currentEditorRef || !widgetManagerRef.current) return
+
+      const blocks = widgetManagerRef.current.getDiffBlocks()
+      if (blocks.length === 0) return
+
+      const currentLine = currentEditorRef.getPosition()?.lineNumber || 1
+      const nextBlock = blocks.find((b) => b.start > currentLine) || blocks[0]
+
+      if (nextBlock) {
+        currentEditorRef.revealLineInCenter(nextBlock.start)
+        currentEditorRef.setPosition({
+          lineNumber: nextBlock.start,
+          column: 1,
+        })
+      }
+    }, []),
+    scrollToPrevDiff: useCallback(() => {
+      const currentEditorRef = editorRefRef.current
+      if (!currentEditorRef || !widgetManagerRef.current) return
+
+      const blocks = widgetManagerRef.current.getDiffBlocks()
+      if (blocks.length === 0) return
+
+      const currentLine = currentEditorRef.getPosition()?.lineNumber || 1
+      // Find last block that starts before current line
+      const prevBlock =
+        [...blocks].reverse().find((b) => b.end < currentLine) ||
+        blocks[blocks.length - 1]
+
+      if (prevBlock) {
+        currentEditorRef.revealLineInCenter(prevBlock.start)
+        currentEditorRef.setPosition({
+          lineNumber: prevBlock.start,
+          column: 1,
+        })
+      }
+    }, []),
   }
 }

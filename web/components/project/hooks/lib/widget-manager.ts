@@ -346,4 +346,125 @@ export class WidgetManager {
   private attachCleanupToEditor(): void {
     ;(this.editorRef as any).cleanupDiffWidgets = () => this.cleanupAllWidgets()
   }
+
+  /**
+   * Gets all current diff blocks
+   */
+  getDiffBlocks(): { start: number; end: number; type: "added" | "removed" }[] {
+    const blocks: { start: number; end: number; type: "added" | "removed" }[] =
+      []
+    const maxLines = this.model.getLineCount()
+    const processedAnchors = new Set<number>()
+
+    for (let lineNumber = 1; lineNumber <= maxLines; lineNumber++) {
+      const isRemoved = this.decorationManager.lineHasClass(
+        lineNumber,
+        "removed-line-decoration"
+      )
+      const isAdded = this.decorationManager.lineHasClass(
+        lineNumber,
+        "added-line-decoration"
+      )
+
+      if (!isRemoved && !isAdded) continue
+
+      const type: "added" | "removed" = isRemoved ? "removed" : "added"
+      const range = this.decorationManager.getLiveRange(type, lineNumber)
+
+      // Skip if we've already processed this block via its anchor
+      // Note: This logic duplicates buildAllWidgetsFromDecorations slightly but is needed for read-only access
+      const partner = this.decorationManager.getModificationPartner(range, type)
+      if (type === "added" && partner) {
+        lineNumber = range.end
+        continue
+      }
+
+      const anchorLine = range.end
+      if (processedAnchors.has(anchorLine)) {
+        lineNumber = range.end
+        continue
+      }
+      processedAnchors.add(anchorLine)
+
+      blocks.push({
+        start: range.start,
+        end: range.end,
+        type,
+      })
+      lineNumber = range.end
+    }
+
+    // Sort blocks by start line
+    return blocks.sort((a, b) => a.start - b.start)
+  }
+
+  /**
+   * Accepts all remaining changes
+   */
+  acceptAll(): void {
+    const blocks = this.getDiffBlocks()
+
+    // Process from bottom to top to preserve line numbers
+    for (const block of blocks.reverse()) {
+      const liveRange = this.decorationManager.getLiveRange(
+        block.type,
+        Math.min(block.end, this.model.getLineCount())
+      )
+
+      let livePartner = undefined
+      if (block.type === "removed") {
+        livePartner = this.decorationManager.getModificationPartner(
+          liveRange,
+          block.type
+        )
+      }
+
+      if (block.type === "removed") {
+        this.decorationManager.clearBlockDecorations(liveRange)
+        if (livePartner) {
+          this.decorationManager.clearBlockDecorations(livePartner)
+        }
+        this.decorationManager.removeLines(liveRange)
+      } else {
+        // For added blocks, just clear decorations (keeping the code)
+        this.decorationManager.clearBlockDecorations(liveRange)
+      }
+    }
+
+    this.cleanupAllWidgets()
+  }
+
+  /**
+   * Rejects all remaining changes
+   */
+  rejectAll(): void {
+    const blocks = this.getDiffBlocks()
+
+    // Process from bottom to top to preserve line numbers
+    for (const block of blocks.reverse()) {
+      const liveRange = this.decorationManager.getLiveRange(
+        block.type,
+        Math.min(block.end, this.model.getLineCount())
+      )
+      const livePartner = this.decorationManager.getModificationPartner(
+        liveRange,
+        block.type
+      )
+
+      if (block.type === "added") {
+        this.decorationManager.clearBlockDecorations(liveRange)
+        this.decorationManager.removeLines(liveRange)
+      } else {
+        // For removed blocks, just clear decorations (keeping the original code)
+        this.decorationManager.clearBlockDecorations(liveRange)
+        if (livePartner) {
+          // If it was a modification, we need to remove the added part
+          this.decorationManager.clearBlockDecorations(livePartner)
+          this.decorationManager.removeLines(livePartner)
+        }
+      }
+    }
+
+    this.cleanupAllWidgets()
+  }
 }

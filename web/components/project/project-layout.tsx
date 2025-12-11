@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import Tab from "../ui/tab"
 import AIEditElements from "./ai-edit/ai-edit-elements"
+import { DiffNavigationWidget } from "./ai-edit/diff-navigation-widget"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
 import { ChatProvider } from "./chat/providers/chat-provider"
@@ -154,8 +155,17 @@ export default function ProjectLayout({
     getUnresolvedSnapshot,
     restoreFromSnapshot,
     clearVisuals,
+    acceptAll,
+    rejectAll,
+    scrollToNextDiff,
+    scrollToPrevDiff,
   } = useCodeDiffer({
     editorRef: editorRef || null,
+    onDiffChange: (session) => {
+      if (activeTab?.id && session) {
+        saveDiffSession(activeTab.id, session)
+      }
+    },
   })
 
   // Use the session manager for tab switching
@@ -363,6 +373,7 @@ export default function ProjectLayout({
       try {
         const session = getDiffSession(fileId)
         if (session) {
+          console.log("clearing")
           // remove only if it matches current active or by id
           clearDiffSession(fileId)
         }
@@ -370,6 +381,7 @@ export default function ProjectLayout({
     }
     return () => {
       try {
+        console.log("clearing")
         delete (window as any).__clearDiffSession
       } catch {}
     }
@@ -457,6 +469,15 @@ export default function ProjectLayout({
                     />
                   </>
                 )}
+                {/* Diff Navigation Widget */}
+                {hasActiveWidgets() && (
+                  <DiffNavigationWidget
+                    onAcceptAll={acceptAll}
+                    onRejectAll={rejectAll}
+                    onNext={scrollToNextDiff}
+                    onPrev={scrollToPrevDiff}
+                  />
+                )}
               </div>
             </ResizablePanel>
 
@@ -537,6 +558,7 @@ export default function ProjectLayout({
             </ResizablePanel>
           </>
         )}
+
         {/* Session Timeout Dialog */}
         <SessionTimeoutDialog isOwner={isOwner} />
       </ResizablePanelGroup>
