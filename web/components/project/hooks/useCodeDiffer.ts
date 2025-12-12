@@ -8,6 +8,7 @@ import { WidgetManager } from "./lib/widget-manager"
 export interface UseCodeDifferProps {
   editorRef: monaco.editor.IStandaloneCodeEditor | null
   onDiffChange?: (session: DiffSession | null) => void
+  onDiffResolved?: (fileId: string, status: "applied" | "rejected") => void
 }
 
 export interface UseCodeDifferReturn {
@@ -43,6 +44,7 @@ export interface UseCodeDifferReturn {
 export function useCodeDiffer({
   editorRef,
   onDiffChange,
+  onDiffResolved,
 }: UseCodeDifferProps): UseCodeDifferReturn {
   const widgetManagerRef = useRef<WidgetManager | null>(null)
   const lastWidgetCountRef = useRef<number>(0)
@@ -131,8 +133,20 @@ export function useCodeDiffer({
             try {
               // No unresolved diffs left; clear any saved session for this file
               const fileId = model.uri.path || model.uri.toString()
-              console.log("clearing")
+
+              const currentContent = model.getValue()
+              const merged = (model as any).mergedContent || ""
+
+              const original = (model as any).originalContent || ""
+              const status =
+                currentContent !== original ? "applied" : "rejected"
+
+              console.log("clearing diff session, status:", status)
               ;(window as any).__clearDiffSession?.(fileId)
+
+              if (onDiffResolved) {
+                onDiffResolved(fileId, status)
+              }
             } catch {}
           }
         }
@@ -309,6 +323,7 @@ export function useCodeDiffer({
     // Suppress session clearing when we intentionally clear visuals on tab switch
     suppressZeroNotifyRef.current = true
     widgetManagerRef.current?.forceClearAllDecorations()
+    widgetManagerRef.current = null
   }, [])
 
   return {

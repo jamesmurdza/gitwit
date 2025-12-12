@@ -167,11 +167,10 @@ const createEditorSlice: StateCreator<EditorSlice> = (set, get) => ({
     }),
   getDiffSession: (fileId) => get().diffSessions[fileId],
   clearDiffSession: (fileId) =>
-    // set((state) => {
-    //   const { [fileId]: _, ...rest } = state.diffSessions
-    //   return { diffSessions: rest }
-    // })
-    console.log("[diffSession] fileId", fileId),
+    set((state) => {
+      const { [fileId]: _, ...rest } = state.diffSessions
+      return { diffSessions: rest }
+    }),
 
   setEditorRef: (ref) => set({ editorRef: ref }),
 

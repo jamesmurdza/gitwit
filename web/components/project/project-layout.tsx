@@ -23,7 +23,7 @@ import AIEditElements from "./ai-edit/ai-edit-elements"
 import { DiffNavigationWidget } from "./ai-edit/diff-navigation-widget"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
-import { ChatProvider } from "./chat/providers/chat-provider"
+import { ChatProvider, useChat } from "./chat/providers/chat-provider"
 import { useAIFileActions } from "./hooks/useAIFileActions"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
 import { useDiffSessionManager } from "./hooks/useDiffSessionManager"
@@ -81,6 +81,11 @@ export default function ProjectLayout({
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const editorPanelRef = useRef<ImperativePanelHandle>(null)
   const previewWindowRef = useRef<{ refreshIframe: () => void }>(null)
+
+  // Ref to hold chat actions for sync
+  const chatActionHandlerRef = useRef<{
+    markResolved: (fileId: string, status: "applied" | "rejected") => void
+  } | null>(null)
 
   // Apply Button merger decoration state
   const [mergeDecorationsCollection, setMergeDecorationsCollection] =
@@ -165,6 +170,9 @@ export default function ProjectLayout({
       if (activeTab?.id && session) {
         saveDiffSession(activeTab.id, session)
       }
+    },
+    onDiffResolved: (fileId, status) => {
+      chatActionHandlerRef.current?.markResolved(fileId, status)
     },
   })
 
@@ -562,6 +570,33 @@ export default function ProjectLayout({
         {/* Session Timeout Dialog */}
         <SessionTimeoutDialog isOwner={isOwner} />
       </ResizablePanelGroup>
+      <DiffSessionHandler
+        onRegister={(handler) => {
+          chatActionHandlerRef.current = handler
+        }}
+      />
     </ChatProvider>
   )
+}
+
+function DiffSessionHandler({
+  onRegister,
+}: {
+  onRegister: (handler: {
+    markResolved: (fileId: string, status: "applied" | "rejected") => void
+  }) => void
+}) {
+  const { markFileActionStatus, latestAssistantId } = useChat()
+
+  useEffect(() => {
+    onRegister({
+      markResolved: (fileId, status) => {
+        if (latestAssistantId) {
+          markFileActionStatus(latestAssistantId, fileId, status)
+        }
+      },
+    })
+  }, [markFileActionStatus, latestAssistantId, onRegister])
+
+  return null
 }
