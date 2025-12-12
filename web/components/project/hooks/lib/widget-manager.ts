@@ -34,8 +34,9 @@ export class WidgetManager {
 
   /**
    * Cleans up all existing widgets and their anchor decorations
+   * @param notify - Whether to trigger the onWidgetsChanged callback (default: true)
    */
-  cleanupAllWidgets(): void {
+  cleanupAllWidgets(notify: boolean = true): void {
     // Remove all content widgets
     this.widgets.forEach((widget) => {
       try {
@@ -56,14 +57,18 @@ export class WidgetManager {
 
     this.widgets = []
     this.anchorDecorations = []
-    this.onWidgetsChanged?.(0)
+
+    if (notify) {
+      this.onWidgetsChanged?.(0)
+    }
   }
 
   /**
    * Builds all widgets from current decorations in the model
    */
   buildAllWidgetsFromDecorations(): void {
-    this.cleanupAllWidgets()
+    // Suppress notification effectively because we are about to rebuild and emit the new count
+    this.cleanupAllWidgets(false)
 
     const processedAnchors = new Set<number>()
     const maxLines = this.model.getLineCount()

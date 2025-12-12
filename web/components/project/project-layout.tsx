@@ -156,6 +156,7 @@ export default function ProjectLayout({
   const {
     handleApplyCode,
     hasActiveWidgets,
+    activeWidgetsState,
     forceClearAllDecorations,
     getUnresolvedSnapshot,
     restoreFromSnapshot,
@@ -312,22 +313,46 @@ export default function ProjectLayout({
 
   const applyPrecomputedMerge = useCallback(
     async (args: any) => {
+      // Smart Keep: If there are active widgets on this file, "Keep" means "Accept All Remaining"
+      if (activeTab?.id === args.filePath && hasActiveWidgets()) {
+        acceptAll()
+        return
+      }
+
       if (baseApplyPrecomputedMerge) {
         await baseApplyPrecomputedMerge(args)
         forceClearAllDecorations()
       }
     },
-    [baseApplyPrecomputedMerge, forceClearAllDecorations]
+    [
+      baseApplyPrecomputedMerge,
+      forceClearAllDecorations,
+      activeTab?.id,
+      hasActiveWidgets,
+      acceptAll,
+    ]
   )
 
   const restoreOriginalFile = useCallback(
     async (args: any) => {
+      // Smart Reject: If there are active widgets on this file, "Reject" means "Reject All Remaining"
+      if (activeTab?.id === args.filePath && hasActiveWidgets()) {
+        rejectAll()
+        return
+      }
+
       if (baseRestoreOriginalFile) {
         await baseRestoreOriginalFile(args)
         forceClearAllDecorations()
       }
     },
-    [baseRestoreOriginalFile, forceClearAllDecorations]
+    [
+      baseRestoreOriginalFile,
+      forceClearAllDecorations,
+      activeTab?.id,
+      hasActiveWidgets,
+      rejectAll,
+    ]
   )
 
   // Handler for rejecting code from chat
@@ -478,7 +503,7 @@ export default function ProjectLayout({
                   </>
                 )}
                 {/* Diff Navigation Widget */}
-                {hasActiveWidgets() && (
+                {activeWidgetsState && (
                   <DiffNavigationWidget
                     onAcceptAll={acceptAll}
                     onRejectAll={rejectAll}

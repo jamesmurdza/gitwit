@@ -1,6 +1,6 @@
 import { DiffSession, LineRange } from "@/lib/types"
 import * as monaco from "monaco-editor"
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { DecorationManager } from "./lib/decoration-manager"
 import { calculateDiff } from "./lib/diff-calculator"
 import { WidgetManager } from "./lib/widget-manager"
@@ -25,6 +25,8 @@ export interface UseCodeDifferReturn {
   rejectAll: () => void
   scrollToNextDiff: () => void
   scrollToPrevDiff: () => void
+  // State to trigger re-renders in parent components
+  activeWidgetsState: boolean
 }
 
 /**
@@ -49,6 +51,9 @@ export function useCodeDiffer({
   const widgetManagerRef = useRef<WidgetManager | null>(null)
   const lastWidgetCountRef = useRef<number>(0)
   const suppressZeroNotifyRef = useRef<boolean>(false)
+
+  // Expose state for UI components to react to widget presence
+  const [activeWidgetsState, setActiveWidgetsState] = useState(false)
 
   // Keep a ref to editorRef so callbacks can access the latest value
   const editorRefRef = useRef(editorRef)
@@ -107,57 +112,69 @@ export function useCodeDiffer({
 
       ;(model as any).granularBlocks = diffResult.granularBlocks
 
+      const checkAndResolve = (count: number) => {
+        // Update state for UI
+        setActiveWidgetsState(count > 0)
+
+        if (suppressZeroNotifyRef.current) {
+          return
+        }
+
+        // Notify about diff changes
+        if (onDiffChange && getUnresolvedSnapshotRef.current) {
+          const fileId = model.uri.path || model.uri.toString()
+          const session = getUnresolvedSnapshotRef.current(fileId)
+          onDiffChange(session)
+        }
+
+        if (count === 0) {
+          try {
+            // No unresolved diffs left; clear any saved session for this file
+            const fileId = model.uri.path || model.uri.toString()
+
+            // Detect if applied or rejected (simplistic check: if content == merged, it's applied)
+            const currentContent = model.getValue()
+            const original = (model as any).originalContent || ""
+            const status = currentContent !== original ? "applied" : "rejected"
+
+            console.log("clearing diff session, status:", status)
+            ;(window as any).__clearDiffSession?.(fileId)
+
+            if (onDiffResolved) {
+              onDiffResolved(fileId, status)
+            }
+          } catch {}
+        }
+      }
+
       // Always create a new widget manager for each diff application
       // This ensures it's bound to the current model
       if (widgetManagerRef.current) {
+        suppressZeroNotifyRef.current = true
         widgetManagerRef.current.cleanupAllWidgets()
+        suppressZeroNotifyRef.current = false
       }
       widgetManagerRef.current = new WidgetManager(
         currentEditorRef,
         model,
         (count) => {
           lastWidgetCountRef.current = count
-
-          // Notify about diff changes
-          if (onDiffChange && getUnresolvedSnapshotRef.current) {
-            const fileId = model.uri.path || model.uri.toString()
-            const session = getUnresolvedSnapshotRef.current(fileId)
-            onDiffChange(session)
-          }
-
-          if (count === 0) {
-            if (suppressZeroNotifyRef.current) {
-              suppressZeroNotifyRef.current = false
-              return
-            }
-            try {
-              // No unresolved diffs left; clear any saved session for this file
-              const fileId = model.uri.path || model.uri.toString()
-
-              const currentContent = model.getValue()
-              const merged = (model as any).mergedContent || ""
-
-              const original = (model as any).originalContent || ""
-              const status =
-                currentContent !== original ? "applied" : "rejected"
-
-              console.log("clearing diff session, status:", status)
-              ;(window as any).__clearDiffSession?.(fileId)
-
-              if (onDiffResolved) {
-                onDiffResolved(fileId, status)
-              }
-            } catch {}
-          }
+          checkAndResolve(count)
         }
       )
 
-      // Build all widgets from the new decorations
+      // Suppress during BUILD of NEW widgets because it might trigger cleanup internally
+      // or start at 0 before adding.
+      suppressZeroNotifyRef.current = true
       widgetManagerRef.current.buildAllWidgetsFromDecorations()
+      suppressZeroNotifyRef.current = false
+
+      // Manually check once after build is done
+      checkAndResolve(widgetManagerRef.current.hasActiveWidgets() ? 1 : 0)
 
       return newDecorations
     },
-    [] // editorRef is accessed via ref, so no dependency needed
+    [onDiffResolved] // editorRef is accessed via ref, so no dependency needed
   )
 
   /**
@@ -169,6 +186,7 @@ export function useCodeDiffer({
         if (widgetManagerRef.current) {
           widgetManagerRef.current.cleanupAllWidgets()
           widgetManagerRef.current = null
+          setActiveWidgetsState(false)
         }
 
         const currentEditorRef = editorRefRef.current
@@ -189,6 +207,7 @@ export function useCodeDiffer({
 
   const forceClearAllDecorations = useCallback(() => {
     widgetManagerRef.current?.forceClearAllDecorations()
+    setActiveWidgetsState(false)
   }, [])
 
   const getUnresolvedSnapshot = useCallback(
@@ -292,29 +311,51 @@ export function useCodeDiffer({
 
       currentEditorRef.createDecorationsCollection(decorations)
 
+      const checkAndResolve = (count: number) => {
+        // Update state for UI
+        setActiveWidgetsState(count > 0)
+
+        if (suppressZeroNotifyRef.current) {
+          return
+        }
+
+        // Notify about diff changes
+        if (onDiffChange && getUnresolvedSnapshotRef.current) {
+          const fileId = model.uri.path || model.uri.toString()
+          const session = getUnresolvedSnapshotRef.current(fileId)
+          onDiffChange(session)
+        }
+
+        if (count === 0) {
+          try {
+            const fileId = model.uri.path || model.uri.toString()
+            console.log("clearing")
+            ;(window as any).__clearDiffSession?.(fileId)
+          } catch {}
+        }
+      }
+
       // Rebuild widgets for current decorations
       if (widgetManagerRef.current) {
+        suppressZeroNotifyRef.current = true
         widgetManagerRef.current.cleanupAllWidgets()
+        suppressZeroNotifyRef.current = false
       }
       widgetManagerRef.current = new WidgetManager(
         currentEditorRef,
         model,
         (count) => {
           lastWidgetCountRef.current = count
-          if (count === 0) {
-            if (suppressZeroNotifyRef.current) {
-              suppressZeroNotifyRef.current = false
-              return
-            }
-            try {
-              const fileId = model.uri.path || model.uri.toString()
-              console.log("clearing")
-              ;(window as any).__clearDiffSession?.(fileId)
-            } catch {}
-          }
+          checkAndResolve(count)
         }
       )
+
+      suppressZeroNotifyRef.current = true
       widgetManagerRef.current.buildAllWidgetsFromDecorations()
+      suppressZeroNotifyRef.current = false
+
+      // Manually check once after build is done
+      checkAndResolve(widgetManagerRef.current.hasActiveWidgets() ? 1 : 0)
     },
     [] // editorRef is accessed via ref
   )
@@ -324,11 +365,14 @@ export function useCodeDiffer({
     suppressZeroNotifyRef.current = true
     widgetManagerRef.current?.forceClearAllDecorations()
     widgetManagerRef.current = null
+    setActiveWidgetsState(false)
   }, [])
 
   return {
     handleApplyCode,
     hasActiveWidgets,
+    // Return reactive state for UI
+    activeWidgetsState,
     forceClearAllDecorations,
     getUnresolvedSnapshot,
     restoreFromSnapshot,
