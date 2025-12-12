@@ -20,9 +20,10 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import Tab from "../ui/tab"
 import AIEditElements from "./ai-edit/ai-edit-elements"
+import { DiffNavigationWidget } from "./ai-edit/diff-navigation-widget"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
-import { ChatProvider } from "./chat/providers/chat-provider"
+import { ChatProvider, useChat } from "./chat/providers/chat-provider"
 import { useAIFileActions } from "./hooks/useAIFileActions"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
 import { useDiffSessionManager } from "./hooks/useDiffSessionManager"
@@ -80,6 +81,11 @@ export default function ProjectLayout({
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const editorPanelRef = useRef<ImperativePanelHandle>(null)
   const previewWindowRef = useRef<{ refreshIframe: () => void }>(null)
+
+  // Ref to hold chat actions for sync
+  const chatActionHandlerRef = useRef<{
+    markResolved: (fileId: string, status: "applied" | "rejected") => void
+  } | null>(null)
 
   // Apply Button merger decoration state
   const [mergeDecorationsCollection, setMergeDecorationsCollection] =
@@ -150,12 +156,25 @@ export default function ProjectLayout({
   const {
     handleApplyCode,
     hasActiveWidgets,
+    activeWidgetsState,
     forceClearAllDecorations,
     getUnresolvedSnapshot,
     restoreFromSnapshot,
     clearVisuals,
+    acceptAll,
+    rejectAll,
+    scrollToNextDiff,
+    scrollToPrevDiff,
   } = useCodeDiffer({
     editorRef: editorRef || null,
+    onDiffChange: (session) => {
+      if (activeTab?.id && session) {
+        saveDiffSession(activeTab.id, session)
+      }
+    },
+    onDiffResolved: (fileId, status) => {
+      chatActionHandlerRef.current?.markResolved(fileId, status)
+    },
   })
 
   // Use the session manager for tab switching
@@ -294,22 +313,46 @@ export default function ProjectLayout({
 
   const applyPrecomputedMerge = useCallback(
     async (args: any) => {
+      // Smart Keep: If there are active widgets on this file, "Keep" means "Accept All Remaining"
+      if (activeTab?.id === args.filePath && hasActiveWidgets()) {
+        acceptAll()
+        return
+      }
+
       if (baseApplyPrecomputedMerge) {
         await baseApplyPrecomputedMerge(args)
         forceClearAllDecorations()
       }
     },
-    [baseApplyPrecomputedMerge, forceClearAllDecorations]
+    [
+      baseApplyPrecomputedMerge,
+      forceClearAllDecorations,
+      activeTab?.id,
+      hasActiveWidgets,
+      acceptAll,
+    ]
   )
 
   const restoreOriginalFile = useCallback(
     async (args: any) => {
+      // Smart Reject: If there are active widgets on this file, "Reject" means "Reject All Remaining"
+      if (activeTab?.id === args.filePath && hasActiveWidgets()) {
+        rejectAll()
+        return
+      }
+
       if (baseRestoreOriginalFile) {
         await baseRestoreOriginalFile(args)
         forceClearAllDecorations()
       }
     },
-    [baseRestoreOriginalFile, forceClearAllDecorations]
+    [
+      baseRestoreOriginalFile,
+      forceClearAllDecorations,
+      activeTab?.id,
+      hasActiveWidgets,
+      rejectAll,
+    ]
   )
 
   // Handler for rejecting code from chat
@@ -363,6 +406,7 @@ export default function ProjectLayout({
       try {
         const session = getDiffSession(fileId)
         if (session) {
+          console.log("clearing")
           // remove only if it matches current active or by id
           clearDiffSession(fileId)
         }
@@ -370,6 +414,7 @@ export default function ProjectLayout({
     }
     return () => {
       try {
+        console.log("clearing")
         delete (window as any).__clearDiffSession
       } catch {}
     }
@@ -457,6 +502,15 @@ export default function ProjectLayout({
                     />
                   </>
                 )}
+                {/* Diff Navigation Widget */}
+                {activeWidgetsState && (
+                  <DiffNavigationWidget
+                    onAcceptAll={acceptAll}
+                    onRejectAll={rejectAll}
+                    onNext={scrollToNextDiff}
+                    onPrev={scrollToPrevDiff}
+                  />
+                )}
               </div>
             </ResizablePanel>
 
@@ -537,9 +591,37 @@ export default function ProjectLayout({
             </ResizablePanel>
           </>
         )}
+
         {/* Session Timeout Dialog */}
         <SessionTimeoutDialog isOwner={isOwner} />
       </ResizablePanelGroup>
+      <DiffSessionHandler
+        onRegister={(handler) => {
+          chatActionHandlerRef.current = handler
+        }}
+      />
     </ChatProvider>
   )
+}
+
+function DiffSessionHandler({
+  onRegister,
+}: {
+  onRegister: (handler: {
+    markResolved: (fileId: string, status: "applied" | "rejected") => void
+  }) => void
+}) {
+  const { markFileActionStatus, latestAssistantId } = useChat()
+
+  useEffect(() => {
+    onRegister({
+      markResolved: (fileId, status) => {
+        if (latestAssistantId) {
+          markFileActionStatus(latestAssistantId, fileId, status)
+        }
+      },
+    })
+  }, [markFileActionStatus, latestAssistantId, onRegister])
+
+  return null
 }

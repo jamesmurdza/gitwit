@@ -157,9 +157,14 @@ const createEditorSlice: StateCreator<EditorSlice> = (set, get) => ({
   getDraft: (fileId) => get().drafts[fileId],
 
   saveDiffSession: (fileId, session) =>
-    set((state) => ({
-      diffSessions: { ...state.diffSessions, [fileId]: session },
-    })),
+    set((state) => {
+      console.log("[diffSession] fileId", fileId)
+      console.log("[diffSession] session", session)
+      console.log("[diffSession] before save", state.diffSessions)
+      const updated = { ...state.diffSessions, [fileId]: session }
+      console.log("[diffSession] after save", updated)
+      return { diffSessions: updated }
+    }),
   getDiffSession: (fileId) => get().diffSessions[fileId],
   clearDiffSession: (fileId) =>
     set((state) => {

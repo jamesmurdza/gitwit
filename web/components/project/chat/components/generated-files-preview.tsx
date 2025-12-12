@@ -267,7 +267,7 @@ export function GeneratedFilesPreview({
 
     generatedFiles.forEach((file) => {
       const key = file.path
-      
+
       if (autoPreviewedRef.current.has(key)) return
 
       const status = mergeStatuses[key]
@@ -278,7 +278,7 @@ export function GeneratedFilesPreview({
           onApplyCode(file.code, undefined, {
             getMergeStatus: (path) => mergeStatusRef.current[path],
           })
-        } 
+        }
         // If file is NOT active, open it (which will trigger this effect again when activeFileId changes)
         else if (onOpenFile) {
           onOpenFile(key)
