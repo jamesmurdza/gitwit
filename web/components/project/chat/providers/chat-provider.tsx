@@ -184,13 +184,17 @@ function ChatProvider({
 
       abortControllerRef.current = new AbortController()
 
-      // Add empty assistant message
-      addMessage(activeThreadId, { role: "assistant", content: "" })
-      const assistantMessageIndex = messages.length + 1 // +1 for user message just added
-
       // Track latest assistant message ID for HEAD compatibility
       const assistantMessageId = nanoid()
       setLatestAssistantId(assistantMessageId)
+
+      // Add empty assistant message
+      addMessage(activeThreadId, {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+      })
+      const assistantMessageIndex = messages.length + 1 // +1 for user message just added
 
       try {
         const { output } = await streamChat(
