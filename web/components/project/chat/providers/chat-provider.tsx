@@ -119,15 +119,29 @@ function ChatProvider({
 
   const addContextTab = useCallback((newTab: ContextTab) => {
     setContextTabs((prev) => {
-      // Check for duplicate by type and content
+      // Check for duplicate by id
+      if (prev.some((tab) => tab.id === newTab.id)) {
+        return prev
+      }
+
+      // Check for duplicate by type and name/content
       const isDuplicate = prev.some((tab) => {
         if (tab.type !== newTab.type) return false
-        if (tab.type === "file" || tab.type === "image") {
+
+        // For files, images, and code (file context), check by name
+        if (
+          tab.type === "file" ||
+          tab.type === "image" ||
+          tab.type === "code"
+        ) {
           return tab.name === newTab.name
         }
-        if (tab.content === newTab.content) {
-          return true
+
+        // For text snippets, check by content
+        if (tab.type === "text" && tab.content && newTab.content) {
+          return tab.content === newTab.content
         }
+
         return false
       })
 
