@@ -37,6 +37,24 @@ export function useAIFileActions({
 }: UseAIFileActionsProps) {
   const getDraft = useAppStore((s) => s.getDraft)
 
+  // Queue for failed diff applies (when model was null)
+  const pendingDiffsQueueRef = useRef<Map<string, any>>(new Map())
+
+  // Retry pending diffs when active tab changes
+  useEffect(() => {
+    if (!activeTab?.id || !editorRef) return
+
+    // Check if current active tab has a pending diff
+    const pending = pendingDiffsQueueRef.current.get(
+      normalizePath(activeTab.id)
+    )
+    if (pending) {
+      console.log("Retrying pending diff for:", activeTab.id)
+      pendingDiffsQueueRef.current.delete(normalizePath(activeTab.id))
+      handleApplyCodeFromChat(pending.code, pending.language, pending.options)
+    }
+  }, [activeTab?.id, editorRef])
+
   // --- Queue Management for "Keep All" ---
   const pendingPreviewApplyRef = useRef<{
     filePath: string
@@ -68,7 +86,7 @@ export function useAIFileActions({
       const normalizedPath = normalizePath(filePath)
       const matchBy = (tab: TTab) => pathMatchesTab(normalizedPath, tab)
       let targetTab = tabs.find(matchBy)
-      
+
       if (!targetTab) {
         targetTab = {
           id: normalizedPath,
@@ -236,6 +254,14 @@ export function useAIFileActions({
             mergeResult.mergedCode,
             mergeResult.originalCode
           )
+        } else if (!model) {
+          // Failed to get model, save to queue for retry
+          console.log("Saving diff apply to queue for:", activeTab.id)
+          pendingDiffsQueueRef.current.set(normalizedPath, {
+            code,
+            language,
+            options,
+          })
         }
       } catch (error) {
         console.error("Apply Code Failed:", error)

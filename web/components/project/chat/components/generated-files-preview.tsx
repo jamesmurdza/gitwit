@@ -95,11 +95,16 @@ export function GeneratedFilesPreview({
   }, [shouldUseDerived, extractedFiles, providedFiles])
 
   const batchKey = React.useMemo(() => {
-    if (shouldUseDerived && sourceKey) return sourceKey
-    if (!generatedFiles.length) return null
-    return generatedFiles
+    const fileFingerprints = generatedFiles
       .map((file) => `${file.id}:${file.code?.length ?? 0}`)
       .join("|")
+
+    if (shouldUseDerived && sourceKey) {
+      return `${sourceKey}|${fileFingerprints}`
+    }
+
+    if (!generatedFiles.length) return null
+    return fileFingerprints
   }, [generatedFiles, sourceKey, shouldUseDerived])
 
   // Create a stable key from file paths to track when new files arrive
@@ -234,17 +239,20 @@ export function GeneratedFilesPreview({
         code: code,
       })
       mergeJobsRef.current.set(key, mergePromise)
-      const jobBatch = batchRef.current
+
       mergePromise
         .then((result) => {
-          if (batchRef.current !== jobBatch) return
+          // Check if this promise is still the active one for this file
+          if (mergeJobsRef.current.get(key) !== mergePromise) return
+
           setMergeStatuses((prev) => ({
             ...prev,
             [key]: { status: "ready", result },
           }))
         })
         .catch((error) => {
-          if (batchRef.current !== jobBatch) return
+          if (mergeJobsRef.current.get(key) !== mergePromise) return
+
           setMergeStatuses((prev) => ({
             ...prev,
             [key]: {
@@ -254,12 +262,15 @@ export function GeneratedFilesPreview({
           }))
         })
         .finally(() => {
-          mergeJobsRef.current.delete(key)
+          // Only cleanup if we are still the active job
+          if (mergeJobsRef.current.get(key) === mergePromise) {
+            mergeJobsRef.current.delete(key)
+          }
         })
     })
-    // Depend on filesKey to process new files as they stream in
-    // But processedFilesRef ensures each file is only processed once
-  }, [sourceKey, filesKey])
+    // Depend on batchKey to process new files as they stream in OR when code becomes available
+    // processedFilesRef ensures each file is only processed once per batch
+  }, [sourceKey, batchKey])
 
   // Auto-apply diff view when ready and active
   React.useEffect(() => {
