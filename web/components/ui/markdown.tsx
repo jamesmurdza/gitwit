@@ -11,10 +11,12 @@ import {
 import { BundledLanguage } from "shiki"
 import { Streamdown } from "streamdown"
 import { CodeBlock, CodeBlockCopyButton } from "./code-block"
-type MarkdownProps = ComponentProps<typeof Streamdown>
+type MarkdownProps = ComponentProps<typeof Streamdown> & {
+  onOpenFile?: (filePath: string) => void
+}
 
 export const Markdown = memo(
-  ({ className, ...props }: MarkdownProps) => {
+  ({ className, onOpenFile, ...props }: MarkdownProps) => {
     const currentIntendedFileRef = useRef<string | null>(null)
     // Extract intended file from markdown content once at component level
     const extractMarkdownText = (children: any) => {
@@ -98,19 +100,30 @@ export const Markdown = memo(
                 code={code}
                 language={language}
                 filename={filename}
+                filePath={intendedFile}
                 isNewFile={fileIsNew}
                 showToolbar
+                onOpenFile={onOpenFile}
               >
                 <CodeBlockCopyButton className="size-7" />
               </CodeBlock>
             )
           },
           p: ({ node, children, ...props }) => {
-            // Keep this simple — don't mutate shared refs here
+            const textContent = typeof children === "string" 
+              ? children 
+              : Array.isArray(children)
+                ? children.map(c => typeof c === "string" ? c : "").join("")
+                : ""
+            
+            if (/^File:\s*[^\n]+$/i.test(textContent.trim())) {
+              return null
+            }
+            
             return <p {...props}>{children}</p>
           },
         }
-      }, [])
+      }, [onOpenFile])
 
     return (
       <Streamdown
@@ -123,7 +136,9 @@ export const Markdown = memo(
       />
     )
   },
-  (prevProps, nextProps) => prevProps.children === nextProps.children
+  (prevProps, nextProps) => 
+    prevProps.children === nextProps.children &&
+    prevProps.onOpenFile === nextProps.onOpenFile
 )
 
 Markdown.displayName = "Markdown"

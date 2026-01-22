@@ -95,6 +95,7 @@ function AIChatBase({
         onApplyCode={onApplyCode}
         onRejectCode={onRejectCode}
         getCurrentFileContent={getCurrentFileContent}
+        onOpenFile={onOpenFile}
       />
       <MainChatInput
         precomputeMergeForFile={precomputeMergeForFile}
@@ -125,6 +126,7 @@ function MainChatContent({
   onApplyCode,
   onRejectCode,
   getCurrentFileContent,
+  onOpenFile,
 }: {
   onApplyCode?: (
     code: string,
@@ -142,7 +144,9 @@ function MainChatContent({
   ) => Promise<void>
   onRejectCode?: () => void
   getCurrentFileContent?: GetCurrentFileContentFn
+  onOpenFile?: (filePath: string) => void
 }) {
+  console.log("onOpenFile :", onOpenFile)
   const { messages, isLoading, mergeStatuses } = useChat()
   const isEmpty = messages.length === 0
   const mergeStatusesRef = React.useRef(mergeStatuses)
@@ -179,6 +183,7 @@ function MainChatContent({
               key={i}
               onApplyCode={wrappedOnApplyCode}
               onRejectCode={onRejectCode}
+              onOpenFile={onOpenFile}
             >
               <MessageContent>{message.content}</MessageContent>
             </Message>

@@ -3,22 +3,27 @@
 import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "framer-motion"
 import { CheckIcon, CopyIcon } from "lucide-react"
+import Image from "next/image"
 import {
   type ComponentProps,
   createContext,
   type HTMLAttributes,
+  useCallback,
   useContext,
   useEffect,
   useState,
 } from "react"
 import { type BundledLanguage, codeToHtml } from "shiki"
+import { getIconForFile } from "vscode-icons-js"
 
 type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   code: string
   language: BundledLanguage
   filename?: string
+  filePath?: string | null
   showToolbar?: boolean
   isNewFile?: boolean
+  onOpenFile?: (filePath: string) => void
 }
 
 type CodeBlockContextType = {
@@ -39,17 +44,30 @@ export async function highlightCode(code: string, language: BundledLanguage) {
   })
 }
 
+const DEFAULT_FILE_ICON = "/icons/default_file.svg"
+
 const CodeBlock = ({
   code,
   language,
   filename,
+  filePath,
   showToolbar = false,
   isNewFile = false,
   className,
   children,
+  onOpenFile,
   ...props
 }: CodeBlockProps) => {
+
+  console.log("filePath :", filePath)
+  console.log("filename :", filename)
   const [html, setHtml] = useState<string>("")
+  const [imgSrc, setImgSrc] = useState<string>(() => {
+    if (filename) {
+      return `/icons/${getIconForFile(filename)}`
+    }
+    return DEFAULT_FILE_ICON
+  })
 
   useEffect(() => {
     let isMounted = true
@@ -65,13 +83,55 @@ const CodeBlock = ({
     }
   }, [code, language])
 
+  useEffect(() => {
+    if (filename) {
+      setImgSrc(`/icons/${getIconForFile(filename)}`)
+    } else {
+      setImgSrc(DEFAULT_FILE_ICON)
+    }
+  }, [filename])
+
+  const handleImageError = useCallback(() => {
+    setImgSrc(DEFAULT_FILE_ICON)
+  }, [])
+
   return (
     <CodeBlockContext.Provider value={{ code }}>
       <div className="group relative my-4 rounded-lg border overflow-hidden">
         {showToolbar && (
           <div className="flex items-center justify-between px-3 py-1 border-b bg-muted/40">
             <div className="text-xs font-medium truncate max-w-[60%] flex items-center gap-2">
-              <span>{filename ?? "code"}</span>
+              {filename && (
+                <Image
+                  src={imgSrc}
+                  alt="File Icon"
+                  width={14}
+                  height={14}
+                  className="shrink-0"
+                  onError={handleImageError}
+                />
+              )}
+              {filePath && onOpenFile ? (
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    console.log("Opening file:", filePath)
+                    try {
+                      await onOpenFile(filePath)
+                    } catch (error) {
+                      console.error("Error opening file:", error)
+                    }
+                  }}
+                  className="hover:underline cursor-pointer text-left hover:text-primary transition-colors"
+                  style={{ pointerEvents: 'auto' }}
+                >
+                  {filename ?? "code"}
+                </button>
+              ) : (
+                <span>{filename ?? "code"}</span>
+              )}
               {isNewFile && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">
                   new file
@@ -167,3 +227,4 @@ const CodeBlockCopyButton = ({
 }
 
 export { CodeBlock, CodeBlockCopyButton }
+
