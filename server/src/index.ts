@@ -80,7 +80,7 @@ const gitClient =
   process.env.DOKKU_HOST && process.env.DOKKU_KEY
     ? new SecureGitClient(
         `dokku@${process.env.DOKKU_HOST}`,
-        process.env.DOKKU_KEY
+        process.env.DOKKU_KEY,
       )
     : null
 
@@ -123,7 +123,7 @@ io.on("connection", async (socket) => {
         {
           dokkuClient,
           gitClient,
-        }
+        },
       )
 
       // For each event handler, listen on the socket for that event
@@ -138,7 +138,7 @@ io.on("connection", async (socket) => {
             } catch (e: any) {
               handleErrors(`Error processing event "${event}":`, e, socket)
             }
-          }
+          },
         )
       })
 
@@ -149,6 +149,7 @@ io.on("connection", async (socket) => {
         try {
           // Deregister the connection
           connections.removeConnectionForProject(socket, data.projectId)
+          await project.killDevServers()
         } catch (e: any) {
           handleErrors("Error disconnecting:", e, socket)
         }
