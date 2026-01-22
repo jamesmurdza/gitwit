@@ -23,6 +23,7 @@ import AIEditElements from "./ai-edit/ai-edit-elements"
 import { DiffNavigationWidget } from "./ai-edit/diff-navigation-widget"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
+import { normalizePath } from "./chat/lib/utils"
 import { ChatProvider, useChat } from "./chat/providers/chat-provider"
 import { useAIFileActions } from "./hooks/useAIFileActions"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
@@ -184,7 +185,7 @@ export default function ProjectLayout({
       getUnresolvedSnapshot,
       restoreFromSnapshot,
       clearVisuals,
-      forceClearAllDecorations
+      forceClearAllDecorations,
     )
 
   // Store diff functions so sidebar can use them
@@ -214,14 +215,14 @@ export default function ProjectLayout({
         setMergeDecorationsCollection(decorationsCollection)
       }
     },
-    [handleApplyCode]
+    [handleApplyCode],
   )
 
   const updateFileDraft = useCallback(
     (fileId: string, content?: string) => {
       setDraft(fileId, content ?? "")
     },
-    [setDraft]
+    [setDraft],
   )
 
   const handleEditorChange = useCallback(
@@ -231,7 +232,7 @@ export default function ProjectLayout({
       }
       updateFileDraft(activeTab.id, value)
     },
-    [activeTab?.id, updateFileDraft]
+    [activeTab?.id, updateFileDraft],
   )
 
   const waitForEditorModel = useCallback(async () => {
@@ -330,7 +331,7 @@ export default function ProjectLayout({
       activeTab?.id,
       hasActiveWidgets,
       acceptAll,
-    ]
+    ],
   )
 
   const restoreOriginalFile = useCallback(
@@ -352,7 +353,7 @@ export default function ProjectLayout({
       activeTab?.id,
       hasActiveWidgets,
       rejectAll,
-    ]
+    ],
   )
 
   // Handler for rejecting code from chat
@@ -394,7 +395,7 @@ export default function ProjectLayout({
       clearVisuals,
       forceClearAllDecorations,
       removeTab,
-    ]
+    ],
   )
 
   // Use the session manager for tab switching
@@ -406,15 +407,12 @@ export default function ProjectLayout({
       try {
         const session = getDiffSession(fileId)
         if (session) {
-          console.log("clearing")
-          // remove only if it matches current active or by id
           clearDiffSession(fileId)
         }
       } catch {}
     }
     return () => {
       try {
-        console.log("clearing")
         delete (window as any).__clearDiffSession
       } catch {}
     }
@@ -523,10 +521,10 @@ export default function ProjectLayout({
                   isAIChatOpen && isHorizontalLayout
                     ? "horizontal"
                     : isAIChatOpen
-                    ? "vertical"
-                    : isHorizontalLayout
-                    ? "horizontal"
-                    : "vertical"
+                      ? "vertical"
+                      : isHorizontalLayout
+                        ? "horizontal"
+                        : "vertical"
                 }
               >
                 {/* Preview Panel */}
@@ -611,17 +609,36 @@ function DiffSessionHandler({
     markResolved: (fileId: string, status: "applied" | "rejected") => void
   }) => void
 }) {
-  const { markFileActionStatus, latestAssistantId } = useChat()
+  const { markFileActionStatus, latestAssistantId, messages } = useChat()
 
   useEffect(() => {
     onRegister({
       markResolved: (fileId, status) => {
+        // Normalize path to ensure it matches what's used in file utils
+        const normalized = normalizePath(fileId)
         if (latestAssistantId) {
-          markFileActionStatus(latestAssistantId, fileId, status)
+          markFileActionStatus(latestAssistantId, normalized, status)
+          return
         }
+
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i]
+          if (msg.role === "assistant" && msg.content) {
+            if (
+              msg.content.includes(normalized) ||
+              msg.content.includes(fileId)
+            ) {
+              if (msg.id) {
+                markFileActionStatus(msg.id, normalized, status)
+                return
+              }
+            }
+          }
+        }
+        console.warn("Could not find message ID for file:", normalized)
       },
     })
-  }, [markFileActionStatus, latestAssistantId, onRegister])
+  }, [markFileActionStatus, latestAssistantId, onRegister, messages])
 
   return null
 }
