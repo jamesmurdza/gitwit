@@ -1,6 +1,7 @@
 import { DiffSession, LineRange } from "@/lib/types"
 import * as monaco from "monaco-editor"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { normalizePath } from "../chat/lib/utils"
 import { DecorationManager } from "./lib/decoration-manager"
 import { calculateDiff } from "./lib/diff-calculator"
 import { WidgetManager } from "./lib/widget-manager"
@@ -14,7 +15,7 @@ export interface UseCodeDifferProps {
 export interface UseCodeDifferReturn {
   handleApplyCode: (
     mergedCode: string,
-    originalCode: string
+    originalCode: string,
   ) => monaco.editor.IEditorDecorationsCollection | null
   hasActiveWidgets: () => boolean
   forceClearAllDecorations: () => void
@@ -76,7 +77,7 @@ export function useCodeDiffer({
   const handleApplyCode = useCallback(
     (
       mergedCode: string,
-      originalCode: string
+      originalCode: string,
     ): monaco.editor.IEditorDecorationsCollection | null => {
       // Use the ref to get the latest editorRef value
       const currentEditorRef = editorRefRef.current
@@ -107,7 +108,7 @@ export function useCodeDiffer({
 
       // Create and return decorations collection
       const newDecorations = currentEditorRef.createDecorationsCollection(
-        diffResult.decorations
+        diffResult.decorations,
       )
 
       ;(model as any).granularBlocks = diffResult.granularBlocks
@@ -122,22 +123,21 @@ export function useCodeDiffer({
 
         // Notify about diff changes
         if (onDiffChange && getUnresolvedSnapshotRef.current) {
-          const fileId = model.uri.path || model.uri.toString()
+          const fileId = normalizePath(model.uri.fsPath)
           const session = getUnresolvedSnapshotRef.current(fileId)
           onDiffChange(session)
         }
 
         if (count === 0) {
           try {
-            // No unresolved diffs left; clear any saved session for this file
-            const fileId = model.uri.path || model.uri.toString()
-
+            // Use fsPath to ensure we get backslashes on Windows if applicable, or consistent path logic
+            // Normalize immediately to ensure consistent use across the app
+            const fileId = normalizePath(model.uri.fsPath)
             // Detect if applied or rejected (simplistic check: if content == merged, it's applied)
             const currentContent = model.getValue()
             const original = (model as any).originalContent || ""
             const status = currentContent !== original ? "applied" : "rejected"
 
-            console.log("clearing diff session, status:", status)
             ;(window as any).__clearDiffSession?.(fileId)
 
             if (onDiffResolved) {
@@ -160,7 +160,7 @@ export function useCodeDiffer({
         (count) => {
           lastWidgetCountRef.current = count
           checkAndResolve(count)
-        }
+        },
       )
 
       // Suppress during BUILD of NEW widgets because it might trigger cleanup internally
@@ -174,7 +174,7 @@ export function useCodeDiffer({
 
       return newDecorations
     },
-    [onDiffResolved] // editorRef is accessed via ref, so no dependency needed
+    [onDiffResolved], // editorRef is accessed via ref, so no dependency needed
   )
 
   /**
@@ -228,11 +228,11 @@ export function useCodeDiffer({
       for (let line = 1; line <= maxLines; line++) {
         const isRemoved = decorationManager.lineHasClass(
           line,
-          "removed-line-decoration"
+          "removed-line-decoration",
         )
         const isAdded = decorationManager.lineHasClass(
           line,
-          "added-line-decoration"
+          "added-line-decoration",
         )
         if (!isRemoved && !isAdded) continue
         const type: "added" | "removed" = isRemoved ? "removed" : "added"
@@ -262,7 +262,7 @@ export function useCodeDiffer({
         unresolvedBlocks: unresolved,
       }
     },
-    [] // editorRef is accessed via ref
+    [], // editorRef is accessed via ref
   )
 
   // Update ref for internal access
@@ -279,7 +279,7 @@ export function useCodeDiffer({
       model.setEOL(
         session.eol === "CRLF"
           ? monaco.editor.EndOfLineSequence.CRLF
-          : monaco.editor.EndOfLineSequence.LF
+          : monaco.editor.EndOfLineSequence.LF,
       )
       ;(model as any).originalContent = session.originalCode
       ;(model as any).mergedContent = session.mergedCode
@@ -321,15 +321,14 @@ export function useCodeDiffer({
 
         // Notify about diff changes
         if (onDiffChange && getUnresolvedSnapshotRef.current) {
-          const fileId = model.uri.path || model.uri.toString()
+          const fileId = normalizePath(model.uri.fsPath)
           const session = getUnresolvedSnapshotRef.current(fileId)
           onDiffChange(session)
         }
 
         if (count === 0) {
           try {
-            const fileId = model.uri.path || model.uri.toString()
-            console.log("clearing")
+            const fileId = normalizePath(model.uri.fsPath)
             ;(window as any).__clearDiffSession?.(fileId)
           } catch {}
         }
@@ -347,7 +346,7 @@ export function useCodeDiffer({
         (count) => {
           lastWidgetCountRef.current = count
           checkAndResolve(count)
-        }
+        },
       )
 
       suppressZeroNotifyRef.current = true
@@ -357,7 +356,7 @@ export function useCodeDiffer({
       // Manually check once after build is done
       checkAndResolve(widgetManagerRef.current.hasActiveWidgets() ? 1 : 0)
     },
-    [] // editorRef is accessed via ref
+    [], // editorRef is accessed via ref
   )
 
   const clearVisuals = useCallback(() => {
