@@ -134,6 +134,8 @@ export default function ProjectLayout({
     handleEditorWillMount,
     handleEditorMount,
     handleAiEdit,
+    cleanupWidgets,
+    setIsSelected,
   } = useMonacoEditor({
     editorPanelRef,
     setIsAIChatOpen,
@@ -184,7 +186,7 @@ export default function ProjectLayout({
       getUnresolvedSnapshot,
       restoreFromSnapshot,
       clearVisuals,
-      forceClearAllDecorations
+      forceClearAllDecorations,
     )
 
   // Store diff functions so sidebar can use them
@@ -214,14 +216,14 @@ export default function ProjectLayout({
         setMergeDecorationsCollection(decorationsCollection)
       }
     },
-    [handleApplyCode]
+    [handleApplyCode],
   )
 
   const updateFileDraft = useCallback(
     (fileId: string, content?: string) => {
       setDraft(fileId, content ?? "")
     },
-    [setDraft]
+    [setDraft],
   )
 
   const handleEditorChange = useCallback(
@@ -231,7 +233,7 @@ export default function ProjectLayout({
       }
       updateFileDraft(activeTab.id, value)
     },
-    [activeTab?.id, updateFileDraft]
+    [activeTab?.id, updateFileDraft],
   )
 
   const waitForEditorModel = useCallback(async () => {
@@ -330,7 +332,7 @@ export default function ProjectLayout({
       activeTab?.id,
       hasActiveWidgets,
       acceptAll,
-    ]
+    ],
   )
 
   const restoreOriginalFile = useCallback(
@@ -352,7 +354,7 @@ export default function ProjectLayout({
       activeTab?.id,
       hasActiveWidgets,
       rejectAll,
-    ]
+    ],
   )
 
   // Handler for rejecting code from chat
@@ -368,20 +370,35 @@ export default function ProjectLayout({
   const handleCloseTab = useCallback(
     (tab: TTab) => {
       const isClosingActive = activeTab?.id === tab.id
-      if (isClosingActive && hasActiveWidgets()) {
+      if (isClosingActive) {
+        // CRITICAL: Clear selection and generate states first to trigger widget removal
+        // This must happen before we remove the tab to prevent React/Monaco DOM conflicts
+        setIsSelected(false)
+        setGenerate((prev) => ({ ...prev, show: false }))
+
+        // Remove all contentWidgets synchronously to prevent DOM errors
+        // Monaco moves widget DOM nodes out of React's tree, so we must remove them
+        // before React tries to unmount the component
         try {
-          const session = getUnresolvedSnapshot(tab.id)
-          if (session) {
-            saveDiffSession(tab.id, session)
-          }
-        } catch (error) {
-          console.warn("Failed to snapshot unresolved diffs on close:", error)
+          cleanupWidgets()
+        } catch (err) {
+          console.warn("Error cleaning up Monaco widgets:", err)
         }
-        // Clear widgets before closing the tab
-        try {
-          clearVisuals()
-        } catch (error) {
-          forceClearAllDecorations()
+        if (hasActiveWidgets()) {
+          try {
+            const session = getUnresolvedSnapshot(tab.id)
+            if (session) {
+              saveDiffSession(tab.id, session)
+            }
+          } catch (error) {
+            console.warn("Failed to snapshot unresolved diffs on close:", error)
+          }
+          // Clear widgets before closing the tab
+          try {
+            clearVisuals()
+          } catch (error) {
+            forceClearAllDecorations()
+          }
         }
       }
       removeTab(tab)
@@ -394,7 +411,10 @@ export default function ProjectLayout({
       clearVisuals,
       forceClearAllDecorations,
       removeTab,
-    ]
+      cleanupWidgets,
+      setIsSelected,
+      setGenerate,
+    ],
   )
 
   // Use the session manager for tab switching
@@ -523,10 +543,10 @@ export default function ProjectLayout({
                   isAIChatOpen && isHorizontalLayout
                     ? "horizontal"
                     : isAIChatOpen
-                    ? "vertical"
-                    : isHorizontalLayout
-                    ? "horizontal"
-                    : "vertical"
+                      ? "vertical"
+                      : isHorizontalLayout
+                        ? "horizontal"
+                        : "vertical"
                 }
               >
                 {/* Preview Panel */}

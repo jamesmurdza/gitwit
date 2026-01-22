@@ -59,6 +59,7 @@ export interface UseMonacoEditorReturn {
   handleEditorWillMount: BeforeMount
   handleEditorMount: OnMount
   handleAiEdit: (editor?: monaco.editor.ICodeEditor) => void
+  cleanupWidgets: () => void
 
   // Internal setters
   setEditorRef: (editor: monaco.editor.IStandaloneCodeEditor) => void
@@ -101,9 +102,10 @@ export const useMonacoEditor = ({
 
   // Refs
   const monacoRef = useRef<typeof monaco | null>(null)
-  const generateRef = useRef<HTMLDivElement>(null)
-  const suggestionRef = useRef<HTMLDivElement>(null)
-  const generateWidgetRef = useRef<HTMLDivElement>(null)
+  const generateRef = useRef<HTMLDivElement | null>(null)
+  const suggestionRef = useRef<HTMLDivElement | null>(null)
+  const generateWidgetRef = useRef<HTMLDivElement | null>(null)
+  const suggestionWidgetRef = useRef<monaco.editor.IContentWidget | null>(null)
   const lastCopiedRangeRef = useRef<{
     startLine: number
     endLine: number
@@ -113,7 +115,7 @@ export const useMonacoEditor = ({
   const debouncedSetIsSelected = useRef(
     debounce((value: boolean) => {
       setIsSelected(value)
-    }, 800)
+    }, 800),
   ).current
 
   // Helper function to fetch file content
@@ -125,7 +127,7 @@ export const useMonacoEditor = ({
         })
       })
     },
-    [socket]
+    [socket],
   )
 
   // Load and merge TSConfig
@@ -133,10 +135,10 @@ export const useMonacoEditor = ({
     async (
       files: (TFolder | TFile)[],
       editor: monaco.editor.IStandaloneCodeEditor,
-      monaco: typeof import("monaco-editor")
+      monaco: typeof import("monaco-editor"),
     ) => {
       const tsconfigFiles = files.filter((file) =>
-        file.name.endsWith("tsconfig.json")
+        file.name.endsWith("tsconfig.json"),
       )
       let mergedConfig: any = { compilerOptions: {} }
 
@@ -172,10 +174,10 @@ export const useMonacoEditor = ({
           ...mergedConfig.compilerOptions,
         })
         monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
-          updatedOptions
+          updatedOptions,
         )
         monaco.languages.typescript.javascriptDefaults.setCompilerOptions(
-          updatedOptions
+          updatedOptions,
         )
       }
 
@@ -189,7 +191,7 @@ export const useMonacoEditor = ({
         }
       })
     },
-    [fetchFileContent]
+    [fetchFileContent],
   )
 
   // Pre-mount editor keybindings
@@ -243,7 +245,7 @@ export const useMonacoEditor = ({
         }
       })
     },
-    [editorRef, generateRef, setGenerate]
+    [editorRef, generateRef, setGenerate],
   )
 
   // Post-mount editor keybindings and actions
@@ -260,10 +262,10 @@ export const useMonacoEditor = ({
       monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true)
 
       monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
-        defaultCompilerOptions
+        defaultCompilerOptions,
       )
       monaco.languages.typescript.javascriptDefaults.setCompilerOptions(
-        defaultCompilerOptions
+        defaultCompilerOptions,
       )
 
       // Load TSConfig
@@ -294,7 +296,7 @@ export const useMonacoEditor = ({
                   lineNumber,
                   column,
                   lineNumber,
-                  endColumn
+                  endColumn,
                 ),
                 options: {
                   afterContentClassName: "inline-decoration",
@@ -336,7 +338,7 @@ export const useMonacoEditor = ({
       handleAiEdit,
       setIsAIChatOpen,
       debouncedSetIsSelected,
-    ]
+    ],
   )
 
   // Generate widget effect
@@ -415,6 +417,26 @@ export const useMonacoEditor = ({
         }
       })
     }
+
+    // Cleanup function for generate widget
+    return () => {
+      if (generate.widget && editorRef) {
+        try {
+          editorRef.removeContentWidget(generate.widget)
+        } catch (e) {
+          // Widget may already be removed
+        }
+      }
+      if (generate.id && editorRef) {
+        try {
+          editorRef.changeViewZones((changeAccessor) => {
+            changeAccessor.removeZone(generate.id)
+          })
+        } catch (e) {
+          // Zone may already be removed
+        }
+      }
+    }
   }, [
     generate.show,
     generate.id,
@@ -428,14 +450,23 @@ export const useMonacoEditor = ({
   // Suggestion widget effect
   useEffect(() => {
     if (!suggestionRef.current || !editorRef) return
+
+    // Remove any existing widget first
+    if (suggestionWidgetRef.current) {
+      try {
+        editorRef.removeContentWidget(suggestionWidgetRef.current)
+      } catch (e) {
+        // Widget may already be removed
+      }
+      suggestionWidgetRef.current = null
+    }
+
+    if (!isSelected) return
+
     const widgetElement = suggestionRef.current
     const suggestionWidget: monaco.editor.IContentWidget = {
-      getDomNode: () => {
-        return widgetElement
-      },
-      getId: () => {
-        return "suggestion.widget"
-      },
+      getDomNode: () => widgetElement,
+      getId: () => "suggestion.widget",
       getPosition: () => {
         const selection = editorRef?.getSelection()
         const column = Math.max(3, selection?.positionColumn ?? 1)
@@ -453,11 +484,21 @@ export const useMonacoEditor = ({
         }
       },
     }
-    if (isSelected) {
-      editorRef?.addContentWidget(suggestionWidget)
-      editorRef?.applyFontInfo(suggestionRef.current)
-    } else {
-      editorRef?.removeContentWidget(suggestionWidget)
+
+    suggestionWidgetRef.current = suggestionWidget
+    editorRef.addContentWidget(suggestionWidget)
+    editorRef.applyFontInfo(suggestionRef.current)
+
+    // Cleanup function - remove widget when effect re-runs or unmounts
+    return () => {
+      if (suggestionWidgetRef.current && editorRef) {
+        try {
+          editorRef.removeContentWidget(suggestionWidgetRef.current)
+        } catch (e) {
+          // Widget may already be removed or editor disposed
+        }
+        suggestionWidgetRef.current = null
+      }
     }
   }, [isSelected, editorRef])
 
@@ -500,6 +541,40 @@ export const useMonacoEditor = ({
     }
   }, [decorations.options, cursorLine, editorRef])
 
+  // Cleanup function to remove all contentWidgets before tab close
+  const cleanupWidgets = useCallback(() => {
+    if (!editorRef) return
+    try {
+      // Remove suggestion widget using stored reference
+      if (suggestionWidgetRef.current) {
+        try {
+          editorRef.removeContentWidget(suggestionWidgetRef.current)
+        } catch (e) {
+          // Already removed
+        }
+        suggestionWidgetRef.current = null
+      }
+      // Remove generate widget
+      if (generate.widget) {
+        try {
+          editorRef.removeContentWidget(generate.widget)
+        } catch (e) {
+          // Already removed
+        }
+      }
+      // Clear any view zones
+      if (generate.id) {
+        editorRef.changeViewZones((changeAccessor) => {
+          changeAccessor.removeZone(generate.id)
+        })
+      }
+      // Clear decorations
+      decorations.instance?.clear()
+    } catch (err) {
+      console.warn("Error cleaning up Monaco widgets:", err)
+    }
+  }, [editorRef, generate.widget, generate.id, decorations.instance])
+
   // useEffect(() => {}, [tabs])
   return {
     // Editor state
@@ -525,6 +600,7 @@ export const useMonacoEditor = ({
     handleEditorWillMount,
     handleEditorMount,
     handleAiEdit,
+    cleanupWidgets,
 
     // Internal setters
     setEditorRef,
