@@ -20,8 +20,10 @@ type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   code: string
   language: BundledLanguage
   filename?: string
+  filePath?: string | null
   showToolbar?: boolean
   isNewFile?: boolean
+  onOpenFile?: (filePath: string) => void
 }
 
 type CodeBlockContextType = {
@@ -48,12 +50,17 @@ const CodeBlock = ({
   code,
   language,
   filename,
+  filePath,
   showToolbar = false,
   isNewFile = false,
   className,
   children,
+  onOpenFile,
   ...props
 }: CodeBlockProps) => {
+
+  console.log("filePath :", filePath)
+  console.log("filename :", filename)
   const [html, setHtml] = useState<string>("")
   const [imgSrc, setImgSrc] = useState<string>(() => {
     if (filename) {
@@ -104,7 +111,27 @@ const CodeBlock = ({
                   onError={handleImageError}
                 />
               )}
-              <span>{filename ?? "code"}</span>
+              {filePath && onOpenFile ? (
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    console.log("Opening file:", filePath)
+                    try {
+                      await onOpenFile(filePath)
+                    } catch (error) {
+                      console.error("Error opening file:", error)
+                    }
+                  }}
+                  className="hover:underline cursor-pointer text-left hover:text-primary transition-colors"
+                  style={{ pointerEvents: 'auto' }}
+                >
+                  {filename ?? "code"}
+                </button>
+              ) : (
+                <span>{filename ?? "code"}</span>
+              )}
               {isNewFile && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">
                   new file
@@ -200,3 +227,4 @@ const CodeBlockCopyButton = ({
 }
 
 export { CodeBlock, CodeBlockCopyButton }
+

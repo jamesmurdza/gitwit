@@ -12,6 +12,7 @@ import { TTab } from "@/lib/types"
 import { processFileType, sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import Editor from "@monaco-editor/react"
+import { useQueryClient } from "@tanstack/react-query"
 import { FileJson, TerminalSquare } from "lucide-react"
 import * as monaco from "monaco-editor"
 import { useTheme } from "next-themes"
@@ -23,7 +24,7 @@ import AIEditElements from "./ai-edit/ai-edit-elements"
 import { DiffNavigationWidget } from "./ai-edit/diff-navigation-widget"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
-import { normalizePath } from "./chat/lib/utils"
+import { normalizePath, pathMatchesTab } from "./chat/lib/utils"
 import { ChatProvider, useChat } from "./chat/providers/chat-provider"
 import { useAIFileActions } from "./hooks/useAIFileActions"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
@@ -401,6 +402,57 @@ export default function ProjectLayout({
   // Use the session manager for tab switching
   const handleSetActiveTab = handleSetActiveTabWithSession
 
+  // Query client for prefetching
+  const queryClient = useQueryClient()
+
+  // Wrapper for openFile that uses session manager and prefetches file content
+  const openFileWithSession = useCallback(
+    async (filePath: string) => {
+      console.log("openFileWithSession called with:", filePath)
+      const normalizedPath = normalizePath(filePath)
+      console.log("normalizedPath:", normalizedPath)
+      const matchBy = (tab: TTab) => pathMatchesTab(normalizedPath, tab)
+      let targetTab = tabs.find(matchBy)
+
+      if (!targetTab) {
+        targetTab = {
+          id: normalizedPath,
+          name: normalizedPath.split("/").pop() || normalizedPath,
+          type: "file",
+          saved: true,
+        }
+        console.log("Created new tab:", targetTab)
+      } else {
+        console.log("Found existing tab:", targetTab)
+      }
+
+      const isAlreadyActive = activeTab ? matchBy(activeTab) : false
+      console.log("isAlreadyActive:", isAlreadyActive, "activeTab:", activeTab)
+      
+      if (!isAlreadyActive) {
+        console.log("Prefetching file content...")
+        try {
+          // Prefetch file content before switching
+          await queryClient.ensureQueryData(
+            fileRouter.fileContent.getFetchOptions({
+              projectId,
+              fileId: normalizedPath,
+            })
+          )
+          console.log("File content prefetched, switching tab...")
+          // Use session manager to switch tabs (handles diff sessions)
+          handleSetActiveTabWithSession(targetTab)
+          console.log("Tab switched successfully")
+        } catch (error) {
+          console.error("Error in openFileWithSession:", error)
+        }
+      } else {
+        console.log("File is already active, skipping switch")
+      }
+    },
+    [tabs, activeTab, projectId, queryClient, handleSetActiveTabWithSession]
+  )
+
   // Bridge to allow diff hook to clear saved session when all widgets are gone
   useEffect(() => {
     ;(window as any).__clearDiffSession = (fileId: string) => {
@@ -584,7 +636,7 @@ export default function ProjectLayout({
                 restoreOriginalFile={restoreOriginalFile}
                 getCurrentFileContent={getCurrentFileContent}
                 activeFileId={activeTab?.id}
-                onOpenFile={openFile}
+                onOpenFile={openFileWithSession}
               />
             </ResizablePanel>
           </>
