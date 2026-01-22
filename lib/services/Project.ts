@@ -1,3 +1,4 @@
+import { templateConfigs } from "@gitwit/templates"
 import { Sandbox as Container } from "e2b"
 import { CONTAINER_TIMEOUT } from "../utils/constants"
 import { FileManager } from "./FileManager"
@@ -24,6 +25,61 @@ export class Project {
     this.projectId = projectId
   }
 
+  /**
+   * Kill all known dev server processes in the container (e.g. npm run dev, yarn dev, pnpm dev, vite, next, etc.)
+   */
+  async killDevServers(): Promise<void> {
+    if (!this.container) return
+    // Gather all dev server patterns (template + common)
+    const patterns = [
+      this.type && templateConfigs[this.type]?.runCommand,
+      "vite",
+      "next",
+      "nodemon",
+      "webpack serve",
+      "parcel",
+      "gulp",
+      "python -m http.server",
+      "node ",
+      "npm ",
+    ].filter(Boolean)
+
+    let psOutput = ""
+    try {
+      const result = await this.container.commands.run("ps aux")
+      psOutput = result.stdout || ""
+    } catch {}
+
+    const lines = psOutput.split("\n")
+    const killed: string[] = []
+    const seenPids = new Set<string>()
+
+    for (const line of lines) {
+      for (const pattern of patterns) {
+        if (pattern && line.includes(pattern)) {
+          const parts = line.trim().split(/\s+/)
+          const pid = parts[1]
+          if (pid && pid !== "PID" && !seenPids.has(pid)) {
+            try {
+              await this.container.commands.run(`kill -9 ${pid}`)
+              killed.push(`${pattern} (pid ${pid})`)
+              seenPids.add(pid)
+            } catch {}
+          }
+        }
+      }
+    }
+
+    if (killed.length) {
+      console.log(
+        `[killDevServers] Killed processes for project ${this.projectId}:\n${killed.join("\n")}`,
+      )
+    } else {
+      console.log(
+        `[killDevServers] No dev server processes found to kill for project ${this.projectId}`,
+      )
+    }
+  }
   async createContainer(): Promise<Container> {
     console.log("Creating container for ", this.projectId)
     const templateTypes = ["vanillajs", "reactjs", "nextjs", "streamlit", "php"]
