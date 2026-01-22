@@ -1,12 +1,12 @@
 "use client"
 
 import { processEdit } from "@/app/actions/ai"
-import { cn } from "@/lib/utils"
 import { useRouter } from "@bprogress/next/app"
 import { Editor } from "@monaco-editor/react"
 import { Check, Loader2, RotateCw, Sparkles, X } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import { Button } from "../../ui/button"
 
@@ -27,10 +27,18 @@ interface GenerateInputProps {
   onClose: () => void
 }
 interface GenerateWidgetProps extends GenerateInputProps {
-  generateRef: React.RefObject<HTMLDivElement>
-  generateWidgetRef: React.RefObject<HTMLDivElement>
+  generateRef: React.MutableRefObject<HTMLDivElement | null>
+  generateWidgetRef: React.MutableRefObject<HTMLDivElement | null>
   show: boolean
 }
+
+/**
+ * Generate Widget container
+ *
+ * IMPORTANT: The widget containers are created imperatively (not via JSX) because
+ * Monaco moves the DOM nodes to its overlay. If React managed these nodes,
+ * it would crash when trying to unmount nodes that are no longer in their expected location.
+ */
 export function GenerateWidget({
   generateRef,
   generateWidgetRef,
@@ -39,21 +47,53 @@ export function GenerateWidget({
   projectName,
   ...inputProps
 }: GenerateWidgetProps) {
-  return (
-    <>
-      {/* Generate DOM anchor point */}
-      <div ref={generateRef} />
-      {/* Generate Widget */}
-      <div className={cn(show && "z-50 p-1")} ref={generateWidgetRef}>
-        {show ? (
-          <GenerateInput
-            {...inputProps}
-            projectId={projectId}
-            projectName={projectName}
-          />
-        ) : null}
-      </div>
-    </>
+  const [containers, setContainers] = useState<{
+    anchor: HTMLDivElement | null
+    widget: HTMLDivElement | null
+  }>({ anchor: null, widget: null })
+
+  // Create the container divs imperatively on mount
+  useEffect(() => {
+    const anchorDiv = document.createElement("div")
+    const widgetDiv = document.createElement("div")
+
+    generateRef.current = anchorDiv
+    generateWidgetRef.current = widgetDiv
+    setContainers({ anchor: anchorDiv, widget: widgetDiv })
+
+    // Cleanup: remove from DOM if still attached somewhere
+    return () => {
+      generateRef.current = null
+      generateWidgetRef.current = null
+      if (anchorDiv.parentNode) {
+        anchorDiv.parentNode.removeChild(anchorDiv)
+      }
+      if (widgetDiv.parentNode) {
+        widgetDiv.parentNode.removeChild(widgetDiv)
+      }
+    }
+  }, [generateRef, generateWidgetRef])
+
+  // Update widget container class when show changes
+  useEffect(() => {
+    if (containers.widget) {
+      containers.widget.className = show ? "z-50 p-1" : ""
+    }
+  }, [show, containers.widget])
+
+  // Don't render anything if containers don't exist yet
+  if (!containers.widget) return null
+
+  // Use portal to render content into the imperatively created widget container
+  return createPortal(
+    show ? (
+      <GenerateInput
+        {...inputProps}
+        projectId={projectId}
+        projectName={projectName}
+      />
+    ) : null,
+    containers.widget,
   )
 }
 
@@ -106,7 +146,7 @@ function GenerateInput({
           fileName: data.fileName,
           projectId: projectId,
           projectName: projectName,
-        }
+        },
       )
 
       // Clean up any potential markdown or explanation text
@@ -120,7 +160,7 @@ function GenerateInput({
       router.refresh()
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to generate code"
+        error instanceof Error ? error.message : "Failed to generate code",
       )
     } finally {
       setLoading({ generate: false, regenerate: false })
@@ -131,7 +171,7 @@ function GenerateInput({
       e.preventDefault()
       handleGenerate({ regenerate: false })
     },
-    [input, currentPrompt]
+    [input, currentPrompt],
   )
 
   useEffect(() => {
