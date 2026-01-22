@@ -590,9 +590,27 @@ export function GeneratedFilesPreview({
             >
               <div className="flex flex-1 items-center gap-2">
                 <Info className="size-3.5 text-muted-foreground" />
-                <span className="text-[11px] font-medium text-foreground">
-                  {file.name}
-                </span>
+                {onOpenFile ? (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      try {
+                        await onOpenFile(file.path)
+                      } catch (error) {
+                        console.error("Error opening file:", error)
+                      }
+                    }}
+                    className="text-[11px] font-medium text-foreground hover:underline cursor-pointer text-left hover:text-primary transition-colors"
+                  >
+                    {file.name}
+                  </button>
+                ) : (
+                  <span className="text-[11px] font-medium text-foreground">
+                    {file.name}
+                  </span>
+                )}
                 {isPreparing && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">
                     preparing
