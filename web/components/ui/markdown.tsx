@@ -106,7 +106,16 @@ export const Markdown = memo(
             )
           },
           p: ({ node, children, ...props }) => {
-            // Keep this simple — don't mutate shared refs here
+            const textContent = typeof children === "string" 
+              ? children 
+              : Array.isArray(children)
+                ? children.map(c => typeof c === "string" ? c : "").join("")
+                : ""
+            
+            if (/^File:\s*[^\n]+$/i.test(textContent.trim())) {
+              return null
+            }
+            
             return <p {...props}>{children}</p>
           },
         }
