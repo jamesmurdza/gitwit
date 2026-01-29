@@ -9,38 +9,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Checks if a file path indicates a new file (contains "(new file)" marker)
- */
-export function isNewFile(
-  filePath: string | null,
-  code: string,
-  markdownText: string
-): boolean {
-  if (!filePath) return false
-
-  // Check in code block itself
-  const filePatternInCode = /^File:\s*([^\n]+)/m
-  const matchInCode = code.match(filePatternInCode)
-  if (matchInCode) {
-    const rawPath = matchInCode[1].trim()
-    return /\s*\(new file\)\s*$/i.test(rawPath)
-  }
-
-  // Check in markdown text
-  const filePattern = /File:\s*([^\n]+)/g
-  let match
-  while ((match = filePattern.exec(markdownText)) !== null) {
-    const rawPath = match[1].trim()
-    const cleanPath = rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
-    if (cleanPath === filePath && /\s*\(new file\)\s*$/i.test(rawPath)) {
-      return true
-    }
-  }
-
-  return false
-}
-
-/**
  * Extracts the file path for a code block from various sources:
  * 1. "File: /path" pattern in the code block itself
  * 2. File path pattern in the code block
@@ -53,7 +21,7 @@ export function extractFilePathFromCode(
   markdownText: string,
   codeBlockFileMap: Map<string, string>,
   codeBlockIndex?: number,
-  previousCodeBlockEnd?: number
+  previousCodeBlockEnd?: number,
 ): string | null {
   // First, try to find "File: /path/to/file" pattern in the code block itself
   const filePatternInCode = /^File:\s*([^\n]+)/m
@@ -151,7 +119,7 @@ export function processFileType(file: string) {
 export function validateName(
   newName: string,
   oldName: string,
-  type: "file" | "folder"
+  type: "file" | "folder",
 ) {
   if (newName === oldName || newName.length === 0) {
     return { status: false, message: "" }
@@ -170,7 +138,7 @@ export function validateName(
 
 export function debounce<T extends (...args: any[]) => void>(
   func: T,
-  wait: number
+  wait: number,
 ): T {
   let timeout: NodeJS.Timeout | null = null
   return function (...args: Parameters<T>) {
@@ -205,7 +173,7 @@ const isObject = (item: any) => {
 }
 
 export function sortFileExplorer(
-  items: (TFile | TFolder)[]
+  items: (TFile | TFolder)[],
 ): (TFile | TFolder)[] {
   return items
     .sort((a, b) => {
@@ -322,7 +290,7 @@ export const createPopupTracker = () => {
    */
   const setupUrlChangeDetection = (
     onUrlChange?: (newUrl: string) => void,
-    pollInterval = 100
+    pollInterval = 100,
   ) => {
     if (!popup || !onUrlChange) return
 
@@ -340,7 +308,7 @@ export const createPopupTracker = () => {
     } catch (error) {
       console.warn(
         "Unable to observe popup DOM changes, falling back to polling",
-        error
+        error,
       )
     }
 
@@ -480,7 +448,7 @@ export const createPopupTracker = () => {
     popup = window.open(
       url,
       title,
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes,location=yes`
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes,location=yes`,
     )
 
     // Handle popup blockers
@@ -503,7 +471,7 @@ export const createPopupTracker = () => {
       () => {
         setupUrlChangeDetection(onUrlChange, pollInterval)
       },
-      { once: true }
+      { once: true },
     )
 
     // Setup close detection

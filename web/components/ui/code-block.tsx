@@ -58,9 +58,6 @@ const CodeBlock = ({
   onOpenFile,
   ...props
 }: CodeBlockProps) => {
-
-  console.log("filePath :", filePath)
-  console.log("filename :", filename)
   const [html, setHtml] = useState<string>("")
   const [imgSrc, setImgSrc] = useState<string>(() => {
     if (filename) {
@@ -117,7 +114,6 @@ const CodeBlock = ({
                   onClick={async (e) => {
                     e.preventDefault()
                     e.stopPropagation()
-                    console.log("Opening file:", filePath)
                     try {
                       await onOpenFile(filePath)
                     } catch (error) {
@@ -125,7 +121,7 @@ const CodeBlock = ({
                     }
                   }}
                   className="hover:underline cursor-pointer text-left hover:text-primary transition-colors"
-                  style={{ pointerEvents: 'auto' }}
+                  style={{ pointerEvents: "auto" }}
                 >
                   {filename ?? "code"}
                 </button>
@@ -145,7 +141,7 @@ const CodeBlock = ({
           className={cn(
             "overflow-x-auto h-auto [&>pre]:p-4 [&>pre]:overflow-x-auto [&>pre]:min-w-0",
             !showToolbar && "rounded-lg border",
-            className
+            className,
           )}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
           dangerouslySetInnerHTML={{ __html: html }}
@@ -193,7 +189,7 @@ const CodeBlockCopyButton = ({
     <button
       className={cn(
         "rounded-md size-7 flex items-center justify-center transition-all hover:bg-secondary active:scale-95",
-        className
+        className,
       )}
       onClick={copyToClipboard}
       type="button"
@@ -227,4 +223,3 @@ const CodeBlockCopyButton = ({
 }
 
 export { CodeBlock, CodeBlockCopyButton }
-
