@@ -23,6 +23,7 @@ import AIEditElements from "./ai-edit/ai-edit-elements"
 import { DiffNavigationWidget } from "./ai-edit/diff-navigation-widget"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
+import { normalizePath } from "./chat/lib/utils"
 import { ChatProvider, useChat } from "./chat/providers/chat-provider"
 import { useAIFileActions } from "./hooks/useAIFileActions"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
@@ -426,15 +427,12 @@ export default function ProjectLayout({
       try {
         const session = getDiffSession(fileId)
         if (session) {
-          console.log("clearing")
-          // remove only if it matches current active or by id
           clearDiffSession(fileId)
         }
       } catch {}
     }
     return () => {
       try {
-        console.log("clearing")
         delete (window as any).__clearDiffSession
       } catch {}
     }
@@ -631,17 +629,36 @@ function DiffSessionHandler({
     markResolved: (fileId: string, status: "applied" | "rejected") => void
   }) => void
 }) {
-  const { markFileActionStatus, latestAssistantId } = useChat()
+  const { markFileActionStatus, latestAssistantId, messages } = useChat()
 
   useEffect(() => {
     onRegister({
       markResolved: (fileId, status) => {
+        // Normalize path to ensure it matches what's used in file utils
+        const normalized = normalizePath(fileId)
         if (latestAssistantId) {
-          markFileActionStatus(latestAssistantId, fileId, status)
+          markFileActionStatus(latestAssistantId, normalized, status)
+          return
         }
+
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i]
+          if (msg.role === "assistant" && msg.content) {
+            if (
+              msg.content.includes(normalized) ||
+              msg.content.includes(fileId)
+            ) {
+              if (msg.id) {
+                markFileActionStatus(msg.id, normalized, status)
+                return
+              }
+            }
+          }
+        }
+        console.warn("Could not find message ID for file:", normalized)
       },
     })
-  }, [markFileActionStatus, latestAssistantId, onRegister])
+  }, [markFileActionStatus, latestAssistantId, onRegister, messages])
 
   return null
 }
