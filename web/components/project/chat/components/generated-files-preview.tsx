@@ -9,6 +9,7 @@ import type {
   GetCurrentFileContentFn,
   PrecomputeMergeArgs,
 } from "../lib/types"
+import { normalizePath } from "../lib/utils"
 import { useChat } from "../providers/chat-provider"
 
 type GeneratedFilesPreviewProps = {
@@ -42,11 +43,11 @@ export function GeneratedFilesPreview({
       >
       getCurrentFileContent?: (filePath: string) => Promise<string> | string
       getMergeStatus?: (
-        filePath: string
+        filePath: string,
       ) =>
         | { status: string; result?: FileMergeResult; error?: string }
         | undefined
-    }
+    },
   ) => Promise<void>
   onOpenFile?: (filePath: string) => void
 }) {
@@ -60,7 +61,7 @@ export function GeneratedFilesPreview({
   } = useChat()
   const [isOpen, setIsOpen] = React.useState(true)
   const [applyingMap, setApplyingMap] = React.useState<Record<string, boolean>>(
-    {}
+    {},
   )
   const [rejectingMap, setRejectingMap] = React.useState<
     Record<string, boolean>
@@ -391,7 +392,7 @@ export function GeneratedFilesPreview({
       latestAssistantId,
       markFileActionStatus,
       getCurrentFileContent,
-    ]
+    ],
   )
 
   const handleRejectFile = React.useCallback(
@@ -485,7 +486,7 @@ export function GeneratedFilesPreview({
       batchKey,
       markFileActionStatus,
       latestAssistantId,
-    ]
+    ],
   )
 
   if (!generatedFiles.length) {
@@ -495,9 +496,11 @@ export function GeneratedFilesPreview({
   // Check if files are resolved either locally or via code block actions
   const visibleFiles = generatedFiles.filter((file) => {
     const isResolvedLocally = resolvedFiles[file.path]
+    const messageId = sourceKey || latestAssistantId
+    // Normalize file.path to ensure it matches the normalized path stored in fileActionStatuses
+    const normalizedPath = normalizePath(file.path)
     const isResolvedViaCodeBlock =
-      latestAssistantId &&
-      fileActionStatuses[latestAssistantId]?.[file.path] !== undefined
+      messageId && fileActionStatuses[messageId]?.[normalizedPath] !== undefined
     return !isResolvedLocally && !isResolvedViaCodeBlock
   })
 
@@ -509,7 +512,7 @@ export function GeneratedFilesPreview({
     <div
       className={cn(
         "mb-2 rounded-md border border-border/70 bg-background/70 p-2 shadow-[0_1px_4px_rgba(0,0,0,0.04)]",
-        className
+        className,
       )}
     >
       <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
@@ -520,13 +523,13 @@ export function GeneratedFilesPreview({
             onClick={() => setIsOpen((prev) => !prev)}
             className={cn(
               "flex h-5 w-5 items-center justify-center rounded-full border border-border transition-colors",
-              "hover:border-foreground/40"
+              "hover:border-foreground/40",
             )}
           >
             <ChevronDown
               className={cn(
                 "size-3 transition-transform",
-                isOpen ? "duration-700 rotate-0" : "duration-500 -rotate-90"
+                isOpen ? "duration-700 rotate-0" : "duration-500 -rotate-90",
               )}
             />
           </button>
@@ -565,7 +568,7 @@ export function GeneratedFilesPreview({
           "space-y-1 overflow-hidden transition-all ease-out",
           isOpen
             ? "max-h-48 opacity-100 duration-700"
-            : "max-h-0 opacity-0 duration-500"
+            : "max-h-0 opacity-0 duration-500",
         )}
       >
         {visibleFiles.map((file) => {
@@ -574,6 +577,12 @@ export function GeneratedFilesPreview({
           const isRejecting = rejectingMap[file.path]
           const isProcessing = isApplying || isRejecting
           const isPreparing = status === "pending"
+
+          // Double check resolved status here to prevent flicker
+          const messageId = sourceKey || latestAssistantId
+          
+          if (resolvedFiles[file.path]) return null
+
           return (
             <div
               key={file.id}
@@ -595,7 +604,7 @@ export function GeneratedFilesPreview({
                   "flex items-center gap-1 transition",
                   isProcessing
                     ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-100"
+                    : "opacity-0 group-hover:opacity-100",
                 )}
               >
                 <HoverIconButton
@@ -637,7 +646,7 @@ function HoverIconButton({
       className={cn(
         "flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background shadow-sm transition hover:border-foreground/40",
         isDisabled && "opacity-60",
-        className
+        className,
       )}
       disabled={isDisabled}
       {...props}
