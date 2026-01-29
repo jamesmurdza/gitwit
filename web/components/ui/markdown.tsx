@@ -20,22 +20,25 @@ import { CodeBlockDownloadButton } from "./code-block/download-button"
 import { CodeBlockRunButton } from "./code-block/run-button"
 import { CodeBlockSkeleton } from "./code-block/skeleton"
 
-// Lazy load heavy components
 const CodeBlock = lazy(() =>
-  import("./code-block").then((mod) => ({ default: mod.CodeBlock })),
+  import("./code-block/index").then((mod) => ({ default: mod.CodeBlock })),
 ) as React.LazyExoticComponent<
   React.ComponentType<
     React.HTMLAttributes<HTMLPreElement> & {
       code: string
       language: string
       filename?: string
+      filePath?: string | null
       isNewFile?: boolean
+      onOpenFile?: (filePath: string) => void
     }
   >
 >
 
 // Types
-type MarkdownProps = ComponentProps<typeof Streamdown>
+type MarkdownProps = ComponentProps<typeof Streamdown> & {
+  onOpenFile?: (filePath: string) => void
+}
 
 interface ExtractedFileInfo {
   filePath: string
@@ -45,6 +48,7 @@ interface ExtractedFileInfo {
 
 interface MarkdownContextType {
   fileInfoMap: Map<string, ExtractedFileInfo>
+  onOpenFile?: (filePath: string) => void
 }
 
 // Constants
@@ -171,6 +175,7 @@ const CodeComponent = ({
 
   const fileInfo = markdownCtx?.fileInfoMap.get(code.trim())
   const showCodeControls = shouldShowControls(controlsConfig, "code")
+  const onOpenFile = markdownCtx?.onOpenFile
 
   return (
     <Suspense fallback={<CodeBlockSkeleton />}>
@@ -179,7 +184,9 @@ const CodeComponent = ({
         code={code}
         language={language}
         filename={fileInfo?.fileName ?? undefined}
+        filePath={fileInfo?.filePath ?? null}
         isNewFile={fileInfo?.isNewFile}
+        onOpenFile={onOpenFile}
       >
         {showCodeControls && (
           <>
@@ -204,7 +211,7 @@ const MemoCode = memo(
 MemoCode.displayName = "MarkdownCode"
 
 export const Markdown = memo(
-  ({ className, children, ...props }: MarkdownProps) => {
+  ({ className, children, onOpenFile, ...props }: MarkdownProps) => {
     const rawMarkdown = typeof children === "string" ? children : ""
 
     const { fileInfoMap, strippedMarkdown } = useMemo(
@@ -213,7 +220,7 @@ export const Markdown = memo(
     )
 
     return (
-      <MarkdownContext.Provider value={{ fileInfoMap }}>
+      <MarkdownContext.Provider value={{ fileInfoMap, onOpenFile }}>
         <CodePluginContext.Provider value={{ codePlugin }}>
           <Streamdown
             className={cn(
@@ -230,7 +237,8 @@ export const Markdown = memo(
       </MarkdownContext.Provider>
     )
   },
-  (prev, next) => prev.children === next.children,
+  (prev, next) =>
+    prev.children === next.children && prev.onOpenFile === next.onOpenFile,
 )
 
 Markdown.displayName = "Markdown"

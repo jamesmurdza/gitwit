@@ -21,14 +21,18 @@ type CodeBlockProps = HTMLAttributes<HTMLPreElement> & {
   code: string
   language: string
   filename?: string
+  filePath?: string | null
   isNewFile?: boolean
+  onOpenFile?: (filePath: string) => void
 }
 
 export const CodeBlock = ({
   code,
   language,
   filename,
+  filePath,
   isNewFile,
+  onOpenFile,
   className,
   children,
   ...rest
@@ -93,7 +97,9 @@ export const CodeBlock = ({
         <CodeBlockHeader
           language={language}
           filename={filename}
+          filePath={filePath}
           isNewFile={isNewFile}
+          onOpenFile={onOpenFile}
         >
           {children}
         </CodeBlockHeader>
