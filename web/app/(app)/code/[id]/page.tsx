@@ -2,7 +2,6 @@
 import Navbar from "@/components/project/navbar"
 import { ProjectWrapper as Project } from "@/components/project/project-wrapper"
 import { ContainerProvider } from "@/context/container-context"
-import { EditorLayoutProvider } from "@/context/EditorLayoutContext"
 import { ProjectProvider } from "@/context/project-context"
 import { SocketProvider } from "@/context/SocketContext"
 import { TerminalProvider } from "@/context/TerminalContext"
@@ -141,26 +140,24 @@ export default async function CodePage({
       >
         <AppStoreProvider>
           <TerminalProvider>
-            <EditorLayoutProvider>
-              <ContainerProvider>
-                {/* <Room id={sandboxId}> */}
-                <div className="overflow-hidden overscroll-none w-screen h-screen grid [grid-template-rows:3.5rem_auto] bg-background">
-                  <Navbar
-                    shared={
-                      shared as {
-                        id: string
-                        name: string
-                        avatarUrl: string
-                      }[]
-                    }
-                  />
-                  <HydrationBoundary state={dehydrate(queryClient)}>
-                    <Project />
-                  </HydrationBoundary>
-                </div>
-                {/* </Room> */}
-              </ContainerProvider>
-            </EditorLayoutProvider>
+            <ContainerProvider>
+              {/* <Room id={sandboxId}> */}
+              <div className="overflow-hidden overscroll-none w-screen h-screen grid [grid-template-rows:3.5rem_auto] bg-background">
+                <Navbar
+                  shared={
+                    shared as {
+                      id: string
+                      name: string
+                      avatarUrl: string
+                    }[]
+                  }
+                />
+                <HydrationBoundary state={dehydrate(queryClient)}>
+                  <Project />
+                </HydrationBoundary>
+              </div>
+              {/* </Room> */}
+            </ContainerProvider>
           </TerminalProvider>
         </AppStoreProvider>
       </SocketProvider>
