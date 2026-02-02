@@ -1,6 +1,7 @@
 "use client"
 
 import { processEdit } from "@/app/actions/ai"
+import { useProjectContext } from "@/context/project-context"
 import { cn } from "@/lib/utils"
 import { useRouter } from "@bprogress/next/app"
 import { Editor } from "@monaco-editor/react"
@@ -20,8 +21,7 @@ interface GenerateInputProps {
   editor: {
     language: string
   }
-  projectId: string
-  projectName: string
+
   onExpand: () => void
   onAccept: (code: string) => void
   onClose: () => void
@@ -35,8 +35,6 @@ export function GenerateWidget({
   generateRef,
   generateWidgetRef,
   show,
-  projectId,
-  projectName,
   ...inputProps
 }: GenerateWidgetProps) {
   return (
@@ -45,13 +43,7 @@ export function GenerateWidget({
       <div ref={generateRef} />
       {/* Generate Widget */}
       <div className={cn(show && "z-50 p-1")} ref={generateWidgetRef}>
-        {show ? (
-          <GenerateInput
-            {...inputProps}
-            projectId={projectId}
-            projectName={projectName}
-          />
-        ) : null}
+        {show ? <GenerateInput {...inputProps} /> : null}
       </div>
     </>
   )
@@ -64,8 +56,6 @@ function GenerateInput({
   onExpand,
   onAccept,
   onClose,
-  projectId,
-  projectName,
 }: GenerateInputProps) {
   const { resolvedTheme: theme } = useTheme()
   const router = useRouter()
@@ -79,7 +69,9 @@ function GenerateInput({
   })
   const [input, setInput] = useState("")
   const [currentPrompt, setCurrentPrompt] = useState("")
-
+  const {
+    project: { id: projectId, name: projectName },
+  } = useProjectContext()
   useEffect(() => {
     setTimeout(() => {
       inputRef.current?.focus()
@@ -106,7 +98,7 @@ function GenerateInput({
           fileName: data.fileName,
           projectId: projectId,
           projectName: projectName,
-        }
+        },
       )
 
       // Clean up any potential markdown or explanation text
@@ -120,7 +112,7 @@ function GenerateInput({
       router.refresh()
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to generate code"
+        error instanceof Error ? error.message : "Failed to generate code",
       )
     } finally {
       setLoading({ generate: false, regenerate: false })
@@ -131,7 +123,7 @@ function GenerateInput({
       e.preventDefault()
       handleGenerate({ regenerate: false })
     },
-    [input, currentPrompt]
+    [input, currentPrompt],
   )
 
   useEffect(() => {

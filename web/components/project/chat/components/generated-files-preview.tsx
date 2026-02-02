@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useAppStore } from "@/store/context"
 import { Check, ChevronDown, Info, Loader2, X } from "lucide-react"
 import React from "react"
 import { GeneratedFile, extractFilesFromMessages } from "../lib/file-utils"
@@ -27,7 +28,6 @@ export function GeneratedFilesPreview({
   applyPrecomputedMerge,
   restoreOriginalFile,
   getCurrentFileContent,
-  activeFileId,
   onApplyCode,
   onOpenFile,
 }: GeneratedFilesPreviewProps & {
@@ -42,14 +42,15 @@ export function GeneratedFilesPreview({
       >
       getCurrentFileContent?: (filePath: string) => Promise<string> | string
       getMergeStatus?: (
-        filePath: string
+        filePath: string,
       ) =>
         | { status: string; result?: FileMergeResult; error?: string }
         | undefined
-    }
+    },
   ) => Promise<void>
   onOpenFile?: (filePath: string) => void
 }) {
+  const activeFileId = useAppStore((s) => s.activeTab?.id)
   const {
     messages,
     markFileActionStatus,
@@ -60,7 +61,7 @@ export function GeneratedFilesPreview({
   } = useChat()
   const [isOpen, setIsOpen] = React.useState(true)
   const [applyingMap, setApplyingMap] = React.useState<Record<string, boolean>>(
-    {}
+    {},
   )
   const [rejectingMap, setRejectingMap] = React.useState<
     Record<string, boolean>
@@ -380,7 +381,7 @@ export function GeneratedFilesPreview({
       latestAssistantId,
       markFileActionStatus,
       getCurrentFileContent,
-    ]
+    ],
   )
 
   const handleRejectFile = React.useCallback(
@@ -474,7 +475,7 @@ export function GeneratedFilesPreview({
       batchKey,
       markFileActionStatus,
       latestAssistantId,
-    ]
+    ],
   )
 
   if (!generatedFiles.length) {
@@ -498,7 +499,7 @@ export function GeneratedFilesPreview({
     <div
       className={cn(
         "mb-2 rounded-md border border-border/70 bg-background/70 p-2 shadow-[0_1px_4px_rgba(0,0,0,0.04)]",
-        className
+        className,
       )}
     >
       <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
@@ -509,13 +510,13 @@ export function GeneratedFilesPreview({
             onClick={() => setIsOpen((prev) => !prev)}
             className={cn(
               "flex h-5 w-5 items-center justify-center rounded-full border border-border transition-colors",
-              "hover:border-foreground/40"
+              "hover:border-foreground/40",
             )}
           >
             <ChevronDown
               className={cn(
                 "size-3 transition-transform",
-                isOpen ? "duration-700 rotate-0" : "duration-500 -rotate-90"
+                isOpen ? "duration-700 rotate-0" : "duration-500 -rotate-90",
               )}
             />
           </button>
@@ -554,7 +555,7 @@ export function GeneratedFilesPreview({
           "space-y-1 overflow-hidden transition-all ease-out",
           isOpen
             ? "max-h-48 opacity-100 duration-700"
-            : "max-h-0 opacity-0 duration-500"
+            : "max-h-0 opacity-0 duration-500",
         )}
       >
         {visibleFiles.map((file) => {
@@ -584,7 +585,7 @@ export function GeneratedFilesPreview({
                   "flex items-center gap-1 transition",
                   isProcessing
                     ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-100"
+                    : "opacity-0 group-hover:opacity-100",
                 )}
               >
                 <HoverIconButton
@@ -626,7 +627,7 @@ function HoverIconButton({
       className={cn(
         "flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background shadow-sm transition hover:border-foreground/40",
         isDisabled && "opacity-60",
-        className
+        className,
       )}
       disabled={isDisabled}
       {...props}
