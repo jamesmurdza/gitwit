@@ -5,6 +5,7 @@ import {
   closeTerminal as closeTerminalHelper,
   createTerminal as createTerminalHelper,
 } from "@/lib/api/terminal"
+import { MAX_TERMINALS } from "@/lib/constants"
 import { Terminal } from "@xterm/xterm"
 import React, { createContext, useContext, useState } from "react"
 import { toast } from "sonner"
@@ -19,7 +20,7 @@ interface TerminalContextType {
   creatingTerminal: boolean
   setCreatingTerminal: React.Dispatch<React.SetStateAction<boolean>>
   closingTerminal: string
-  createNewTerminal: (command?: string) => Promise<void>
+  createNewTerminal: (command?: string) => Promise<string | null>
   closeTerminal: (id: string) => Promise<void>
   deploy: (callback: () => void) => void
   getAppExists:
@@ -28,48 +29,63 @@ interface TerminalContextType {
 }
 
 const TerminalContext = createContext<TerminalContextType | undefined>(
-  undefined
+  undefined,
 )
+
+const errorMap = {
+  MAX_TERMINALS: "You reached the maximum # of terminals.",
+  CREATE_FAILED: "Failed to create new terminal",
+  CREATE_NO_SOCKET: "Failed to create new terminal: No socket connection",
+  UNKNOWN_ERROR: "An unknown error occurred while creating a new terminal",
+  CREATE_IN_PROGRESS: "A terminal is already being created. Please wait.",
+}
 
 export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { socket } = useSocket()
+  const { socket, isReady: isSocketReady } = useSocket()
   const [terminals, setTerminals] = useState<
     { id: string; terminal: Terminal | null }[]
   >([])
   const [activeTerminalId, setActiveTerminalId] = useState<string>("")
   const [creatingTerminal, setCreatingTerminal] = useState<boolean>(false)
   const [closingTerminal, setClosingTerminal] = useState<string>("")
-  const [isSocketReady, setIsSocketReady] = useState<boolean>(false)
 
-  // Listen for the "ready" signal from the socket
-  React.useEffect(() => {
-    if (socket) {
-      socket.on("ready", () => {
-        setIsSocketReady(true)
-      })
-    }
-    return () => {
-      if (socket) socket.off("ready")
-    }
-  }, [socket])
+  const createNewTerminal = async (
+    command?: string,
+  ): Promise<string | null> => {
+    if (
+      !socket ||
+      !isSocketReady ||
+      creatingTerminal ||
+      terminals.length >= MAX_TERMINALS
+    ) {
+      toast.error(
+        terminals.length >= MAX_TERMINALS
+          ? errorMap.MAX_TERMINALS
+          : creatingTerminal
+            ? errorMap.CREATE_IN_PROGRESS
+            : errorMap.CREATE_NO_SOCKET,
+      )
 
-  const createNewTerminal = async (command?: string): Promise<void> => {
-    if (!socket) return
-    if (creatingTerminal) return // Guard against creating while another create is in progress
+      return null
+    }
     try {
-      await createTerminalHelper({
+      const id = await createTerminalHelper({
         setTerminals,
         setActiveTerminalId,
         setCreatingTerminal,
         command,
         socket,
       })
+      return id
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to create new terminal"
+        error instanceof Error
+          ? error.message
+          : "Failed to create new terminal",
       )
+      return null
     }
   }
 
@@ -98,14 +114,14 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
   }
 
   const getAppExists = async (
-    appName: string
+    appName: string,
   ): Promise<{ success: boolean; exists?: boolean }> => {
     if (!socket) {
       console.error("Couldn't check if app exists: No socket")
       return { success: false }
     }
     const response: { success: boolean; exists?: boolean } = await new Promise(
-      (resolve) => socket.emit("getAppExists", { appName }, resolve)
+      (resolve) => socket.emit("getAppExists", { appName }, resolve),
     )
     return response
   }

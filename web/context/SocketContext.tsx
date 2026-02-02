@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client"
 
 interface SocketContextType {
   socket: Socket | null
+  isReady: boolean
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined)
@@ -16,6 +17,7 @@ export const SocketProvider: React.FC<{
   sandboxId: string
 }> = ({ children, token, userId, sandboxId }) => {
   const [socket, setSocket] = useState<Socket | null>(null)
+  const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
     const newSocket = io(
@@ -25,8 +27,21 @@ export const SocketProvider: React.FC<{
           token,
           sandboxId,
         },
-      }
+      },
     )
+
+    newSocket.on("ready", () => {
+      setIsReady(true)
+    })
+
+    newSocket.on("disconnect", () => {
+      setIsReady(false)
+    })
+
+    newSocket.on("connect_error", () => {
+      setIsReady(false)
+    })
+
     setSocket(newSocket)
 
     return () => {
@@ -36,6 +51,7 @@ export const SocketProvider: React.FC<{
 
   const value = {
     socket,
+    isReady,
   }
 
   return (
