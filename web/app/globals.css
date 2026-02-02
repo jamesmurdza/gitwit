@@ -1,3 +1,5 @@
+@import "dockview/dist/styles/dockview.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -379,4 +381,55 @@ html.dark .shiki span {
   ::view-transition-new(chat-container) {
     overflow: clip;
   }
+}
+
+/* Watermark */
+
+.watermark {
+  height: 100%;
+  max-width: 240px;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.watermark > .letterpress {
+  width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1/1;
+  background-size: 100%;
+  background-image: url("/watermark.svg");
+  background-repeat: no-repeat;
+  background-position-x: center;
+}
+
+/* File explorer drag-to-dockview visual feedback */
+[data-file-drag-over="true"] {
+  outline: 2px dashed hsl(var(--primary));
+  outline-offset: -2px;
+  background-color: hsl(var(--primary) / 0.05);
+}
+
+[data-file-drag-over="true"]::after {
+  content: "Drop to open file";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 16px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* Hide drag feedback when dragging file over dockview */
+[data-dragging-to-dockview="true"] [data-dnd-feedback] {
+  opacity: 0 !important;
+  transition: opacity 0.15s ease-out;
 }
