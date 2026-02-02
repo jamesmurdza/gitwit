@@ -83,7 +83,15 @@ export function FileExplorer() {
         onDragMove={(event) => {
           // Only track for file drags
           if (!isDraggingFileRef.current) return
+
           const pointerPos = lastPointerPositionRef.current
+          if (pointerPos) {
+            const isOver = checkIsOverDockview(pointerPos.x, pointerPos.y)
+            if (isOver !== isOverDockviewRef.current) {
+              isOverDockviewRef.current = isOver
+              updateDockviewFeedback(isOver)
+            }
+          }
         }}
         onDragEnd={(event) => {
           // Clean up visual feedback
