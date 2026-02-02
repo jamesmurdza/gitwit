@@ -110,13 +110,13 @@ const SidebarFolder = memo(function SidebarFolder(props: TFolder) {
           disabled={isDeletingFolder}
           onClick={handleClick}
           className={cn(
-            "rounded-sm w-full flex items-center h-7 px-1 transition-colors hover:bg-secondary cursor-pointer min-w-0"
+            "rounded-sm w-full flex items-center h-7 px-1 transition-colors hover:bg-secondary cursor-pointer min-w-0",
           )}
         >
           <ChevronRight
             className={cn(
               "min-w-3 min-h-3 mr-1 ml-auto transition-all duration-300",
-              isOpen ? "transform rotate-90" : ""
+              isOpen ? "transform rotate-90" : "",
             )}
           />
           <Image
@@ -204,7 +204,7 @@ const SidebarFolder = memo(function SidebarFolder(props: TFolder) {
               }}
               className={cn(
                 // isDraggedOver ? "rounded-b-sm bg-secondary/50" : "",
-                "overflow-y-hidden flex flex-col grow ml-2 pl-2 border-l border-border"
+                "overflow-y-hidden flex flex-col grow ml-2 pl-2 border-l border-border",
               )}
             >
               {props.children.map((child) =>
@@ -212,7 +212,7 @@ const SidebarFolder = memo(function SidebarFolder(props: TFolder) {
                   <SidebarFile key={child.id} {...child} />
                 ) : (
                   <SidebarFolder key={child.id} {...child} />
-                )
+                ),
               )}
               {showNewForm && creationType !== null && (
                 <New
