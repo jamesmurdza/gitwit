@@ -23,7 +23,7 @@ export const createTerminal = ({
   setCreatingTerminal: React.Dispatch<React.SetStateAction<boolean>>
   command?: string
   socket: Socket
-}): Promise<void> => {
+}): Promise<string> => {
   return new Promise((resolve) => {
     setCreatingTerminal(true)
     const id = createId()
@@ -35,7 +35,7 @@ export const createTerminal = ({
       socket.emit("createTerminal", { id }, () => {
         setCreatingTerminal(false)
         if (command) socket.emit("terminalData", { id, data: command + "\n" })
-        resolve()
+        resolve(id)
       })
     }, 1000)
   })
@@ -81,6 +81,11 @@ export const closeTerminal = ({
 
     setClosingTerminal(term.id)
 
+    // Dispose the XTerm instance before closing
+    if (term.terminal) {
+      term.terminal.dispose()
+    }
+
     socket.emit("closeTerminal", { id: term.id }, () => {
       setClosingTerminal("")
 
@@ -89,8 +94,8 @@ export const closeTerminal = ({
           ? numTerminals === 1
             ? null
             : index < numTerminals - 1
-            ? terminals[index + 1].id
-            : terminals[index - 1].id
+              ? terminals[index + 1].id
+              : terminals[index - 1].id
           : activeTerminalId
 
       setTerminals((prev) => prev.filter((t) => t.id !== term.id))
