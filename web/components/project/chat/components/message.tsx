@@ -31,12 +31,14 @@ export type MessageProps = {
   context?: ContextTab[]
   onApplyCode?: (code: string, language?: string) => Promise<void>
   onRejectCode?: () => void
+  onOpenFile?: (filePath: string) => void
 } & React.HTMLProps<HTMLDivElement>
 
 export type MessageContextValue = {
   role: "user" | "assistant"
   context?: ContextTab[]
   messageId?: string
+  onOpenFile?: (filePath: string) => void
 }
 
 const MessageContext = React.createContext<MessageContextValue | undefined>(
@@ -57,9 +59,11 @@ const Message = ({
   context,
   onApplyCode,
   onRejectCode,
+  onOpenFile,
   ...props
-}: MessageProps) => (
-  <MessageContext.Provider value={{ role, context, messageId }}>
+}: MessageProps) => {
+  return (
+    <MessageContext.Provider value={{ role, context, messageId, onOpenFile }}>
     <div
       className={cn(
         "flex gap-3",
@@ -81,7 +85,8 @@ const Message = ({
       )}
     </div>
   </MessageContext.Provider>
-)
+  )
+}
 
 export type MessageAvatarProps = {
   src: string
@@ -118,7 +123,7 @@ const MessageContent = ({
   className,
   ...props
 }: MessageContentProps) => {
-  const { role, context } = useMessage()
+  const { role, context, onOpenFile } = useMessage()
   const isAssistant = role === "assistant"
   const hasContext = context ? context.length > 0 : false
   const stringifiedContent = React.useMemo(() => {
@@ -133,7 +138,7 @@ const MessageContent = ({
       className
     )
     return isAssistant ? (
-      <Markdown className={classNames} {...props}>
+      <Markdown className={classNames} onOpenFile={onOpenFile} {...props}>
         {children as string}
       </Markdown>
     ) : (
@@ -151,7 +156,7 @@ const MessageContent = ({
         </div>
       </div>
     )
-  }, [role, className, children, props])
+  }, [role, className, children, onOpenFile, props])
 
   return (
     <div

@@ -20,7 +20,7 @@ interface UseAIFileActionsProps {
   waitForEditorModel: () => Promise<monaco.editor.ITextModel | null>
   handleApplyCodeWithDecorations: (
     mergedCode: string,
-    originalCode: string
+    originalCode: string,
   ) => void
   updateFileDraft: (fileId: string, content?: string) => void
 }
@@ -36,6 +36,23 @@ export function useAIFileActions({
   updateFileDraft,
 }: UseAIFileActionsProps) {
   const getDraft = useAppStore((s) => s.getDraft)
+
+  // Queue for failed diff applies (when model was null)
+  const pendingDiffsQueueRef = useRef<Map<string, any>>(new Map())
+
+  // Retry pending diffs when active tab changes
+  useEffect(() => {
+    if (!activeTab?.id || !editorRef) return
+
+    // Check if current active tab has a pending diff
+    const pending = pendingDiffsQueueRef.current.get(
+      normalizePath(activeTab.id),
+    )
+    if (pending) {
+      pendingDiffsQueueRef.current.delete(normalizePath(activeTab.id))
+      handleApplyCodeFromChat(pending.code, pending.language, pending.options)
+    }
+  }, [activeTab?.id, editorRef])
 
   // --- Queue Management for "Keep All" ---
   const pendingPreviewApplyRef = useRef<{
@@ -68,7 +85,7 @@ export function useAIFileActions({
       const normalizedPath = normalizePath(filePath)
       const matchBy = (tab: TTab) => pathMatchesTab(normalizedPath, tab)
       let targetTab = tabs.find(matchBy)
-      
+
       if (!targetTab) {
         targetTab = {
           id: normalizedPath,
@@ -83,7 +100,7 @@ export function useAIFileActions({
         setActiveTab(targetTab)
       }
     },
-    [tabs, activeTab, setActiveTab]
+    [tabs, activeTab, setActiveTab],
   )
 
   const processNextInQueue = useCallback(() => {
@@ -133,7 +150,7 @@ export function useAIFileActions({
 
       return ""
     },
-    [projectId, getDraft]
+    [projectId, getDraft],
   )
 
   // --- Action: Precompute Merge ---
@@ -154,7 +171,7 @@ export function useAIFileActions({
           code,
           originalCode,
           normalizedPath.split("/").pop() || normalizedPath,
-          projectId
+          projectId,
         )
         return { mergedCode, originalCode }
       } catch (error) {
@@ -162,7 +179,7 @@ export function useAIFileActions({
         return { mergedCode: code, originalCode }
       }
     },
-    [projectId, getCurrentFileContent]
+    [projectId, getCurrentFileContent],
   )
 
   // --- Action: Apply Logic (Diff View) ---
@@ -177,11 +194,11 @@ export function useAIFileActions({
         >
         getCurrentFileContent?: (filePath: string) => Promise<string> | string
         getMergeStatus?: (
-          filePath: string
+          filePath: string,
         ) =>
           | { status: string; result?: FileMergeResult; error?: string }
           | undefined
-      }
+      },
     ) => {
       if (!activeTab) return
 
@@ -224,7 +241,7 @@ export function useAIFileActions({
             code,
             originalCode,
             activeTab.name,
-            projectId
+            projectId,
           )
           mergeResult = { mergedCode, originalCode }
         }
@@ -234,8 +251,16 @@ export function useAIFileActions({
         if (model && mergeResult) {
           handleApplyCodeWithDecorations(
             mergeResult.mergedCode,
-            mergeResult.originalCode
+            mergeResult.originalCode,
           )
+        } else if (!model) {
+          // Failed to get model, save to queue for retry
+          console.log("Saving diff apply to queue for:", activeTab.id)
+          pendingDiffsQueueRef.current.set(normalizedPath, {
+            code,
+            language,
+            options,
+          })
         }
       } catch (error) {
         console.error("Apply Code Failed:", error)
@@ -250,7 +275,7 @@ export function useAIFileActions({
       getCurrentFileContent,
       waitForEditorModel,
       handleApplyCodeWithDecorations,
-    ]
+    ],
   )
 
   const enqueueFileContentUpdate = useCallback(
@@ -267,21 +292,7 @@ export function useAIFileActions({
       })
       return completion
     },
-    [processNextInQueue]
-  )
-
-  const applyPrecomputedMerge = useCallback(
-    ({ filePath, mergedCode }: ApplyMergedFileArgs) => {
-      return enqueueFileContentUpdate(filePath, mergedCode)
-    },
-    [enqueueFileContentUpdate]
-  )
-
-  const restoreOriginalFile = useCallback(
-    ({ filePath, originalCode }: ApplyMergedFileArgs) => {
-      return enqueueFileContentUpdate(filePath, originalCode)
-    },
-    [enqueueFileContentUpdate]
+    [processNextInQueue],
   )
 
   // Effect to process the actual update on the editor
@@ -306,7 +317,7 @@ export function useAIFileActions({
               return
             }
             await new Promise((resolve) =>
-              setTimeout(resolve, 300 * (attempt + 1))
+              setTimeout(resolve, 300 * (attempt + 1)),
             )
             model = await waitForEditorModel()
             if (model) break
@@ -355,6 +366,116 @@ export function useAIFileActions({
     processNextInQueue,
     updateFileDraft,
   ])
+
+  // --- Helper: Diff Session Logic ---
+  const applyKeepToSession = (session: {
+    combinedText: string
+    unresolvedBlocks: {
+      type: "added" | "removed"
+      start: number
+      end: number
+    }[]
+  }) => {
+    const lines = session.combinedText.split("\n")
+    const rangesToRemove: { start: number; end: number }[] = []
+
+    session.unresolvedBlocks.forEach((block) => {
+      if (block.type === "removed") {
+        rangesToRemove.push({ start: block.start, end: block.end })
+      }
+    })
+
+    rangesToRemove.sort((a, b) => b.start - a.start)
+
+    rangesToRemove.forEach((range) => {
+      // 1-based index to 0-based
+      lines.splice(range.start - 1, range.end - range.start + 1)
+    })
+
+    return lines.join("\n")
+  }
+
+  const applyRejectToSession = (session: {
+    combinedText: string
+    unresolvedBlocks: {
+      type: "added" | "removed"
+      start: number
+      end: number
+    }[]
+  }) => {
+    const lines = session.combinedText.split("\n")
+    const rangesToRemove: { start: number; end: number }[] = []
+
+    // For "Reject" (Reject Remaining):
+    // - Remove lines from "added" blocks (reject addition)
+    // - Keep lines from "removed" blocks (reject deletion -> keep original)
+    session.unresolvedBlocks.forEach((block) => {
+      if (block.type === "added") {
+        rangesToRemove.push({ start: block.start, end: block.end })
+      }
+    })
+
+    // Sort ranges descending to remove successfully
+    rangesToRemove.sort((a, b) => b.start - a.start)
+
+    rangesToRemove.forEach((range) => {
+      // 1-based index to 0-based
+      lines.splice(range.start - 1, range.end - range.start + 1)
+    })
+
+    return lines.join("\n")
+  }
+
+  const getDiffSession = useAppStore((s) => s.getDiffSession)
+  const clearDiffSession = useAppStore((s) => s.clearDiffSession)
+
+  const applyPrecomputedMerge = useCallback(
+    ({ filePath, mergedCode }: ApplyMergedFileArgs) => {
+      const normalizedPath = normalizePath(filePath)
+      const session = getDiffSession(normalizedPath)
+
+      let contentToApply = mergedCode
+
+      // If we have a diff session with unresolved blocks, applying "Keep" means
+      // we should apply the logic to the *session state*, not the raw merged code.
+      if (session && session.unresolvedBlocks.length > 0) {
+        try {
+          contentToApply = applyKeepToSession(session)
+          // Clear session after applying because we are fully resolving it
+          clearDiffSession(normalizedPath)
+        } catch (error) {
+          console.error("Failed to apply session keep logic:", error)
+        }
+      }
+
+      return enqueueFileContentUpdate(filePath, contentToApply)
+    },
+    [enqueueFileContentUpdate, getDiffSession, clearDiffSession],
+  )
+
+  const restoreOriginalFile = useCallback(
+    ({ filePath, originalCode }: ApplyMergedFileArgs) => {
+      const normalizedPath = normalizePath(filePath)
+      const session = getDiffSession(normalizedPath)
+
+      let contentToApply = originalCode
+
+      // If we have a diff session, applying "Reject" means we should reject
+      // the remaining changes in the session, preserving what was already accepted/rejected/original.
+      if (session && session.unresolvedBlocks.length > 0) {
+        try {
+          contentToApply = applyRejectToSession(session)
+          // Clear session after resolving
+          clearDiffSession(normalizedPath)
+        } catch (error) {
+          console.error("Failed to apply session reject logic:", error)
+        }
+      }
+
+      return enqueueFileContentUpdate(filePath, contentToApply)
+    },
+    [enqueueFileContentUpdate, getDiffSession, clearDiffSession],
+  )
 
   return {
     getCurrentFileContent,

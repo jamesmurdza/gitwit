@@ -7,14 +7,28 @@ import {
 } from "@/lib/api/terminal"
 import { MAX_TERMINALS } from "@/lib/constants"
 import { Terminal } from "@xterm/xterm"
-import React, { createContext, useContext, useState } from "react"
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import { toast } from "sonner"
 
+// Grace period in ms - ignore prompts within this time after sending command
+const PROMPT_GRACE_PERIOD = 550
+
+interface TerminalState {
+  id: string
+  terminal: Terminal | null
+  isBusy: boolean
+}
+
 interface TerminalContextType {
-  terminals: { id: string; terminal: Terminal | null }[]
-  setTerminals: React.Dispatch<
-    React.SetStateAction<{ id: string; terminal: Terminal | null }[]>
-  >
+  terminals: TerminalState[]
+  setTerminals: React.Dispatch<React.SetStateAction<TerminalState[]>>
   activeTerminalId: string
   setActiveTerminalId: React.Dispatch<React.SetStateAction<string>>
   creatingTerminal: boolean
@@ -26,6 +40,11 @@ interface TerminalContextType {
   getAppExists:
     | ((appName: string) => Promise<{ success: boolean; exists?: boolean }>)
     | null
+  isTerminalBusy: (id: string) => boolean
+  isActiveTerminalBusy: boolean
+  setTerminalBusy: (id: string, busy: boolean) => void
+  sendCommandToTerminal: (id: string, command: string) => void
+  terminalExists: (id: string) => boolean
 }
 
 const TerminalContext = createContext<TerminalContextType | undefined>(
@@ -44,12 +63,80 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { socket, isReady: isSocketReady } = useSocket()
-  const [terminals, setTerminals] = useState<
-    { id: string; terminal: Terminal | null }[]
-  >([])
+  const [terminals, setTerminals] = useState<TerminalState[]>([])
   const [activeTerminalId, setActiveTerminalId] = useState<string>("")
   const [creatingTerminal, setCreatingTerminal] = useState<boolean>(false)
   const [closingTerminal, setClosingTerminal] = useState<string>("")
+
+  // Track when commands were sent to ignore prompts that arrive too quickly
+  // (the existing prompt before command runs)
+  const commandSentAtRef = useRef<Record<string, number>>({})
+
+  // Listen for terminal responses to detect busy/idle state
+  useEffect(() => {
+    if (!socket) return
+
+    const handleTerminalResponse = (response: { id: string; data: string }) => {
+      const { id, data } = response
+      const trimmedData = data.trimEnd()
+      const endsWithPrompt = trimmedData.endsWith("user>")
+
+      if (endsWithPrompt) {
+        // Ignore prompts that arrive too quickly after a command was sent
+        // (this is the existing prompt before the command runs)
+        const sentAt = commandSentAtRef.current[id]
+        if (sentAt && Date.now() - sentAt < PROMPT_GRACE_PERIOD) {
+          return
+        }
+        // Clear the timestamp and mark as idle
+        delete commandSentAtRef.current[id]
+        setTerminals((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, isBusy: false } : t)),
+        )
+      }
+    }
+
+    socket.on("terminalResponse", handleTerminalResponse)
+    return () => {
+      socket.off("terminalResponse", handleTerminalResponse)
+    }
+  }, [socket])
+
+  const setTerminalBusy = useCallback((id: string, busy: boolean) => {
+    setTerminals((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, isBusy: busy } : t)),
+    )
+  }, [])
+
+  const isTerminalBusy = useCallback(
+    (id: string) => terminals.find((t) => t.id === id)?.isBusy ?? false,
+    [terminals],
+  )
+
+  const isActiveTerminalBusy =
+    terminals.find((t) => t.id === activeTerminalId)?.isBusy ?? false
+
+  const terminalExists = useCallback(
+    (id: string) => terminals.some((t) => t.id === id),
+    [terminals],
+  )
+
+  const sendCommandToTerminal = useCallback(
+    (id: string, command: string) => {
+      if (!socket) return
+      if (!terminalExists(id)) return
+
+      // Record when command was sent to ignore prompts arriving too quickly
+      commandSentAtRef.current[id] = Date.now()
+      // Mark terminal as busy
+      setTerminalBusy(id, true)
+      // Send command with newline
+      socket.emit("terminalData", { id, data: command + "\n" })
+      // Switch to that terminal
+      setActiveTerminalId(id)
+    },
+    [socket, terminalExists, setTerminalBusy, setActiveTerminalId],
+  )
 
   const createNewTerminal = async (
     command?: string,
@@ -72,11 +159,20 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     try {
       const id = await createTerminalHelper({
-        setTerminals,
+        setTerminals: setTerminals as React.Dispatch<
+          React.SetStateAction<{ id: string; terminal: Terminal | null }[]>
+        >,
         setActiveTerminalId,
         setCreatingTerminal,
         command,
         socket,
+        // Mark terminal as busy if a command is provided
+        onCreated: command
+          ? (id: string) => {
+              commandSentAtRef.current[id] = Date.now()
+              setTerminalBusy(id, true)
+            }
+          : undefined,
       })
       return id
     } catch (error) {
@@ -94,10 +190,13 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
     if (closingTerminal) return // Guard against closing while another close is in progress
     const terminalToClose = terminals.find((term) => term.id === id)
     if (terminalToClose) {
+      // Clean up timestamp
+      delete commandSentAtRef.current[id]
       await closeTerminalHelper({
         term: terminalToClose,
         terminals,
-        setTerminals,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setTerminals: setTerminals as any,
         setActiveTerminalId,
         setClosingTerminal,
         socket,
@@ -138,6 +237,11 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
     closeTerminal,
     deploy,
     getAppExists: isSocketReady ? getAppExists : null,
+    isTerminalBusy,
+    isActiveTerminalBusy,
+    setTerminalBusy,
+    sendCommandToTerminal,
+    terminalExists,
   }
 
   return (

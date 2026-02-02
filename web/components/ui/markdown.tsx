@@ -1,129 +1,244 @@
 "use client"
-
-import { cn, extractFilePathFromCode, isNewFile } from "@/lib/utils"
-import {
+import { cn } from "@/lib/utils"
+import { createCodePlugin } from "@streamdown/code"
+import type { Element } from "hast"
+import React, {
   type ComponentProps,
+  createContext,
+  type DetailedHTMLProps,
+  type HTMLAttributes,
   isValidElement,
+  lazy,
   memo,
+  Suspense,
+  use,
   useMemo,
-  useRef,
 } from "react"
-import { BundledLanguage } from "shiki"
-import { Streamdown } from "streamdown"
-import { CodeBlock, CodeBlockCopyButton } from "./code-block"
-type MarkdownProps = ComponentProps<typeof Streamdown>
+import { type BundledLanguage, Streamdown, StreamdownContext } from "streamdown"
+import { CodeBlockCopyButton } from "./code-block/copy-button"
+import { CodeBlockDownloadButton } from "./code-block/download-button"
+import { CodeBlockRunButton } from "./code-block/run-button"
+import { CodeBlockSkeleton } from "./code-block/skeleton"
+
+const CodeBlock = lazy(() =>
+  import("./code-block/index").then((mod) => ({ default: mod.CodeBlock })),
+) as React.LazyExoticComponent<
+  React.ComponentType<
+    React.HTMLAttributes<HTMLPreElement> & {
+      code: string
+      language: string
+      filename?: string
+      filePath?: string | null
+      isNewFile?: boolean
+      onOpenFile?: (filePath: string) => void
+    }
+  >
+>
+
+// Types
+type MarkdownProps = ComponentProps<typeof Streamdown> & {
+  onOpenFile?: (filePath: string) => void
+}
+
+interface ExtractedFileInfo {
+  filePath: string
+  fileName: string | null
+  isNewFile: boolean
+}
+
+interface MarkdownContextType {
+  fileInfoMap: Map<string, ExtractedFileInfo>
+  onOpenFile?: (filePath: string) => void
+}
+
+// Constants
+const LANGUAGE_REGEX = /language-([^\s]+)/
+const FILE_WITH_CODE_REGEX =
+  /^File:\s*([^\s(]+)(?:\s*\(new file\))?\s*\n```\w*\n([\s\S]*?)```/gm
+const FILE_LINE_REGEX = /^File:\s*[^\n]+\n/gm
+
+const codePlugin = createCodePlugin({
+  themes: ["github-light", "github-dark-default"],
+})
+
+export const CodePluginContext = createContext<
+  { codePlugin: ReturnType<typeof createCodePlugin> } | undefined
+>(undefined)
+
+const MarkdownContext = createContext<MarkdownContextType | null>(null)
+
+// Utility Functions
+
+/**
+ * Parses markdown: extracts file info and strips "File:" lines in one pass
+ */
+function parseMarkdownFileInfo(markdown: string) {
+  const fileInfoMap = new Map<string, ExtractedFileInfo>()
+  let match: RegExpExecArray | null
+
+  while ((match = FILE_WITH_CODE_REGEX.exec(markdown)) !== null) {
+    const filePath = match[1]
+    const codeContent = match[2].trim()
+    fileInfoMap.set(codeContent, {
+      filePath,
+      fileName: filePath.split("/").pop() || null,
+      isNewFile: match[0].includes("(new file)"),
+    })
+  }
+
+  // Reset regex lastIndex for reuse
+  FILE_WITH_CODE_REGEX.lastIndex = 0
+
+  return {
+    fileInfoMap,
+    strippedMarkdown: markdown.replace(FILE_LINE_REGEX, ""),
+  }
+}
+
+const shouldShowControls = (
+  config:
+    | boolean
+    | { table?: boolean; code?: boolean; mermaid?: boolean | object },
+  type: "table" | "code" | "mermaid",
+) => (typeof config === "boolean" ? config : config[type] !== false)
+
+function sameNodePosition(
+  prev?: {
+    position?: {
+      start?: { line?: number; column?: number }
+      end?: { line?: number; column?: number }
+    }
+  },
+  next?: {
+    position?: {
+      start?: { line?: number; column?: number }
+      end?: { line?: number; column?: number }
+    }
+  },
+): boolean {
+  const ps = prev?.position,
+    ns = next?.position
+  if (!ps && !ns) return true
+  if (!ps || !ns) return false
+  return (
+    ps.start?.line === ns.start?.line &&
+    ps.start?.column === ns.start?.column &&
+    ps.end?.line === ns.end?.line &&
+    ps.end?.column === ns.end?.column
+  )
+}
+
+// Components
+const CodeComponent = ({
+  node,
+  className,
+  children,
+  ...props
+}: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
+  node?: Element
+}) => {
+  const inline = node?.position?.start.line === node?.position?.end.line
+  const { controls: controlsConfig } = use(StreamdownContext)
+  const markdownCtx = use(MarkdownContext)
+
+  if (inline) {
+    return (
+      <code
+        className={cn(
+          "rounded bg-muted px-1.5 py-0.5 font-mono text-sm",
+          className,
+        )}
+        data-streamdown="inline-code"
+        {...props}
+      >
+        {children}
+      </code>
+    )
+  }
+
+  const language = (className?.match(LANGUAGE_REGEX)?.[1] ??
+    "") as BundledLanguage
+
+  // Extract code content from children
+  let code = ""
+  if (
+    isValidElement(children) &&
+    children.props &&
+    typeof children.props === "object" &&
+    "children" in children.props &&
+    typeof (children.props as { children?: unknown }).children === "string"
+  ) {
+    code = (children.props as { children: string }).children
+  } else if (typeof children === "string") {
+    code = children
+  }
+
+  const fileInfo = markdownCtx?.fileInfoMap.get(code.trim())
+  const showCodeControls = shouldShowControls(controlsConfig, "code")
+  const onOpenFile = markdownCtx?.onOpenFile
+
+  return (
+    <Suspense fallback={<CodeBlockSkeleton />}>
+      <CodeBlock
+        className={cn("overflow-x-auto border-border border-t", className)}
+        code={code}
+        language={language}
+        filename={fileInfo?.fileName ?? undefined}
+        filePath={fileInfo?.filePath ?? null}
+        isNewFile={fileInfo?.isNewFile}
+        onOpenFile={onOpenFile}
+      >
+        {showCodeControls && (
+          <>
+            <CodeBlockRunButton language={language} />
+            <CodeBlockDownloadButton code={code} language={language} />
+            <CodeBlockCopyButton />
+          </>
+        )}
+      </CodeBlock>
+    </Suspense>
+  )
+}
+
+const MemoCode = memo(
+  CodeComponent,
+  (p, n) => p.className === n.className && sameNodePosition(p.node, n.node),
+) as React.ComponentType<
+  DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & {
+    node?: Element
+  }
+>
+MemoCode.displayName = "MarkdownCode"
 
 export const Markdown = memo(
-  ({ className, ...props }: MarkdownProps) => {
-    const currentIntendedFileRef = useRef<string | null>(null)
-    // Extract intended file from markdown content once at component level
-    const extractMarkdownText = (children: any) => {
-      if (typeof children === "string") return children
-      if (Array.isArray(children)) {
-        return children
-          .map((c) => (typeof c === "string" ? c : c?.props?.children ?? ""))
-          .join("")
-      }
-      if (children && typeof children === "object" && "props" in children) {
-        return children.props?.children ?? ""
-      }
-      return ""
-    }
+  ({ className, children, onOpenFile, ...props }: MarkdownProps) => {
+    const rawMarkdown = typeof children === "string" ? children : ""
 
-    const markdownText = extractMarkdownText(props.children)
-
-    // Use refs to store dynamic data without causing re-renders
-    const markdownTextRef = useRef(markdownText)
-    markdownTextRef.current = markdownText
-
-    const codeBlockFileMapRef = useRef<Map<string, string>>(new Map())
-    const lastMarkdownLengthRef = useRef(0)
-
-    if (markdownText.length < lastMarkdownLengthRef.current * 0.5) {
-      codeBlockFileMapRef.current.clear()
-    }
-    lastMarkdownLengthRef.current = markdownText.length
-
-    // Create stable components that don't depend on changing markdownText
-    const componentsWithIntendedFile: MarkdownProps["components"] =
-      useMemo(() => {
-        return {
-          pre: ({ node, className, children }) => {
-            let language: BundledLanguage = "javascript"
-            if (typeof node?.properties?.className === "string") {
-              language = node.properties.className.replace(
-                "language-",
-                ""
-              ) as BundledLanguage
-            }
-
-            // Extract code safely (same as before)
-            let code = ""
-            if (
-              isValidElement(children) &&
-              children.props &&
-              typeof children.props === "object" &&
-              "children" in children.props &&
-              typeof children.props.children === "string"
-            ) {
-              code = children.props.children
-            } else if (typeof children === "string") {
-              code = children
-            }
-
-            // Extract file path for THIS specific code block
-            const intendedFile = extractFilePathFromCode(
-              code,
-              markdownTextRef.current,
-              codeBlockFileMapRef.current
-            )
-
-            currentIntendedFileRef.current = intendedFile
-
-            // Determine a filename for the toolbar from the intended file path
-            const filename = intendedFile
-              ? intendedFile.split("/").pop() || intendedFile
-              : undefined
-
-            // Check if this is a new file
-            const fileIsNew = isNewFile(
-              intendedFile,
-              code,
-              markdownTextRef.current
-            )
-
-            return (
-              <CodeBlock
-                className={cn(className)}
-                code={code}
-                language={language}
-                filename={filename}
-                isNewFile={fileIsNew}
-                showToolbar
-              >
-                <CodeBlockCopyButton className="size-7" />
-              </CodeBlock>
-            )
-          },
-          p: ({ node, children, ...props }) => {
-            // Keep this simple — don't mutate shared refs here
-            return <p {...props}>{children}</p>
-          },
-        }
-      }, [])
+    const { fileInfoMap, strippedMarkdown } = useMemo(
+      () => parseMarkdownFileInfo(rawMarkdown),
+      [rawMarkdown],
+    )
 
     return (
-      <Streamdown
-        className={cn(
-          "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-          className
-        )}
-        components={componentsWithIntendedFile}
-        {...props}
-      />
+      <MarkdownContext.Provider value={{ fileInfoMap, onOpenFile }}>
+        <CodePluginContext.Provider value={{ codePlugin }}>
+          <Streamdown
+            className={cn(
+              "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+              className,
+            )}
+            plugins={{ code: codePlugin }}
+            components={{ code: MemoCode }}
+            {...props}
+          >
+            {strippedMarkdown}
+          </Streamdown>
+        </CodePluginContext.Provider>
+      </MarkdownContext.Provider>
     )
   },
-  (prevProps, nextProps) => prevProps.children === nextProps.children
+  (prev, next) =>
+    prev.children === next.children && prev.onOpenFile === next.onOpenFile,
 )
 
 Markdown.displayName = "Markdown"

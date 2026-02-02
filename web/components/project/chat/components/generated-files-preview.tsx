@@ -10,6 +10,7 @@ import type {
   GetCurrentFileContentFn,
   PrecomputeMergeArgs,
 } from "../lib/types"
+import { normalizePath } from "../lib/utils"
 import { useChat } from "../providers/chat-provider"
 
 type GeneratedFilesPreviewProps = {
@@ -96,11 +97,16 @@ export function GeneratedFilesPreview({
   }, [shouldUseDerived, extractedFiles, providedFiles])
 
   const batchKey = React.useMemo(() => {
-    if (shouldUseDerived && sourceKey) return sourceKey
-    if (!generatedFiles.length) return null
-    return generatedFiles
+    const fileFingerprints = generatedFiles
       .map((file) => `${file.id}:${file.code?.length ?? 0}`)
       .join("|")
+
+    if (shouldUseDerived && sourceKey) {
+      return `${sourceKey}|${fileFingerprints}`
+    }
+
+    if (!generatedFiles.length) return null
+    return fileFingerprints
   }, [generatedFiles, sourceKey, shouldUseDerived])
 
   // Create a stable key from file paths to track when new files arrive
@@ -235,17 +241,20 @@ export function GeneratedFilesPreview({
         code: code,
       })
       mergeJobsRef.current.set(key, mergePromise)
-      const jobBatch = batchRef.current
+
       mergePromise
         .then((result) => {
-          if (batchRef.current !== jobBatch) return
+          // Check if this promise is still the active one for this file
+          if (mergeJobsRef.current.get(key) !== mergePromise) return
+
           setMergeStatuses((prev) => ({
             ...prev,
             [key]: { status: "ready", result },
           }))
         })
         .catch((error) => {
-          if (batchRef.current !== jobBatch) return
+          if (mergeJobsRef.current.get(key) !== mergePromise) return
+
           setMergeStatuses((prev) => ({
             ...prev,
             [key]: {
@@ -255,12 +264,15 @@ export function GeneratedFilesPreview({
           }))
         })
         .finally(() => {
-          mergeJobsRef.current.delete(key)
+          // Only cleanup if we are still the active job
+          if (mergeJobsRef.current.get(key) === mergePromise) {
+            mergeJobsRef.current.delete(key)
+          }
         })
     })
-    // Depend on filesKey to process new files as they stream in
-    // But processedFilesRef ensures each file is only processed once
-  }, [sourceKey, filesKey])
+    // Depend on batchKey to process new files as they stream in OR when code becomes available
+    // processedFilesRef ensures each file is only processed once per batch
+  }, [sourceKey, batchKey])
 
   // Auto-apply diff view when ready and active
   React.useEffect(() => {
@@ -485,9 +497,11 @@ export function GeneratedFilesPreview({
   // Check if files are resolved either locally or via code block actions
   const visibleFiles = generatedFiles.filter((file) => {
     const isResolvedLocally = resolvedFiles[file.path]
+    const messageId = sourceKey || latestAssistantId
+    // Normalize file.path to ensure it matches the normalized path stored in fileActionStatuses
+    const normalizedPath = normalizePath(file.path)
     const isResolvedViaCodeBlock =
-      latestAssistantId &&
-      fileActionStatuses[latestAssistantId]?.[file.path] !== undefined
+      messageId && fileActionStatuses[messageId]?.[normalizedPath] !== undefined
     return !isResolvedLocally && !isResolvedViaCodeBlock
   })
 
@@ -564,6 +578,12 @@ export function GeneratedFilesPreview({
           const isRejecting = rejectingMap[file.path]
           const isProcessing = isApplying || isRejecting
           const isPreparing = status === "pending"
+
+          // Double check resolved status here to prevent flicker
+          const messageId = sourceKey || latestAssistantId
+          
+          if (resolvedFiles[file.path]) return null
+
           return (
             <div
               key={file.id}
@@ -571,9 +591,27 @@ export function GeneratedFilesPreview({
             >
               <div className="flex flex-1 items-center gap-2">
                 <Info className="size-3.5 text-muted-foreground" />
-                <span className="text-[11px] font-medium text-foreground">
-                  {file.name}
-                </span>
+                {onOpenFile ? (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      try {
+                        await onOpenFile(file.path)
+                      } catch (error) {
+                        console.error("Error opening file:", error)
+                      }
+                    }}
+                    className="text-[11px] font-medium text-foreground hover:underline cursor-pointer text-left hover:text-primary transition-colors"
+                  >
+                    {file.name}
+                  </button>
+                ) : (
+                  <span className="text-[11px] font-medium text-foreground">
+                    {file.name}
+                  </span>
+                )}
                 {isPreparing && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">
                     preparing

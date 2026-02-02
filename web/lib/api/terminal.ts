@@ -10,12 +10,14 @@ export const createTerminal = ({
   setCreatingTerminal,
   command,
   socket,
+  onCreated,
 }: {
   setTerminals: React.Dispatch<
     React.SetStateAction<
       {
         id: string
         terminal: Terminal | null
+        isBusy?: boolean
       }[]
     >
   >
@@ -23,18 +25,22 @@ export const createTerminal = ({
   setCreatingTerminal: React.Dispatch<React.SetStateAction<boolean>>
   command?: string
   socket: Socket
+  onCreated?: (id: string) => void
 }): Promise<string> => {
   return new Promise((resolve) => {
     setCreatingTerminal(true)
     const id = createId()
 
-    setTerminals((prev) => [...prev, { id, terminal: null }])
+    setTerminals((prev) => [...prev, { id, terminal: null, isBusy: !!command }])
     setActiveTerminalId(id)
 
     setTimeout(() => {
       socket.emit("createTerminal", { id }, () => {
         setCreatingTerminal(false)
-        if (command) socket.emit("terminalData", { id, data: command + "\n" })
+        if (command) {
+          socket.emit("terminalData", { id, data: command + "\n" })
+        }
+        onCreated?.(id)
         resolve(id)
       })
     }, 1000)

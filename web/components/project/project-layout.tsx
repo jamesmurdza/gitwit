@@ -12,6 +12,7 @@ import { TTab } from "@/lib/types"
 import { processFileType, sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import Editor from "@monaco-editor/react"
+import { useQueryClient } from "@tanstack/react-query"
 import { FileJson, TerminalSquare } from "lucide-react"
 import * as monaco from "monaco-editor"
 import { useTheme } from "next-themes"
@@ -23,6 +24,7 @@ import AIEditElements from "./ai-edit/ai-edit-elements"
 import { DiffNavigationWidget } from "./ai-edit/diff-navigation-widget"
 import { SessionTimeoutDialog } from "./alerts/session-timeout-dialog"
 import { AIChat } from "./chat"
+import { normalizePath, pathMatchesTab } from "./chat/lib/utils"
 import { ChatProvider, useChat } from "./chat/providers/chat-provider"
 import { useAIFileActions } from "./hooks/useAIFileActions"
 import { useCodeDiffer } from "./hooks/useCodeDiffer"
@@ -134,6 +136,8 @@ export default function ProjectLayout({
     handleEditorWillMount,
     handleEditorMount,
     handleAiEdit,
+    cleanupWidgets,
+    setIsSelected,
   } = useMonacoEditor({
     editorPanelRef,
     setIsAIChatOpen,
@@ -184,7 +188,7 @@ export default function ProjectLayout({
       getUnresolvedSnapshot,
       restoreFromSnapshot,
       clearVisuals,
-      forceClearAllDecorations
+      forceClearAllDecorations,
     )
 
   // Store diff functions so sidebar can use them
@@ -214,14 +218,14 @@ export default function ProjectLayout({
         setMergeDecorationsCollection(decorationsCollection)
       }
     },
-    [handleApplyCode]
+    [handleApplyCode],
   )
 
   const updateFileDraft = useCallback(
     (fileId: string, content?: string) => {
       setDraft(fileId, content ?? "")
     },
-    [setDraft]
+    [setDraft],
   )
 
   const handleEditorChange = useCallback(
@@ -231,7 +235,7 @@ export default function ProjectLayout({
       }
       updateFileDraft(activeTab.id, value)
     },
-    [activeTab?.id, updateFileDraft]
+    [activeTab?.id, updateFileDraft],
   )
 
   const waitForEditorModel = useCallback(async () => {
@@ -330,7 +334,7 @@ export default function ProjectLayout({
       activeTab?.id,
       hasActiveWidgets,
       acceptAll,
-    ]
+    ],
   )
 
   const restoreOriginalFile = useCallback(
@@ -352,7 +356,7 @@ export default function ProjectLayout({
       activeTab?.id,
       hasActiveWidgets,
       rejectAll,
-    ]
+    ],
   )
 
   // Handler for rejecting code from chat
@@ -368,20 +372,35 @@ export default function ProjectLayout({
   const handleCloseTab = useCallback(
     (tab: TTab) => {
       const isClosingActive = activeTab?.id === tab.id
-      if (isClosingActive && hasActiveWidgets()) {
+      if (isClosingActive) {
+        // CRITICAL: Clear selection and generate states first to trigger widget removal
+        // This must happen before we remove the tab to prevent React/Monaco DOM conflicts
+        setIsSelected(false)
+        setGenerate((prev) => ({ ...prev, show: false }))
+
+        // Remove all contentWidgets synchronously to prevent DOM errors
+        // Monaco moves widget DOM nodes out of React's tree, so we must remove them
+        // before React tries to unmount the component
         try {
-          const session = getUnresolvedSnapshot(tab.id)
-          if (session) {
-            saveDiffSession(tab.id, session)
-          }
-        } catch (error) {
-          console.warn("Failed to snapshot unresolved diffs on close:", error)
+          cleanupWidgets()
+        } catch (err) {
+          console.warn("Error cleaning up Monaco widgets:", err)
         }
-        // Clear widgets before closing the tab
-        try {
-          clearVisuals()
-        } catch (error) {
-          forceClearAllDecorations()
+        if (hasActiveWidgets()) {
+          try {
+            const session = getUnresolvedSnapshot(tab.id)
+            if (session) {
+              saveDiffSession(tab.id, session)
+            }
+          } catch (error) {
+            console.warn("Failed to snapshot unresolved diffs on close:", error)
+          }
+          // Clear widgets before closing the tab
+          try {
+            clearVisuals()
+          } catch (error) {
+            forceClearAllDecorations()
+          }
         }
       }
       removeTab(tab)
@@ -394,11 +413,65 @@ export default function ProjectLayout({
       clearVisuals,
       forceClearAllDecorations,
       removeTab,
-    ]
+      cleanupWidgets,
+      setIsSelected,
+      setGenerate,
+    ],
   )
 
   // Use the session manager for tab switching
   const handleSetActiveTab = handleSetActiveTabWithSession
+
+  // Query client for prefetching
+  const queryClient = useQueryClient()
+
+  // Wrapper for openFile that uses session manager and prefetches file content
+  const openFileWithSession = useCallback(
+    async (filePath: string) => {
+      console.log("openFileWithSession called with:", filePath)
+      const normalizedPath = normalizePath(filePath)
+      console.log("normalizedPath:", normalizedPath)
+      const matchBy = (tab: TTab) => pathMatchesTab(normalizedPath, tab)
+      let targetTab = tabs.find(matchBy)
+
+      if (!targetTab) {
+        targetTab = {
+          id: normalizedPath,
+          name: normalizedPath.split("/").pop() || normalizedPath,
+          type: "file",
+          saved: true,
+        }
+        console.log("Created new tab:", targetTab)
+      } else {
+        console.log("Found existing tab:", targetTab)
+      }
+
+      const isAlreadyActive = activeTab ? matchBy(activeTab) : false
+      console.log("isAlreadyActive:", isAlreadyActive, "activeTab:", activeTab)
+      
+      if (!isAlreadyActive) {
+        console.log("Prefetching file content...")
+        try {
+          // Prefetch file content before switching
+          await queryClient.ensureQueryData(
+            fileRouter.fileContent.getFetchOptions({
+              projectId,
+              fileId: normalizedPath,
+            })
+          )
+          console.log("File content prefetched, switching tab...")
+          // Use session manager to switch tabs (handles diff sessions)
+          handleSetActiveTabWithSession(targetTab)
+          console.log("Tab switched successfully")
+        } catch (error) {
+          console.error("Error in openFileWithSession:", error)
+        }
+      } else {
+        console.log("File is already active, skipping switch")
+      }
+    },
+    [tabs, activeTab, projectId, queryClient, handleSetActiveTabWithSession]
+  )
 
   // Bridge to allow diff hook to clear saved session when all widgets are gone
   useEffect(() => {
@@ -406,15 +479,12 @@ export default function ProjectLayout({
       try {
         const session = getDiffSession(fileId)
         if (session) {
-          console.log("clearing")
-          // remove only if it matches current active or by id
           clearDiffSession(fileId)
         }
       } catch {}
     }
     return () => {
       try {
-        console.log("clearing")
         delete (window as any).__clearDiffSession
       } catch {}
     }
@@ -523,10 +593,10 @@ export default function ProjectLayout({
                   isAIChatOpen && isHorizontalLayout
                     ? "horizontal"
                     : isAIChatOpen
-                    ? "vertical"
-                    : isHorizontalLayout
-                    ? "horizontal"
-                    : "vertical"
+                      ? "vertical"
+                      : isHorizontalLayout
+                        ? "horizontal"
+                        : "vertical"
                 }
               >
                 {/* Preview Panel */}
@@ -586,7 +656,7 @@ export default function ProjectLayout({
                 restoreOriginalFile={restoreOriginalFile}
                 getCurrentFileContent={getCurrentFileContent}
                 activeFileId={activeTab?.id}
-                onOpenFile={openFile}
+                onOpenFile={openFileWithSession}
               />
             </ResizablePanel>
           </>
@@ -611,17 +681,36 @@ function DiffSessionHandler({
     markResolved: (fileId: string, status: "applied" | "rejected") => void
   }) => void
 }) {
-  const { markFileActionStatus, latestAssistantId } = useChat()
+  const { markFileActionStatus, latestAssistantId, messages } = useChat()
 
   useEffect(() => {
     onRegister({
       markResolved: (fileId, status) => {
+        // Normalize path to ensure it matches what's used in file utils
+        const normalized = normalizePath(fileId)
         if (latestAssistantId) {
-          markFileActionStatus(latestAssistantId, fileId, status)
+          markFileActionStatus(latestAssistantId, normalized, status)
+          return
         }
+
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i]
+          if (msg.role === "assistant" && msg.content) {
+            if (
+              msg.content.includes(normalized) ||
+              msg.content.includes(fileId)
+            ) {
+              if (msg.id) {
+                markFileActionStatus(msg.id, normalized, status)
+                return
+              }
+            }
+          }
+        }
+        console.warn("Could not find message ID for file:", normalized)
       },
     })
-  }, [markFileActionStatus, latestAssistantId, onRegister])
+  }, [markFileActionStatus, latestAssistantId, onRegister, messages])
 
   return null
 }
