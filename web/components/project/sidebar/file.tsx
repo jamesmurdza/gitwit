@@ -55,12 +55,22 @@ function useFileSelection(file: TFile) {
         fileId: file.id,
       }),
     )
-    dockRef.current?.addPanel({
-      id: file.id,
-      component: "editor",
-      title: file.name,
-      tabComponent: "editor",
-    })
+    if (dockRef.current) {
+      // Check if file is already open
+      const existingPanel = dockRef.current.getPanel(file.id)
+      if (existingPanel) {
+        // Just activate the existing panel
+        existingPanel.api.setActive()
+      } else {
+        // Add the file as a new editor panel
+        dockRef.current.addPanel({
+          id: file.id,
+          component: "editor",
+          title: file.name,
+          tabComponent: "editor",
+        })
+      }
+    }
 
     handleSetActiveTab(newTab)
   }, [file, projectId, queryClient, handleSetActiveTab])
