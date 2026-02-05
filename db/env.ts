@@ -15,7 +15,7 @@ export const env = {
     | string
     | undefined,
   AWS_REGION: (process.env.AWS_REGION as string) || "us-east-1",
-  AWS_BEDROCK_MODEL_ID: process.env.AWS_BEDROCK_MODEL_ID as string | undefined,
+  AWS_MODEL_ID: process.env.AWS_MODEL_ID as string | undefined,
   DATABASE_URL: process.env.DATABASE_URL as string,
   NODE_ENV:
     (process.env.NODE_ENV as "development" | "production" | "test") ||

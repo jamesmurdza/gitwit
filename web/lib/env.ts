@@ -14,7 +14,7 @@ export const env = createEnv({
     AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
     AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     AWS_REGION: z.string().min(1).default("us-east-1").optional(),
-    AWS_BEDROCK_MODEL_ID: z.string().min(1).optional(),
+    AWS_MODEL_ID: z.string().min(1).optional(),
     DATABASE_URL: z.string().url().min(1),
     NODE_ENV: z
       .enum(["development", "production", "test"])
