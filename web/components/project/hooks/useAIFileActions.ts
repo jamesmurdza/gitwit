@@ -21,6 +21,7 @@ interface UseAIFileActionsProps {
   handleApplyCodeWithDecorations: (
     mergedCode: string,
     originalCode: string,
+    targetFileId?: string,
   ) => void
   updateFileDraft: (fileId: string, content?: string) => void
 }
@@ -39,20 +40,6 @@ export function useAIFileActions({
 
   // Queue for failed diff applies (when model was null)
   const pendingDiffsQueueRef = useRef<Map<string, any>>(new Map())
-
-  // Retry pending diffs when active tab changes
-  useEffect(() => {
-    if (!activeTab?.id || !editorRef) return
-
-    // Check if current active tab has a pending diff
-    const pending = pendingDiffsQueueRef.current.get(
-      normalizePath(activeTab.id),
-    )
-    if (pending) {
-      pendingDiffsQueueRef.current.delete(normalizePath(activeTab.id))
-      handleApplyCodeFromChat(pending.code, pending.language, pending.options)
-    }
-  }, [activeTab?.id, editorRef])
 
   // --- Queue Management for "Keep All" ---
   const pendingPreviewApplyRef = useRef<{
@@ -188,6 +175,7 @@ export function useAIFileActions({
       code: string,
       language?: string,
       options?: {
+        targetFilePath?: string
         mergeStatuses?: Record<
           string,
           { status: string; result?: FileMergeResult; error?: string }
@@ -200,10 +188,55 @@ export function useAIFileActions({
           | undefined
       },
     ) => {
-      if (!activeTab) return
+      // Determine target file path
+      const targetFilePath = options?.targetFilePath
+      const normalizedTargetPath = targetFilePath
+        ? normalizePath(targetFilePath)
+        : null
 
+      let targetTab: TTab | undefined
+
+      if (normalizedTargetPath) {
+        const matchBy = (tab: TTab) => pathMatchesTab(normalizedTargetPath, tab)
+        targetTab = tabs.find(matchBy)
+
+        // If tab doesn't exist, create it
+        if (!targetTab) {
+          const fileName =
+            normalizedTargetPath.split("/").pop() || normalizedTargetPath
+          targetTab = {
+            id: normalizedTargetPath,
+            name: fileName,
+            type: "file",
+            saved: true,
+          }
+        }
+
+        // Get current activeTab from tabs array (more reliable than closure)
+        const currentActiveTab =
+          tabs.find((t) => t.id === activeTab?.id) || activeTab
+        // Check if target tab is currently active (compare with current activeTab)
+        const isTargetActive = currentActiveTab
+          ? matchBy(currentActiveTab)
+          : false
+
+        if (!isTargetActive) {
+          // Open and activate the target file (openFile handles tab creation and activation)
+          openFile(normalizedTargetPath)
+        }
+      } else {
+        // No target path specified, use active tab
+        targetTab = activeTab
+      }
+
+      if (!targetTab) {
+        return
+      }
+
+      // Use target path if provided, otherwise use target tab
+      const targetPath = normalizedTargetPath || normalizePath(targetTab.id)
       try {
-        const normalizedPath = normalizePath(activeTab.id)
+        const normalizedPath = targetPath
         let mergeResult: FileMergeResult | null = null
 
         // 1. Check Precomputed Status
@@ -236,47 +269,56 @@ export function useAIFileActions({
 
         // 4. If still no result, calculate fresh
         if (!mergeResult) {
-          const originalCode = await getCurrentFileContent(activeTab.id)
+          const originalCode = await getCurrentFileContent(targetTab.id)
           const mergedCode = await mergeCode(
             code,
             originalCode,
-            activeTab.name,
+            targetTab.name,
             projectId,
           )
           mergeResult = { mergedCode, originalCode }
         }
 
         // 5. Apply to Editor
-        const model = await waitForEditorModel()
-        if (model && mergeResult) {
+        if (mergeResult) {
           handleApplyCodeWithDecorations(
             mergeResult.mergedCode,
             mergeResult.originalCode,
+            targetTab.id,
           )
-        } else if (!model) {
-          // Failed to get model, save to queue for retry
-          console.log("Saving diff apply to queue for:", activeTab.id)
-          pendingDiffsQueueRef.current.set(normalizedPath, {
-            code,
-            language,
-            options,
-          })
         }
       } catch (error) {
-        console.error("Apply Code Failed:", error)
+        console.error("[ai-file-actions] Apply Code Failed:", error)
         // Fallback
-        const original = await getCurrentFileContent(activeTab.id)
+        const original = await getCurrentFileContent(targetTab.id)
         handleApplyCodeWithDecorations(code, original)
       }
     },
     [
       activeTab,
+      tabs,
+      setActiveTab,
+      openFile,
       projectId,
       getCurrentFileContent,
       waitForEditorModel,
       handleApplyCodeWithDecorations,
     ],
   )
+
+  // Retry pending diffs when active tab changes
+  // No need to wait for model - if file is open, handlers should be available
+  useEffect(() => {
+    if (!activeTab?.id) return
+
+    const normalizedPath = normalizePath(activeTab.id)
+    const pending = pendingDiffsQueueRef.current.get(normalizedPath)
+
+    if (pending) {
+      pendingDiffsQueueRef.current.delete(normalizedPath)
+      handleApplyCodeFromChat(pending.code, pending.language, pending.options)
+    }
+  }, [activeTab?.id, handleApplyCodeFromChat])
 
   const enqueueFileContentUpdate = useCallback(
     (filePath: string, content: string) => {
@@ -325,7 +367,6 @@ export function useAIFileActions({
         }
 
         if (!model || isCancelled) {
-          // Reject gracefully instead of throwing uncaught error
           pending.reject(new Error("Editor not ready"))
           return
         }

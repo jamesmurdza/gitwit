@@ -23,6 +23,7 @@ import { SideBarPanel } from "./components/sidebar-panel"
 import { tabComponents } from "./components/tab-components"
 import { TerminalPanel } from "./components/terminal-panel"
 import { MainWatermark, TerminalWatermark } from "./components/watermark"
+import { useChatPanelHandlers } from "./hooks/useChatPanelHandlers"
 import { handleTerminalDrop, loadDefaultGridviewLayout } from "./utils"
 import { useGlobalShortcut } from "./utils/shortcuts"
 
@@ -35,6 +36,7 @@ export function Dock(_props: DockProps) {
   const { gridRef, dockRef, terminalRef } = useContainer()
   const { isReady: isSocketReady } = useSocket()
   const { creatingTerminal, createNewTerminal } = useTerminal()
+  const chatHandlers = useChatPanelHandlers()
 
   useEditorSocket()
   useGlobalShortcut()
@@ -139,14 +141,13 @@ export function Dock(_props: DockProps) {
       <ChatPanel
         {...props}
         params={{
-          // TODO: replace with real handlers
-          onApplyCode: (() => {}) as any,
-          onRejectCode: (() => {}) as any,
-          precomputeMergeForFile: (() => {}) as any,
-          applyPrecomputedMerge: (() => {}) as any,
-          restoreOriginalFile: (() => {}) as any,
-          getCurrentFileContent: (() => {}) as any,
-          onOpenFile: (() => {}) as any,
+          onApplyCode: chatHandlers.onApplyCode,
+          onRejectCode: chatHandlers.onRejectCode,
+          precomputeMergeForFile: chatHandlers.precomputeMergeForFile,
+          applyPrecomputedMerge: chatHandlers.applyPrecomputedMerge,
+          restoreOriginalFile: chatHandlers.restoreOriginalFile,
+          getCurrentFileContent: chatHandlers.getCurrentFileContent,
+          onOpenFile: chatHandlers.onOpenFile,
         }}
       />
     ),

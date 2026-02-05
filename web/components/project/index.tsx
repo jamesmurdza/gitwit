@@ -1,12 +1,15 @@
 "use client"
 
+import { EditorHandlersProvider } from "@/context/editor-handlers-context"
 import { ChatProvider } from "./chat/providers/chat-provider"
 import { Dock } from "./layout"
 
 export default function Project() {
   return (
-    <ChatProvider>
-      <Dock />
-    </ChatProvider>
+    <EditorHandlersProvider>
+      <ChatProvider>
+        <Dock />
+      </ChatProvider>
+    </EditorHandlersProvider>
   )
 }

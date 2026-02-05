@@ -37,6 +37,7 @@ export function GeneratedFilesPreview({
     code: string,
     language?: string,
     options?: {
+      targetFilePath?: string
       mergeStatuses?: Record<
         string,
         { status: string; result?: FileMergeResult; error?: string }
@@ -285,17 +286,12 @@ export function GeneratedFilesPreview({
 
       const status = mergeStatuses[key]
       if (status?.status === "ready" && status.result && file.code) {
-        // If file is active, apply diff
-        if (key === activeFileId) {
-          autoPreviewedRef.current.add(key)
-          onApplyCode(file.code, undefined, {
-            getMergeStatus: (path) => mergeStatusRef.current[path],
-          })
-        }
-        // If file is NOT active, open it (which will trigger this effect again when activeFileId changes)
-        else if (onOpenFile) {
-          onOpenFile(key)
-        }
+        // Always pass targetFilePath to onApplyCode so it can open/activate if needed
+        autoPreviewedRef.current.add(key)
+        onApplyCode(file.code, undefined, {
+          targetFilePath: key,
+          getMergeStatus: (path) => mergeStatusRef.current[path],
+        })
       }
     })
   }, [generatedFiles, mergeStatuses, activeFileId, onApplyCode, onOpenFile])
@@ -581,7 +577,7 @@ export function GeneratedFilesPreview({
 
           // Double check resolved status here to prevent flicker
           const messageId = sourceKey || latestAssistantId
-          
+
           if (resolvedFiles[file.path]) return null
 
           return (

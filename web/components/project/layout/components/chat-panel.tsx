@@ -13,6 +13,7 @@ export interface ChatPanelParams {
     code: string,
     language?: string,
     options?: {
+      targetFilePath?: string
       mergeStatuses?: Record<
         string,
         { status: string; result?: FileMergeResult; error?: string }

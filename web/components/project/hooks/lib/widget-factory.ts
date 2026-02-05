@@ -41,11 +41,15 @@ export function createWidgetContainer(): HTMLDivElement {
   container.style.background = "transparent"
   container.style.borderRadius = "0"
   container.style.padding = "0"
+  container.style.paddingLeft = "8px"
   container.style.boxShadow = "none"
   container.style.zIndex = "1000"
   container.style.userSelect = "none"
   container.style.pointerEvents = "auto"
   container.style.fontSize = "12px"
+  container.style.marginLeft = "0"
+  container.style.verticalAlign = "middle"
+  container.style.lineHeight = "1"
 
   return container
 }
@@ -61,7 +65,7 @@ export function createWidgetContainer(): HTMLDivElement {
 export function createContentWidget(
   id: string,
   domNode: HTMLElement,
-  getPosition: () => monaco.editor.IContentWidgetPosition
+  getPosition: () => monaco.editor.IContentWidgetPosition,
 ): monaco.editor.IContentWidget {
   return {
     getId: () => id,
@@ -134,7 +138,7 @@ function createButtonIcon(kind: "accept" | "reject"): SVGElement {
  */
 function addButtonEventHandlers(
   button: HTMLButtonElement,
-  kind: "accept" | "reject"
+  kind: "accept" | "reject",
 ): void {
   const hoverColor =
     kind === "accept" ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)"

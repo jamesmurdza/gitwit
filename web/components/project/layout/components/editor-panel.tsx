@@ -1,3 +1,4 @@
+import { useEditorHandlers } from "@/context/editor-handlers-context"
 import { useProjectContext } from "@/context/project-context"
 import { fileRouter } from "@/lib/api"
 import { defaultEditorOptions } from "@/lib/monaco/config"
@@ -10,6 +11,8 @@ import { useTheme } from "next-themes"
 import { useCallback, useEffect } from "react"
 import AIEditElements from "../../ai-edit/ai-edit-elements"
 import { DiffNavigationWidget } from "../../ai-edit/diff-navigation-widget"
+import { normalizePath } from "../../chat/lib/utils"
+import { useChat } from "../../chat/providers/chat-provider"
 import { useCodeDiffer } from "../../hooks/useCodeDiffer"
 import { useEditor } from "../../hooks/useEditor"
 
@@ -23,6 +26,33 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>) {
   const {
     project: { id: projectId },
   } = useProjectContext()
+  const { registerHandlers, unregisterHandlers } = useEditorHandlers()
+  const { markFileActionStatus, latestAssistantId, messages } = useChat()
+
+  const onDiffResolved = useCallback(
+    (resolvedFileId: string, status: "applied" | "rejected") => {
+      const normalized = normalizePath(resolvedFileId)
+      if (latestAssistantId) {
+        markFileActionStatus(latestAssistantId, normalized, status)
+        return
+      }
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i]
+        if (msg.role === "assistant" && msg.content) {
+          if (
+            msg.content.includes(normalized) ||
+            msg.content.includes(resolvedFileId)
+          ) {
+            if (msg.id) {
+              markFileActionStatus(msg.id, normalized, status)
+              return
+            }
+          }
+        }
+      }
+    },
+    [markFileActionStatus, latestAssistantId, messages],
+  )
 
   const tabs = useAppStore((state) => state.tabs)
   const draft = useAppStore((s) => s.drafts[fileId ?? ""])
@@ -48,33 +78,62 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>) {
   useEffect(() => {
     props.api.updateParameters({ saved: !hasUnsavedChanges })
   }, [hasUnsavedChanges])
+
   // Register cleanup on panel close
   useEffect(() => {
     const disposable = props.containerApi.onDidRemovePanel((event) => {
       if (event.id === props.api.id) {
-        // Cleanup if needed
+        unregisterHandlers(fileId)
       }
     })
     return () => disposable.dispose()
-  }, [props.containerApi, props.api.id])
+  }, [props.containerApi, props.api.id, fileId, unregisterHandlers])
 
   // Diffing logic - localized to this panel
 
   const {
+    handleApplyCode,
     activeWidgetsState, // hasActiveWidgets()
     acceptAll,
     rejectAll,
     scrollToNextDiff,
     scrollToPrevDiff,
+    forceClearAllDecorations,
   } = useCodeDiffer({
     editorRef: editor.editorRef || null,
     onDiffChange: (session) => {
       // Save session to global store if needed, or local
     },
-    onDiffResolved: (fileId, status) => {
-      // Mark resolved
-    },
+    onDiffResolved,
   })
+
+  // Register handlers when editorRef or handlers change
+  useEffect(() => {
+    if (!fileId) return
+
+    registerHandlers(fileId, {
+      handleApplyCode,
+      editorRef: editor.editorRef || null,
+      hasActiveWidgets: () => activeWidgetsState,
+      acceptAll,
+      rejectAll,
+      forceClearAllDecorations,
+    })
+
+    return () => {
+      unregisterHandlers(fileId)
+    }
+  }, [
+    fileId,
+    registerHandlers,
+    unregisterHandlers,
+    handleApplyCode,
+    editor.editorRef,
+    activeWidgetsState,
+    acceptAll,
+    rejectAll,
+    forceClearAllDecorations,
+  ])
 
   const handleEditorChange = useCallback(
     (value?: string) => {

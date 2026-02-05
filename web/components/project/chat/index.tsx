@@ -127,6 +127,7 @@ function MainChatContent({
     code: string,
     language?: string,
     options?: {
+      targetFilePath?: string
       mergeStatuses?: Record<
         string,
         { status: string; result?: any; error?: string }
@@ -141,7 +142,7 @@ function MainChatContent({
   getCurrentFileContent?: GetCurrentFileContentFn
   onOpenFile?: (filePath: string) => void
 }) {
-  console.log("onOpenFile :", onOpenFile)
+  //console.log("onOpenFile :", onOpenFile)
   const { messages, isLoading, mergeStatuses } = useChat()
   const isEmpty = messages.length === 0
   const mergeStatusesRef = React.useRef(mergeStatuses)
