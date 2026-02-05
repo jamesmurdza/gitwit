@@ -82,7 +82,14 @@ export class Project {
   }
   async createContainer(): Promise<Container> {
     console.log("Creating container for ", this.projectId)
-    const templateTypes = ["vanillajs", "reactjs", "nextjs", "streamlit", "php"]
+    const templateTypes = [
+      "vanillajs",
+      "reactjs",
+      "nextjs",
+      "streamlit",
+      "php",
+      "empty",
+    ]
     const template = templateTypes.includes(this.type ?? "")
       ? `gitwit-${this.type}`
       : `base`
