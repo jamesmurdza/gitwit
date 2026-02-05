@@ -65,6 +65,17 @@ export const templateConfigs: { [key: string]: TemplateConfig } = {
       "Keep PHP logic separate from presentation",
     ],
   },
+  // Empty template - no files, blank slate
+  empty: {
+    id: "empty",
+    name: "Empty",
+    runCommand:
+      'echo "Empty project - add your files to get started" && sleep infinity',
+    conventions: [
+      "Start from scratch with no pre-existing files",
+      "Add whatever you need - Node.js and npm are available",
+    ],
+  },
 }
 
 export const projectTemplates: {
@@ -107,6 +118,13 @@ export const projectTemplates: {
     name: "PHP",
     description: "PHP development environment",
     icon: "/project-icons/php.svg",
+    disabled: false,
+  },
+  {
+    id: "empty",
+    name: "Empty",
+    icon: "/project-icons/more.svg",
+    description: "A blank slate with no pre-existing files",
     disabled: false,
   },
 ]
