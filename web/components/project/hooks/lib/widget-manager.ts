@@ -269,31 +269,14 @@ export class WidgetManager {
       : Math.min(seedLine, this.model.getLineCount())
 
     const liveRange = this.decorationManager.getLiveRange(type, anchorLine)
-    const diffEndLine = Math.min(liveRange.end, this.model.getLineCount())
-
-    // Check if there's a partner (modification pair)
-    const partner = this.decorationManager.getModificationPartner(
-      liveRange,
-      type,
-    )
-    const targetEndLine =
-      partner && type === "removed"
-        ? Math.min(partner.end, this.model.getLineCount())
-        : diffEndLine
-
-    const lineNumber = targetEndLine
-
-    // Position at the end of the line content to place buttons after the code
-    const lineContent = this.model.getLineContent(lineNumber)
-    const trimmedLength = lineContent.trimEnd().length
-    const column = trimmedLength > 0 ? trimmedLength + 1 : 1
+    const diffStartLine = Math.max(1, liveRange.start)
 
     return {
       position: {
-        lineNumber,
-        column,
+        lineNumber: diffStartLine,
+        column: 1,
       },
-      preference: [monaco.editor.ContentWidgetPositionPreference.EXACT],
+      preference: [monaco.editor.ContentWidgetPositionPreference.ABOVE],
     }
   }
 
