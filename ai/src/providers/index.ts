@@ -99,13 +99,15 @@ export class AIProvider {
           return customOpenAI(config.modelId!)
         }
         return openai(config.modelId!)
-      case "openrouter":
+      case "openrouter": {
+        const modelId = config.modelId || process.env.OPENROUTER_MODEL_ID
         const openrouter = createOpenAI({
           apiKey: config.apiKey,
           baseURL: "https://openrouter.ai/api/v1",
         })
-        return openrouter(config.modelId!)
-      case "bedrock":
+        return openrouter(modelId!)
+      }
+      case "bedrock": {
         if (!config.region) throw new Error("AWS region required for Bedrock")
         const modelId = config.modelId || process.env.AWS_MODEL_ID
         if (!modelId)
@@ -113,6 +115,7 @@ export class AIProvider {
             "Bedrock model ID required (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0')"
           )
         return bedrock(modelId)
+      }
       default:
         throw new Error(`Unsupported provider: ${config.provider}`)
     }
@@ -247,7 +250,11 @@ export function createAIProvider(
 
   // Only auto-detect provider if not explicitly specified in overrides
   if (!overrides?.provider) {
-    if (process.env.ANTHROPIC_API_KEY) {
+    if (process.env.OPENROUTER_API_KEY) {
+      config.provider = "openrouter"
+      config.apiKey = process.env.OPENROUTER_API_KEY
+      config.modelId = process.env.OPENROUTER_MODEL_ID
+    } else if (process.env.ANTHROPIC_API_KEY) {
       config.provider = "anthropic"
       config.apiKey = process.env.ANTHROPIC_API_KEY
     } else if (process.env.OPENAI_API_KEY) {
@@ -282,6 +289,9 @@ export function createAIProvider(
         process.env.OPENROUTER_API_KEY
       ) {
         config.apiKey = process.env.OPENROUTER_API_KEY
+        if (!config.modelId) {
+          config.modelId = process.env.OPENROUTER_MODEL_ID
+        }
       } else if (overrides.provider === "bedrock") {
         config.region =
           overrides.region || process.env.AWS_REGION || "us-east-1"
