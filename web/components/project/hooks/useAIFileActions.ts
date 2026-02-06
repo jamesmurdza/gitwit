@@ -221,8 +221,17 @@ export function useAIFileActions({
           : false
 
         if (!isTargetActive) {
+          pendingDiffsQueueRef.current.set(normalizedTargetPath, {
+            code,
+            language,
+            options: {
+              ...options,
+              targetFilePath: normalizedTargetPath,
+            },
+          })
           // Open and activate the target file (openFile handles tab creation and activation)
           openFile(normalizedTargetPath)
+          return
         }
       } else {
         // No target path specified, use active tab
@@ -486,7 +495,7 @@ export function useAIFileActions({
           clearDiffSession(normalizedPath)
         } catch (error) {
           console.error("Failed to apply session keep logic:", error)
-        }
+}
       }
 
       return enqueueFileContentUpdate(filePath, contentToApply)
