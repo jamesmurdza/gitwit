@@ -20,8 +20,6 @@ export interface AIEditElementsProps {
   editorLanguage: string
   handleAiEdit: (editor?: monaco.editor.ICodeEditor) => void
   showSuggestion: boolean
-  projectId: string
-  projectName: string
 }
 
 /**
@@ -39,8 +37,7 @@ export default function AIEditElements({
   tabs,
   activeFileId,
   editorLanguage,
-  projectId,
-  projectName,
+
   showSuggestion,
   handleAiEdit,
 }: // suggestionWidget,
@@ -56,8 +53,6 @@ AIEditElementsProps) {
     tabs,
     activeFileId,
     editorLanguage,
-    projectId,
-    projectName,
   })
   return (
     <>
@@ -66,8 +61,6 @@ AIEditElementsProps) {
         generateRef={generateRef}
         generateWidgetRef={generateWidgetRef}
         show={generate.show}
-        projectId={projectId}
-        projectName={projectName}
         {...generateInputProps}
       />
       {/* AI Suggestion Widget */}

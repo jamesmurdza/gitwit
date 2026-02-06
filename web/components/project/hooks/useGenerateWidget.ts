@@ -1,4 +1,5 @@
 import { GenerateState } from "@/components/project/hooks/useMonacoEditor"
+import { useProjectContext } from "@/context/project-context"
 import { TTab } from "@/lib/types"
 import * as monaco from "monaco-editor"
 import { useCallback } from "react"
@@ -13,8 +14,6 @@ export interface UseGenerateWidgetProps {
   tabs: TTab[]
   activeFileId: string
   editorLanguage: string
-  projectId: string
-  projectName: string
 }
 
 export interface UseGenerateWidgetReturn {
@@ -45,9 +44,10 @@ export function useGenerateWidget({
   tabs,
   activeFileId,
   editorLanguage,
-  projectId,
-  projectName,
 }: UseGenerateWidgetProps): UseGenerateWidgetReturn {
+  const {
+    project: { id: projectId, name: projectName },
+  } = useProjectContext()
   // Handle expanding the generate widget
   const handleExpand = useCallback(() => {
     if (!editorRef) return
@@ -124,7 +124,7 @@ export function useGenerateWidget({
         { range, text: code, forceMoveMarkers: true },
       ])
     },
-    [editorRef, generate.line, isSelected, setGenerate]
+    [editorRef, generate.line, isSelected, setGenerate],
   )
 
   // Handle closing the generate widget
@@ -142,8 +142,9 @@ export function useGenerateWidget({
   // Get the current code (selection or entire content)
   const currentCode =
     isSelected && editorRef?.getSelection()
-      ? editorRef?.getModel()?.getValueInRange(editorRef.getSelection()!) ?? ""
-      : editorRef?.getValue() ?? ""
+      ? (editorRef?.getModel()?.getValueInRange(editorRef.getSelection()!) ??
+        "")
+      : (editorRef?.getValue() ?? "")
 
   const generateInputProps = {
     width: generate.width - 90,

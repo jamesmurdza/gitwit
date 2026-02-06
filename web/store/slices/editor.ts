@@ -23,13 +23,13 @@ interface EditorSlice {
   // Actions
   setTabs: (tabs: TTab[] | ((previousTabs: TTab[]) => TTab[])) => void
   setActiveTab: (
-    tabs: TTab | ((previousTabs?: TTab) => TTab | undefined)
+    tabs: TTab | ((previousTabs?: TTab) => TTab | undefined),
   ) => void
   addTab: (tab: TTab) => void
   removeTab: (tab: TTab, override?: boolean) => void
   setActiveTabContent: (text: string) => void
   setUnsavedAlert: (state: boolean) => void
-  setDraft: (fileId: string, content: string) => void
+  setDraft: (fileId: string, content: string | undefined) => void
   clearDraft: (fileId: string) => void
   getDraft: (fileId: string) => string | undefined
   saveDiffSession: (fileId: string, session: DiffSession) => void
@@ -133,6 +133,12 @@ const createEditorSlice: StateCreator<EditorSlice> = (set, get) => ({
   },
   setDraft: (fileId, content) =>
     set((state) => {
+      // If content is undefined, delete the key from drafts
+      if (content === undefined) {
+        const { [fileId]: _, ...rest } = state.drafts
+        return { drafts: rest }
+      }
+
       // Update drafts
       const newDrafts = {
         ...state.drafts,
@@ -140,7 +146,7 @@ const createEditorSlice: StateCreator<EditorSlice> = (set, get) => ({
       }
       // Mark the tab with fileId as unsaved
       const newTabs = state.tabs.map((tab) =>
-        tab.id === fileId ? { ...tab, saved: false } : tab
+        tab.id === fileId ? { ...tab, saved: false } : tab,
       )
       return {
         drafts: newDrafts,
@@ -194,7 +200,7 @@ const tabsMatch = (tab1: TTab, tab2: TTab): boolean => {
 const getNextActiveTab = (
   tabs: TTab[],
   removingTab: TTab,
-  currentActiveTab: TTab | undefined
+  currentActiveTab: TTab | undefined,
 ): TTab | undefined => {
   if (tabs.length <= 1) return undefined
 

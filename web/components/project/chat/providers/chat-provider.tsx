@@ -1,10 +1,12 @@
+"use client"
 import { streamChat } from "@/app/actions/ai"
-import { TFile, TFolder } from "@/lib/types"
+import { useProjectContext } from "@/context/project-context"
+import { fileRouter } from "@/lib/api"
+import { sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import { useQueryClient } from "@tanstack/react-query"
 import { readStreamableValue } from "ai/rsc"
 import { nanoid } from "nanoid"
-import { useParams } from "next/navigation"
 import React, {
   createContext,
   ReactNode,
@@ -19,11 +21,6 @@ import type { ContextTab, FileMergeResult, Message } from "../lib/types"
 import { getCombinedContext, normalizePath } from "../lib/utils"
 
 type ChatProviderProps = {
-  activeFileContent: string
-  activeFileName: string
-  projectType: string
-  fileTree: (TFile | TFolder)[]
-  projectName: string
   children: ReactNode
 }
 
@@ -50,7 +47,7 @@ type ChatContextType = {
   markFileActionStatus: (
     messageId: string,
     filePath: string,
-    status: "applied" | "rejected"
+    status: "applied" | "rejected",
   ) => void
   latestAssistantId?: string
   mergeStatuses: Record<string, MergeState>
@@ -61,17 +58,14 @@ type ChatContextType = {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
-function ChatProvider({
-  activeFileContent,
-  activeFileName,
-  projectType,
-  fileTree,
-  projectName,
-  children,
-}: ChatProviderProps) {
-  const { id: projectId } = useParams<{ id: string }>()
+function ChatProvider({ children }: ChatProviderProps) {
+  const {
+    project: { id: projectId, name: projectName, type: projectType },
+  } = useProjectContext()
   const queryClient = useQueryClient()
   const drafts = useAppStore((s) => s.drafts)
+  const activeTab = useAppStore((s) => s.activeTab)
+  const activeDraft = useAppStore((s) => s.drafts[activeTab?.id ?? ""])
 
   // Thread management
   const hasHydrated = useAppStore((s) => s._hasHydrated)
@@ -83,17 +77,41 @@ function ChatProvider({
 
   // Get messages from active thread
   const messages = useAppStore((s) =>
-    s.activeThreadId && s.threads[s.activeThreadId]
-      ? s.threads[s.activeThreadId].messages
-      : []
+    activeThreadId && s.threads[activeThreadId]
+      ? s.threads[activeThreadId].messages
+      : [],
   )
+
+  const { data: fileTree = [] } = fileRouter.fileTree.useQuery({
+    variables: {
+      projectId,
+    },
+    select(data) {
+      return sortFileExplorer(data.data ?? [])
+    },
+  })
+
+  const { data: serverActiveFile = "" } = fileRouter.fileContent.useQuery({
+    enabled: !!activeTab?.id,
+    variables: {
+      fileId: activeTab?.id ?? "",
+      projectId,
+    },
+    select(data) {
+      return data.data
+    },
+  })
+
+  const activeFileContent =
+    activeDraft === undefined ? serverActiveFile : activeDraft
+  const activeFileName = activeTab?.name || "untitled"
 
   // Initialize thread on mount after hydration
   useEffect(() => {
     if (!hasHydrated) return
 
     const projectThreads = Object.values(threads).filter(
-      (t) => t.projectId === projectId
+      (t) => t.projectId === projectId,
     )
 
     // If no threads exist for this project or no active thread, create one
@@ -110,7 +128,7 @@ function ChatProvider({
     Record<string, Record<string, "applied" | "rejected">>
   >({})
   const [latestAssistantId, setLatestAssistantId] = useState<string | null>(
-    null
+    null,
   )
   const [mergeStatuses, setMergeStatuses] = useState<
     Record<string, MergeState>
@@ -164,14 +182,14 @@ function ChatProvider({
 
   // Throttle streaming updates to reduce render frequency
   const throttledSetMessages = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   )
   const updateAssistantMessage = useCallback(
     (buffer: string, messageIndex: number) => {
       if (!activeThreadId) return
       updateMessage(activeThreadId, messageIndex, buffer)
     },
-    [activeThreadId, updateMessage]
+    [activeThreadId, updateMessage],
   )
 
   const sendMessage = useCallback(
@@ -223,7 +241,7 @@ function ChatProvider({
             contextContent,
             projectName,
             fileName: activeFileName,
-          }
+          },
         )
 
         let buffer = ""
@@ -252,7 +270,7 @@ function ChatProvider({
           console.error("Error:", error)
           updateAssistantMessage(
             error.message || "Sorry, an error occurred.",
-            assistantMessageIndex
+            assistantMessageIndex,
           )
         }
       } finally {
@@ -279,7 +297,7 @@ function ChatProvider({
       messages,
       addMessage,
       updateAssistantMessage,
-    ]
+    ],
   )
 
   const stopGeneration = useCallback(() => {
@@ -298,7 +316,7 @@ function ChatProvider({
         },
       }))
     },
-    []
+    [],
   )
 
   // Memoize context value to avoid unnecessary re-renders
@@ -339,7 +357,7 @@ function ChatProvider({
       latestAssistantId,
       mergeStatuses,
       setMergeStatuses,
-    ]
+    ],
   )
 
   return (

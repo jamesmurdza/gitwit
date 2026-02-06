@@ -5,6 +5,7 @@ import {
   closeTerminal as closeTerminalHelper,
   createTerminal as createTerminalHelper,
 } from "@/lib/api/terminal"
+import { MAX_TERMINALS } from "@/lib/constants"
 import { Terminal } from "@xterm/xterm"
 import React, {
   createContext,
@@ -33,7 +34,7 @@ interface TerminalContextType {
   creatingTerminal: boolean
   setCreatingTerminal: React.Dispatch<React.SetStateAction<boolean>>
   closingTerminal: string
-  createNewTerminal: (command?: string) => Promise<string | undefined>
+  createNewTerminal: (command?: string) => Promise<string | null>
   closeTerminal: (id: string) => Promise<void>
   deploy: (callback: () => void) => void
   getAppExists:
@@ -50,31 +51,26 @@ const TerminalContext = createContext<TerminalContextType | undefined>(
   undefined,
 )
 
+const errorMap = {
+  MAX_TERMINALS: "You reached the maximum # of terminals.",
+  CREATE_FAILED: "Failed to create new terminal",
+  CREATE_NO_SOCKET: "Failed to create new terminal: No socket connection",
+  UNKNOWN_ERROR: "An unknown error occurred while creating a new terminal",
+  CREATE_IN_PROGRESS: "A terminal is already being created. Please wait.",
+}
+
 export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { socket } = useSocket()
+  const { socket, isReady: isSocketReady } = useSocket()
   const [terminals, setTerminals] = useState<TerminalState[]>([])
   const [activeTerminalId, setActiveTerminalId] = useState<string>("")
   const [creatingTerminal, setCreatingTerminal] = useState<boolean>(false)
   const [closingTerminal, setClosingTerminal] = useState<string>("")
-  const [isSocketReady, setIsSocketReady] = useState<boolean>(false)
 
   // Track when commands were sent to ignore prompts that arrive too quickly
   // (the existing prompt before command runs)
   const commandSentAtRef = useRef<Record<string, number>>({})
-
-  // Listen for the "ready" signal from the socket
-  useEffect(() => {
-    if (socket) {
-      socket.on("ready", () => {
-        setIsSocketReady(true)
-      })
-    }
-    return () => {
-      if (socket) socket.off("ready")
-    }
-  }, [socket])
 
   // Listen for terminal responses to detect busy/idle state
   useEffect(() => {
@@ -144,9 +140,23 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const createNewTerminal = async (
     command?: string,
-  ): Promise<string | undefined> => {
-    if (!socket) return undefined
-    if (creatingTerminal) return undefined
+  ): Promise<string | null> => {
+    if (
+      !socket ||
+      !isSocketReady ||
+      creatingTerminal ||
+      terminals.length >= MAX_TERMINALS
+    ) {
+      toast.error(
+        terminals.length >= MAX_TERMINALS
+          ? errorMap.MAX_TERMINALS
+          : creatingTerminal
+            ? errorMap.CREATE_IN_PROGRESS
+            : errorMap.CREATE_NO_SOCKET,
+      )
+
+      return null
+    }
     try {
       const id = await createTerminalHelper({
         setTerminals: setTerminals as React.Dispatch<
@@ -171,7 +181,7 @@ export const TerminalProvider: React.FC<{ children: React.ReactNode }> = ({
           ? error.message
           : "Failed to create new terminal",
       )
-      return undefined
+      return null
     }
   }
 

@@ -1,11 +1,12 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { useEditorLayout } from "@/context/EditorLayoutContext"
+import { useContainer } from "@/context/container-context"
 import { useTerminal } from "@/context/TerminalContext"
 import { Sandbox } from "@/lib/types"
 import { templateConfigs } from "@gitwit/templates"
 import { LoaderCircle, Play, StopCircle } from "lucide-react"
+import { useTheme } from "next-themes"
 import { useEffect, useRef } from "react"
 import { toast } from "sonner"
 
@@ -18,6 +19,8 @@ export default function RunButtonModal({
   setIsRunning: (running: boolean) => void
   sandboxData: Sandbox
 }) {
+  const { gridRef, dockRef, terminalRef } = useContainer()
+  const { resolvedTheme } = useTheme()
   const {
     createNewTerminal,
     closeTerminal,
@@ -25,7 +28,6 @@ export default function RunButtonModal({
     creatingTerminal,
     closingTerminal,
   } = useTerminal()
-  const { setIsPreviewCollapsed, previewPanelRef } = useEditorLayout()
   // Ref to keep track of the last created terminal's ID
   const lastCreatedTerminalRef = useRef<string | null>(null)
   // Disable button when creating or closing a terminal
@@ -49,24 +51,51 @@ export default function RunButtonModal({
     if (isTransitioning) return
 
     if (isRunning && lastCreatedTerminalRef.current) {
+      // Stop: Close the terminal (panel will auto-hide if it's the last one)
       await closeTerminal(lastCreatedTerminalRef.current)
       lastCreatedTerminalRef.current = null
-      setIsPreviewCollapsed(true)
-      previewPanelRef.current?.collapse()
+
+      // Close preview panel if it exists
+      const previewPanel = dockRef.current?.panels.find(
+        (panel) => panel.id === "preview",
+      )
+      if (previewPanel) {
+        previewPanel.api.close()
+      }
     } else if (!isRunning && terminals.length < 4) {
       const command =
         templateConfigs[sandboxData.type]?.runCommand || "npm run dev"
 
       try {
+        // Show terminal panel if hidden
+        const terminalPanel = gridRef.current?.getPanel("terminal")
+        if (terminalPanel && !terminalPanel.api.isVisible) {
+          terminalPanel.api.setVisible(true)
+        }
+
         // Create a new terminal with the appropriate command
-        await createNewTerminal(command)
-        setIsPreviewCollapsed(false)
-        previewPanelRef.current?.expand()
+        const terminalId = await createNewTerminal(command)
+        if (!terminalId) {
+          throw new Error("Failed to create terminal")
+        }
+
+        // Add terminal panel to the terminal container
+        terminalRef.current?.addPanel({
+          id: `terminal-${terminalId}`,
+          component: "terminal",
+          title: "Shell",
+          tabComponent: "terminal",
+          params: {
+            dockRef,
+            terminalRef,
+            theme: resolvedTheme,
+          },
+        })
       } catch (error) {
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to create new terminal"
+            : "Failed to create new terminal",
         )
         return
       }

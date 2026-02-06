@@ -1,6 +1,7 @@
 "use client"
 
 import { processEdit } from "@/app/actions/ai"
+import { useProjectContext } from "@/context/project-context"
 import { useRouter } from "@bprogress/next/app"
 import { Editor } from "@monaco-editor/react"
 import { Check, Loader2, RotateCw, Sparkles, X } from "lucide-react"
@@ -20,12 +21,11 @@ interface GenerateInputProps {
   editor: {
     language: string
   }
-  projectId: string
-  projectName: string
   onExpand: () => void
   onAccept: (code: string) => void
   onClose: () => void
 }
+
 interface GenerateWidgetProps extends GenerateInputProps {
   generateRef: React.MutableRefObject<HTMLDivElement | null>
   generateWidgetRef: React.MutableRefObject<HTMLDivElement | null>
@@ -43,8 +43,6 @@ export function GenerateWidget({
   generateRef,
   generateWidgetRef,
   show,
-  projectId,
-  projectName,
   ...inputProps
 }: GenerateWidgetProps) {
   const [containers, setContainers] = useState<{
@@ -86,13 +84,7 @@ export function GenerateWidget({
 
   // Use portal to render content into the imperatively created widget container
   return createPortal(
-    show ? (
-      <GenerateInput
-        {...inputProps}
-        projectId={projectId}
-        projectName={projectName}
-      />
-    ) : null,
+    show ? <GenerateInput {...inputProps} /> : null,
     containers.widget,
   )
 }
@@ -104,8 +96,6 @@ function GenerateInput({
   onExpand,
   onAccept,
   onClose,
-  projectId,
-  projectName,
 }: GenerateInputProps) {
   const { resolvedTheme: theme } = useTheme()
   const router = useRouter()
@@ -119,7 +109,9 @@ function GenerateInput({
   })
   const [input, setInput] = useState("")
   const [currentPrompt, setCurrentPrompt] = useState("")
-
+  const {
+    project: { id: projectId, name: projectName },
+  } = useProjectContext()
   useEffect(() => {
     setTimeout(() => {
       inputRef.current?.focus()

@@ -87,6 +87,11 @@ export const closeTerminal = ({
 
     setClosingTerminal(term.id)
 
+    // Dispose the XTerm instance before closing
+    if (term.terminal) {
+      term.terminal.dispose()
+    }
+
     socket.emit("closeTerminal", { id: term.id }, () => {
       setClosingTerminal("")
 

@@ -75,6 +75,22 @@ export class WidgetManager {
     const newWidgets: monaco.editor.IContentWidget[] = []
     const newAnchorDecorations: string[] = []
 
+    // Debug: Check if decorations are readable
+    let foundDecorations = 0
+    for (let lineNumber = 1; lineNumber <= maxLines; lineNumber++) {
+      const decorations = this.model.getLineDecorations(lineNumber) || []
+      const hasRemoved = decorations.some(
+        (d) => (d.options as any)?.className === "removed-line-decoration",
+      )
+      const hasAdded = decorations.some(
+        (d) => (d.options as any)?.className === "added-line-decoration",
+      )
+
+      if (hasRemoved || hasAdded) {
+        foundDecorations++
+      }
+    }
+
     for (let lineNumber = 1; lineNumber <= maxLines; lineNumber++) {
       const isRemoved = this.decorationManager.lineHasClass(
         lineNumber,
@@ -104,7 +120,6 @@ export class WidgetManager {
         continue
       }
       processedAnchors.add(anchorLine)
-
       const widget = this.createWidgetForBlock(type, range, anchorLine)
       if (widget) {
         newWidgets.push(widget.widget)
@@ -113,7 +128,6 @@ export class WidgetManager {
 
       lineNumber = range.end
     }
-
     this.widgets = newWidgets
     this.anchorDecorations = newAnchorDecorations
     this.onWidgetsChanged?.(this.widgets.length)
@@ -255,18 +269,14 @@ export class WidgetManager {
       : Math.min(seedLine, this.model.getLineCount())
 
     const liveRange = this.decorationManager.getLiveRange(type, anchorLine)
-    const lineNumber = Math.min(liveRange.end, this.model.getLineCount())
+    const diffStartLine = Math.max(1, liveRange.start)
 
     return {
       position: {
-        lineNumber,
-        column: this.model.getLineMaxColumn(lineNumber) + 2,
+        lineNumber: diffStartLine,
+        column: 1,
       },
-      preference: [
-        monaco.editor.ContentWidgetPositionPreference.BELOW,
-        monaco.editor.ContentWidgetPositionPreference.ABOVE,
-        monaco.editor.ContentWidgetPositionPreference.EXACT,
-      ],
+      preference: [monaco.editor.ContentWidgetPositionPreference.ABOVE],
     }
   }
 

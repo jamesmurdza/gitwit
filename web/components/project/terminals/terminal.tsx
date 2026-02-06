@@ -30,6 +30,11 @@ export default function EditorTerminal({
   useEffect(() => {
     if (!terminalContainerRef.current) return
 
+    // If terminal already exists (e.g., from a panel move), skip creation
+    if (term) {
+      return
+    }
+
     const terminal = new Terminal({
       cursorBlink: true,
       theme: theme === "light" ? lightTheme : darkTheme,
@@ -54,7 +59,7 @@ export default function EditorTerminal({
 
     terminalContainerRef.current.addEventListener(
       "contextmenu",
-      handleContextMenu
+      handleContextMenu,
     )
 
     // keyboard paste handler
@@ -79,13 +84,14 @@ export default function EditorTerminal({
     setTerm(terminal)
 
     return () => {
-      terminal.dispose()
+      // Don't dispose terminal on unmount - it may be reused after panel move
+      // Terminal disposal is handled explicitly in closeTerminal
       terminalContainerRef.current?.removeEventListener(
         "contextmenu",
-        handleContextMenu
+        handleContextMenu,
       )
     }
-  }, [])
+  }, [term])
 
   useEffect(() => {
     if (term) {
@@ -103,6 +109,20 @@ export default function EditorTerminal({
       term.open(terminalContainerRef.current)
       fitAddon.fit()
       fitAddonRef.current = fitAddon
+    } else {
+      // Terminal already opened - reattach to new container
+      const terminalElement = term.element
+      if (
+        terminalElement &&
+        terminalElement.parentElement !== terminalContainerRef.current
+      ) {
+        // Move the terminal DOM element to the new container
+        terminalContainerRef.current.appendChild(terminalElement)
+        // Refit after reattachment
+        setTimeout(() => {
+          fitAddonRef.current?.fit()
+        }, 10)
+      }
     }
 
     const disposableOnData = term.onData((data) => {
@@ -132,7 +152,7 @@ export default function EditorTerminal({
             console.error("Error during fit:", err)
           }
         }
-      }, 50)
+      }, 50),
     )
 
     resizeObserver.observe(terminalContainerRef.current)

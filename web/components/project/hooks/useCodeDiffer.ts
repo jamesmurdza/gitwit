@@ -113,6 +113,20 @@ export function useCodeDiffer({
 
       ;(model as any).granularBlocks = diffResult.granularBlocks
 
+      // Verify decorations are readable immediately
+      let readableDecorations = 0
+      for (let i = 1; i <= Math.min(model.getLineCount(), 20); i++) {
+        const lineDecs = model.getLineDecorations(i) || []
+        if (
+          lineDecs.some(
+            (d) =>
+              (d.options as any)?.className === "added-line-decoration" ||
+              (d.options as any)?.className === "removed-line-decoration",
+          )
+        ) {
+          readableDecorations++
+        }
+      }
       const checkAndResolve = (count: number) => {
         // Update state for UI
         setActiveWidgetsState(count > 0)
@@ -163,14 +177,20 @@ export function useCodeDiffer({
         },
       )
 
-      // Suppress during BUILD of NEW widgets because it might trigger cleanup internally
-      // or start at 0 before adding.
-      suppressZeroNotifyRef.current = true
-      widgetManagerRef.current.buildAllWidgetsFromDecorations()
-      suppressZeroNotifyRef.current = false
+      // Store decorations collection reference to prevent garbage collection
+      ;(model as any).diffDecorationsCollection = newDecorations
+      currentEditorRef.layout()
+      requestAnimationFrame(() => {
+        if (!widgetManagerRef.current) return
 
-      // Manually check once after build is done
-      checkAndResolve(widgetManagerRef.current.hasActiveWidgets() ? 1 : 0)
+        suppressZeroNotifyRef.current = true
+        widgetManagerRef.current.buildAllWidgetsFromDecorations()
+        suppressZeroNotifyRef.current = false
+
+        // Manually check once after build is done
+        const hasWidgets = widgetManagerRef.current.hasActiveWidgets()
+        checkAndResolve(hasWidgets ? 1 : 0)
+      })
 
       return newDecorations
     },

@@ -16,14 +16,14 @@ import * as React from "react"
 // #region Context
 type SidebarContextType = {
   activeItem: string | null
-  setActiveItem: (id: string | null) => void
+  setActiveItem: (id: string) => void
   registerItem: (id: string) => void
   unregisterItem: (id: string) => void
   items: string[]
 }
 
 const SidebarContext = React.createContext<SidebarContextType | undefined>(
-  undefined
+  undefined,
 )
 
 export function useSidebar() {
@@ -44,7 +44,7 @@ export function SidebarProvider({
   defaultActiveItem = null,
 }: SidebarProviderProps) {
   const [activeItem, setActiveItem] = React.useState<string | null>(
-    defaultActiveItem
+    defaultActiveItem,
   )
   const [items, setItems] = React.useState<string[]>([])
 
@@ -67,7 +67,7 @@ export function SidebarProvider({
       unregisterItem,
       items,
     }),
-    [activeItem, registerItem, unregisterItem, items]
+    [activeItem, registerItem, unregisterItem, items],
   )
 
   return (
@@ -77,8 +77,7 @@ export function SidebarProvider({
 // #endregion
 
 // #region Button
-interface SidebarButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface SidebarButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean
   id: string
   tooltip?: string | React.ComponentProps<typeof TooltipContent>
@@ -110,7 +109,7 @@ export const SidebarButton = React.forwardRef<
       children,
       ...props
     },
-    ref
+    ref,
   ) => {
     const { activeItem, setActiveItem, registerItem, unregisterItem } =
       useSidebar()
@@ -126,9 +125,9 @@ export const SidebarButton = React.forwardRef<
     const handleClick = React.useCallback(
       (e: React.MouseEvent<HTMLButtonElement>) => {
         onClick?.(e)
-        setActiveItem(isActive ? null : id)
+        setActiveItem(id)
       },
-      [onClick, setActiveItem, isActive, id]
+      [onClick, setActiveItem, id],
     )
 
     const button = (
@@ -137,7 +136,7 @@ export const SidebarButton = React.forwardRef<
         data-active={isActive}
         className={cn(
           buttonVariants({ variant: isActive ? "secondary" : variant, size }),
-          className
+          className,
         )}
         onClick={handleClick}
         {...props}
@@ -177,7 +176,7 @@ export const SidebarButton = React.forwardRef<
         </Tooltip>
       </div>
     )
-  }
+  },
 )
 
 SidebarButton.displayName = "SidebarButton"
@@ -205,7 +204,7 @@ export function SidebarContent({
         "h-full transition-all duration-300 delay-75 overflow-hidden",
         hideSidebar ? "w-0" : "flex-auto",
         !isActive && !hideSidebar && "hidden",
-        className
+        className,
       )}
       {...props}
     >
@@ -239,8 +238,8 @@ export function SidebarRail({
   return (
     <div
       className={cn(
-        "w-12 flex flex-col items-center gap-3 pt-2 border-r border-secondary",
-        className
+        "min-w-12 flex flex-col items-center gap-3 pt-2 border-r border-secondary",
+        className,
       )}
       {...props}
     >

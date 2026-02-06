@@ -231,9 +231,11 @@ function parseBlocks(blockContent: string): Omit<AiderDiffBlock, "filePath">[] {
     // Only remove completely empty lines at the very start/end if they exist
     // But preserve internal empty lines and all indentation
 
-    // Allow empty search blocks for new files (searchLines.length === 0)
-    // This means the entire file is new and should be created from replaceLines
-    if (searchLines.length >= 0 && replaceLines.length > 0) {
+    // Allow:
+    // - Empty search blocks for new files (searchLines.length === 0, replace has content)
+    // - Non-empty search with empty replace for deletions (delete matched region)
+    // Skip only when BOTH sides are completely empty.
+    if (searchLines.length > 0 || replaceLines.length > 0) {
       blocks.push({
         searchLines,
         replaceLines,
