@@ -22,7 +22,7 @@ interface UseAIFileActionsProps {
     mergedCode: string,
     originalCode: string,
     targetFileId?: string,
-  ) => void
+  ) => unknown
   updateFileDraft: (fileId: string, content?: string) => void
 }
 
@@ -38,8 +38,12 @@ export function useAIFileActions({
 }: UseAIFileActionsProps) {
   const getDraft = useAppStore((s) => s.getDraft)
 
-  // Queue for failed diff applies (when model was null)
   const pendingDiffsQueueRef = useRef<Map<string, any>>(new Map())
+  const pendingApplyReadyRef = useRef<
+    Map<string, { mergedCode: string; originalCode: string }>
+  >(new Map())
+  const [retryApplyTick, setRetryApplyTick] = useState(0)
+  const retryCountRef = useRef(0)
 
   // --- Queue Management for "Keep All" ---
   const pendingPreviewApplyRef = useRef<{
@@ -290,11 +294,20 @@ export function useAIFileActions({
 
         // 5. Apply to Editor
         if (mergeResult) {
-          handleApplyCodeWithDecorations(
+          const applied = handleApplyCodeWithDecorations(
             mergeResult.mergedCode,
             mergeResult.originalCode,
             targetTab.id,
           )
+          // If editor wasn't ready (e.g. newly created file tab still loading), queue for retry
+          if (applied === null) {
+            pendingApplyReadyRef.current.set(targetTab.id, {
+              mergedCode: mergeResult.mergedCode,
+              originalCode: mergeResult.originalCode,
+            })
+            retryCountRef.current = 0
+            setRetryApplyTick((t) => t + 1)
+          }
         }
       } catch (error) {
         console.error("[ai-file-actions] Apply Code Failed:", error)
@@ -315,19 +328,45 @@ export function useAIFileActions({
     ],
   )
 
-  // Retry pending diffs when active tab changes
-  // No need to wait for model - if file is open, handlers should be available
+  // Retry pending diffs when active tab changes; also retry ready-to-apply when editor mounts
   useEffect(() => {
     if (!activeTab?.id) return
 
     const normalizedPath = normalizePath(activeTab.id)
-    const pending = pendingDiffsQueueRef.current.get(normalizedPath)
 
+    // First try ready-to-apply (editor was not ready on first attempt)
+    const ready = pendingApplyReadyRef.current.get(normalizedPath)
+    if (ready) {
+      const applied = handleApplyCodeWithDecorations(
+        ready.mergedCode,
+        ready.originalCode,
+        normalizedPath,
+      )
+      if (applied !== null) {
+        pendingApplyReadyRef.current.delete(normalizedPath)
+        retryCountRef.current = 0
+      } else if (retryCountRef.current < 5) {
+        retryCountRef.current += 1
+        const id = setTimeout(() => setRetryApplyTick((t) => t + 1), 150)
+        return () => clearTimeout(id)
+      } else {
+        pendingApplyReadyRef.current.delete(normalizedPath)
+        retryCountRef.current = 0
+      }
+    }
+
+    // Then process queue (tab switch case)
+    const pending = pendingDiffsQueueRef.current.get(normalizedPath)
     if (pending) {
       pendingDiffsQueueRef.current.delete(normalizedPath)
       handleApplyCodeFromChat(pending.code, pending.language, pending.options)
     }
-  }, [activeTab?.id, handleApplyCodeFromChat])
+  }, [
+    activeTab?.id,
+    handleApplyCodeFromChat,
+    handleApplyCodeWithDecorations,
+    retryApplyTick,
+  ])
 
   const enqueueFileContentUpdate = useCallback(
     (filePath: string, content: string) => {
