@@ -19,6 +19,7 @@ import Image from "next/image"
 import { useParams } from "next/navigation"
 import React, { useCallback, useRef, useState } from "react"
 import { getIconForFile } from "vscode-icons-js"
+import { normalizePath, pathMatchesTab } from "../chat/lib/utils"
 import { useDiffSessionManager } from "../hooks/useDiffSessionManager"
 import { useFileContent, useFileTree } from "../hooks/useFile"
 
@@ -55,16 +56,22 @@ function useFileSelection(file: TFile) {
         fileId: file.id,
       }),
     )
-    if (dockRef.current) {
-      // Check if file is already open
-      const existingPanel = dockRef.current.getPanel(file.id)
+    const dock = dockRef.current
+    if (dock) {
+      const normalizedId = normalizePath(file.id)
+      const existingPanel =
+        dock.panels.find((p) =>
+          pathMatchesTab(normalizedId, {
+            id: p.id,
+            name: p.id.split("/").pop() || p.id,
+          }),
+        ) ?? undefined
+        
       if (existingPanel) {
-        // Just activate the existing panel
         existingPanel.api.setActive()
       } else {
-        // Add the file as a new editor panel
-        dockRef.current.addPanel({
-          id: file.id,
+        dock.addPanel({
+          id: normalizedId,
           component: "editor",
           title: file.name,
           tabComponent: "editor",

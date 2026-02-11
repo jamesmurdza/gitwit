@@ -5,7 +5,7 @@ import { TTab } from "@/lib/types"
 import { useAppStore } from "@/store/context"
 import { useCallback } from "react"
 import { ApplyMergedFileArgs } from "../../chat/lib/types"
-import { normalizePath } from "../../chat/lib/utils"
+import { findPanelByPath, normalizePath } from "../../chat/lib/utils"
 import { useAIFileActions } from "../../hooks/useAIFileActions"
 
 /**
@@ -24,19 +24,20 @@ export function useChatPanelHandlers() {
   const storeSetActiveTab = useAppStore((s) => s.setActiveTab)
   const activeFileId = activeTab?.id ?? null
 
-  // setActiveTab adapter - activates panel in Dockview
+  // setActiveTab adapter - activates panel in Dockview (reuse existing panel if same file)
   const setActiveTab = useCallback(
     (tab: TTab) => {
       // Update editor store's active tab
       storeSetActiveTab(tab)
 
-      // Ensure there is a corresponding Dockview editor panel and activate it
-      const panel = dockRef.current?.getPanel(tab.id)
+      const dock = dockRef.current
+      if (!dock) return
+      // Prefer exact id, then find by path so we don't open a duplicate tab
+      const panel = dock.getPanel(tab.id) ?? findPanelByPath(dock, tab.id)
       if (panel) {
         panel.api.setActive()
       } else {
-        // Panel doesn't exist, create it
-        dockRef.current?.addPanel({
+        dock.addPanel({
           id: tab.id,
           component: "editor",
           title: tab.name,
@@ -187,21 +188,21 @@ export function useChatPanelHandlers() {
     forceClearAllDecorations()
   }, [forceClearAllDecorations])
 
-  // onOpenFile adapter - opens/activates editor panel
+  // onOpenFile adapter - opens/activates editor panel (reuse existing panel if same file)
   const onOpenFile = useCallback(
     (filePath: string) => {
       // 1) Let useAIFileActions manage tabs + activeTab + pending diff queue
       openFile(filePath)
 
-      // 2) Ensure there is a corresponding Dockview editor panel and activate it
+      const dock = dockRef.current
+      if (!dock) return
       const normalizedPath = normalizePath(filePath)
-      const panel = dockRef.current?.getPanel(normalizedPath)
-
+      const panel = dock.getPanel(normalizedPath) ?? findPanelByPath(dock, normalizedPath)
       if (panel) {
         panel.api.setActive()
       } else {
         const fileName = normalizedPath.split("/").pop() || normalizedPath
-        dockRef.current?.addPanel({
+        dock.addPanel({
           id: normalizedPath,
           component: "editor",
           title: fileName,
