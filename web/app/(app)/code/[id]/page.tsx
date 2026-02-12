@@ -1,7 +1,8 @@
 // import { Room } from "@/components/editor/live/room"
 import Navbar from "@/components/project/navbar"
 import { ProjectWrapper as Project } from "@/components/project/project-wrapper"
-import { EditorLayoutProvider } from "@/context/EditorLayoutContext"
+import { ContainerProvider } from "@/context/container-context"
+import { ProjectProvider } from "@/context/project-context"
 import { SocketProvider } from "@/context/SocketContext"
 import { TerminalProvider } from "@/context/TerminalContext"
 import { fileRouter, githubRouter } from "@/lib/api"
@@ -54,7 +55,7 @@ const getSharedUsers = async (usersToSandboxes: UsersToSandboxes[]) => {
         name: userData.name,
         avatarUrl: userData.avatarUrl,
       }
-    })
+    }),
   )
 
   return shared
@@ -87,12 +88,12 @@ export default async function CodePage({
     queryClient.prefetchQuery(
       githubRouter.repoStatus.getOptions({
         projectId: sandboxData.id,
-      })
+      }),
     ),
     queryClient.prefetchQuery(
       fileRouter.fileTree.getOptions({
         projectId: sandboxData.id,
-      })
+      }),
     ),
   ])
 
@@ -100,7 +101,7 @@ export default async function CodePage({
   const repoStatus = await queryClient.fetchQuery(
     githubRouter.repoStatus.getOptions({
       projectId: sandboxData.id,
-    })
+    }),
   )
 
   const hasRepo =
@@ -110,7 +111,7 @@ export default async function CodePage({
     await queryClient.prefetchQuery(
       githubRouter.getChangedFiles.getOptions({
         projectId: sandboxData.id,
-      })
+      }),
     )
   }
 
@@ -126,31 +127,40 @@ export default async function CodePage({
   }
 
   return (
-    <SocketProvider
-      token={authToken}
-      userId={userData.id}
-      sandboxId={sandboxData.id}
+    <ProjectProvider
+      value={{
+        project: sandboxData,
+        user: userData,
+      }}
     >
-      <AppStoreProvider>
-        <TerminalProvider>
-          <EditorLayoutProvider>
-            {/* <Room id={sandboxId}> */}
-            <div className="overflow-hidden overscroll-none w-screen h-screen grid [grid-template-rows:3.5rem_auto] bg-background">
-              <Navbar
-                userData={userData}
-                sandboxData={sandboxData}
-                shared={
-                  shared as { id: string; name: string; avatarUrl: string }[]
-                }
-              />
-              <HydrationBoundary state={dehydrate(queryClient)}>
-                <Project userData={userData} sandboxData={sandboxData} />
-              </HydrationBoundary>
-            </div>
-            {/* </Room> */}
-          </EditorLayoutProvider>
-        </TerminalProvider>
-      </AppStoreProvider>
-    </SocketProvider>
+      <SocketProvider
+        token={authToken}
+        userId={userData.id}
+        sandboxId={sandboxData.id}
+      >
+        <AppStoreProvider>
+          <TerminalProvider>
+            <ContainerProvider>
+              {/* <Room id={sandboxId}> */}
+              <div className="overflow-hidden overscroll-none w-screen h-screen grid [grid-template-rows:3.5rem_auto] bg-background">
+                <Navbar
+                  shared={
+                    shared as {
+                      id: string
+                      name: string
+                      avatarUrl: string
+                    }[]
+                  }
+                />
+                <HydrationBoundary state={dehydrate(queryClient)}>
+                  <Project />
+                </HydrationBoundary>
+              </div>
+              {/* </Room> */}
+            </ContainerProvider>
+          </TerminalProvider>
+        </AppStoreProvider>
+      </SocketProvider>
+    </ProjectProvider>
   )
 }

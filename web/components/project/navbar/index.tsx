@@ -3,11 +3,11 @@
 import { Logo } from "@/components/ui/logo"
 import { ThemeSwitcher } from "@/components/ui/theme-switcher"
 import UserButton from "@/components/ui/userButton"
-import { Sandbox, User } from "@/lib/types"
 import { Pencil } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 // import { Avatars } from "../live/avatars"
+import { useProjectContext } from "@/context/project-context"
 import DeployButtonModal from "./deploy"
 import DownloadButton from "./downloadButton"
 import EditSandboxModal from "./edit"
@@ -15,31 +15,27 @@ import RunButtonModal from "./run"
 import ShareSandboxModal from "./share"
 
 export default function Navbar({
-  userData,
-  sandboxData,
   shared,
 }: {
-  userData: User
-  sandboxData: Sandbox
   shared: { id: string; name: string; avatarUrl: string }[]
 }) {
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
-
-  const isOwner = sandboxData.userId === userData.id
+  const { user, project } = useProjectContext()
+  const isOwner = project.userId === user.id
 
   return (
     <>
       <EditSandboxModal
         open={isEditOpen}
         setOpen={setIsEditOpen}
-        data={sandboxData}
+        data={project}
       />
       <ShareSandboxModal
         open={isShareOpen}
         setOpen={setIsShareOpen}
-        data={sandboxData}
+        data={project}
         shared={shared}
       />
       <div className="h-14 shrink-0 px-2 w-full flex items-center justify-between border-b border-border">
@@ -51,7 +47,7 @@ export default function Navbar({
             <Logo />
           </Link>
           <div className="text-sm font-medium flex items-center">
-            {sandboxData.name}
+            {project.name}
             {isOwner ? (
               <button
                 onClick={() => setIsEditOpen(true)}
@@ -65,26 +61,23 @@ export default function Navbar({
         <RunButtonModal
           isRunning={isRunning}
           setIsRunning={setIsRunning}
-          sandboxData={sandboxData}
+          sandboxData={project}
         />
         <div className="flex items-center h-full space-x-4">
           {/* <Avatars /> */}
 
           {isOwner ? (
             <>
-              <DeployButtonModal data={sandboxData} userData={userData} />
+              <DeployButtonModal data={project} userData={user} />
               {/* <Button variant="outline" onClick={() => setIsShareOpen(true)}>
                 <Users className="w-4 h-4 mr-2" />
                 Share
               </Button> */}
-              <DownloadButton
-                name={sandboxData.name}
-                projectId={sandboxData.id}
-              />
+              <DownloadButton name={project.name} projectId={project.id} />
             </>
           ) : null}
           <ThemeSwitcher />
-          <UserButton userData={userData} />
+          <UserButton userData={user} />
         </div>
       </div>
     </>

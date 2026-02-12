@@ -234,5 +234,25 @@ export {
   pathMatchesTab,
   processCodeContext,
   shouldTreatAsContext,
-  stringifyContent,
+  stringifyContent
 }
+
+
+export function findPanelByPath(
+  dockApi: { getPanel: (id: string) => { api: { setActive: () => void } } | undefined; panels: { id: string }[] } | null,
+  filePath: string
+): { api: { setActive: () => void } } | undefined {
+  if (!dockApi?.panels?.length) return undefined
+  const normalized = normalizePath(filePath)
+  const exact = dockApi.getPanel(normalized)
+  if (exact) return exact
+  
+  const found = dockApi.panels.find((p) =>
+    pathMatchesTab(normalized, {
+      id: p.id,
+      name: p.id.split("/").pop() || p.id,
+    })
+  )
+  return found ? dockApi.getPanel(found.id) : undefined
+}
+

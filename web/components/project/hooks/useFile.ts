@@ -31,8 +31,8 @@ export function useFileTree() {
       onMutate({ folderId }) {
         setTabs((tabs) =>
           tabs.filter(
-            (tab) => tab.id !== folderId && !tab.id.startsWith(folderId + "/")
-          )
+            (tab) => tab.id !== folderId && !tab.id.startsWith(folderId + "/"),
+          ),
         )
         setActiveTab((activeTab) => {
           if (
@@ -49,7 +49,7 @@ export function useFileTree() {
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
               projectId,
-            })
+            }),
           )
           .then(() => {
             toast.success(message)
@@ -76,7 +76,7 @@ export function useFileTree() {
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
               projectId,
-            })
+            }),
           )
           .then(() => {
             toast.success(message)
@@ -94,7 +94,7 @@ export function useFileTree() {
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
               projectId,
-            })
+            }),
           )
           .then(() => {
             toast.success(message)
@@ -106,13 +106,12 @@ export function useFileTree() {
     })
 
   const { mutateAsync: rawSaveFile } = fileRouter.saveFile.useMutation({
-    onMutate: async ({ fileId, content }) => {
-      // Optimistically update changed files with the actual content
-      updateChangedFilesOptimistically("update", fileId, content)
-    },
     onSuccess(_, { fileId }) {
-      setTabs((tabs) =>
-        tabs.map((tab) => (tab.id === fileId ? { ...tab, saved: true } : tab))
+      return queryClient.invalidateQueries(
+        fileRouter.fileContent.getOptions({
+          fileId,
+          projectId,
+        }),
       )
     },
   })
@@ -121,7 +120,7 @@ export function useFileTree() {
   const { mutate: moveFile } = fileRouter.moveFile.useMutation({
     onMutate: async (toBeMoved) => {
       await queryClient.cancelQueries(
-        fileRouter.fileTree.getOptions({ projectId })
+        fileRouter.fileTree.getOptions({ projectId }),
       )
 
       const previous = queryClient.getQueryData(fileTreeKey)
@@ -147,7 +146,7 @@ export function useFileTree() {
                 ...old,
                 data: newTree,
               }
-            : old
+            : old,
         )
       }
 
@@ -165,7 +164,7 @@ export function useFileTree() {
     onSettled: () => {
       // Always refetch after error or success
       queryClient.invalidateQueries(
-        fileRouter.fileTree.getOptions({ projectId })
+        fileRouter.fileTree.getOptions({ projectId }),
       )
     },
   })
@@ -217,7 +216,7 @@ export function useFileContent(
   }: {
     id: string
     enabled?: boolean
-  } = { id: "", enabled: true }
+  } = { id: "", enabled: true },
 ) {
   const { id: projectId } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
@@ -239,7 +238,7 @@ export function useFileContent(
       fileRouter.fileContent.getFetchOptions({
         fileId,
         projectId,
-      })
+      }),
     )
   }, [fileId, projectId])
 
@@ -253,7 +252,7 @@ export function useFileContent(
 // Helper: remove a node by path, returning the removed node
 function removeNode(
   nodes: FileTree,
-  targetPath: string
+  targetPath: string,
 ): FileTree[number] | null {
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i]
@@ -274,7 +273,7 @@ function rebaseNodeIds<
     name: string
     type: "file" | "folder"
     children?: any
-  }
+  },
 >(node: N, newParentPath: string): N {
   const parent = newParentPath === "/" ? "" : newParentPath.replace(/\/$/, "")
 
@@ -298,7 +297,7 @@ function rebaseNodeIds<
 function insertNode(
   nodes: FileTree,
   folderPath: string,
-  nodeToInsert: FileTree[number]
+  nodeToInsert: FileTree[number],
 ): boolean {
   if (folderPath === "/") {
     nodes.push(nodeToInsert)

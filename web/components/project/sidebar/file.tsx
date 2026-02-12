@@ -6,6 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
+import { useContainer } from "@/context/container-context"
 import { getParentPath, useFileExplorer } from "@/context/FileExplorerContext"
 import { fileRouter } from "@/lib/api"
 import { TFile } from "@/lib/types"
@@ -18,6 +19,7 @@ import Image from "next/image"
 import { useParams } from "next/navigation"
 import React, { useCallback, useRef, useState } from "react"
 import { getIconForFile } from "vscode-icons-js"
+import { normalizePath, pathMatchesTab } from "../chat/lib/utils"
 import { useDiffSessionManager } from "../hooks/useDiffSessionManager"
 import { useFileContent, useFileTree } from "../hooks/useFile"
 
@@ -35,6 +37,7 @@ const noopNull = () => null
 function useFileSelection(file: TFile) {
   const { id: projectId } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
+  const { dockRef } = useContainer()
   const diffFunctions = useAppStore((s) => s.diffFunctions)
 
   const { handleSetActiveTab } = useDiffSessionManager(
@@ -42,7 +45,7 @@ function useFileSelection(file: TFile) {
     diffFunctions?.getUnresolvedSnapshot ?? noopNull,
     diffFunctions?.restoreFromSnapshot ?? noop,
     diffFunctions?.clearVisuals ?? noop,
-    diffFunctions?.forceClearAllDecorations ?? noop
+    diffFunctions?.forceClearAllDecorations ?? noop,
   )
 
   const selectFile = useCallback(async () => {
@@ -51,8 +54,31 @@ function useFileSelection(file: TFile) {
       fileRouter.fileContent.getFetchOptions({
         projectId,
         fileId: file.id,
-      })
+      }),
     )
+    const dock = dockRef.current
+    if (dock) {
+      const normalizedId = normalizePath(file.id)
+      const existingPanel =
+        dock.panels.find((p) =>
+          pathMatchesTab(normalizedId, {
+            id: p.id,
+            name: p.id.split("/").pop() || p.id,
+          }),
+        ) ?? undefined
+        
+      if (existingPanel) {
+        existingPanel.api.setActive()
+      } else {
+        dock.addPanel({
+          id: normalizedId,
+          component: "editor",
+          title: file.name,
+          tabComponent: "editor",
+        })
+      }
+    }
+
     handleSetActiveTab(newTab)
   }, [file, projectId, queryClient, handleSetActiveTab])
 
@@ -64,7 +90,7 @@ function useFileSelection(file: TFile) {
  */
 function useHoverPrefetch(
   prefetchFileContent: () => Promise<void>,
-  isDisabled: boolean
+  isDisabled: boolean,
 ) {
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -114,14 +140,14 @@ function SidebarFile(props: TFile) {
   const inputRef = useRef<HTMLInputElement>(null)
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [imgSrc, setImgSrc] = useState(
-    () => `/icons/${getIconForFile(props.name)}`
+    () => `/icons/${getIconForFile(props.name)}`,
   )
   const [isEditing, setIsEditing] = useState(false)
 
   // Hover prefetching
   const { handleMouseEnter, handleMouseLeave } = useHoverPrefetch(
     prefetchFileContent,
-    isEditing || isDeletingFile
+    isEditing || isDeletingFile,
   )
 
   // Event handlers
@@ -173,7 +199,7 @@ function SidebarFile(props: TFile) {
       e.preventDefault()
       handleRename()
     },
-    [handleRename]
+    [handleRename],
   )
 
   const handleInputClick = useCallback((e: React.MouseEvent) => {
@@ -273,7 +299,7 @@ function FileNameInput({
         className={cn(
           "bg-transparent transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring rounded-sm w-full truncate",
           !isEditing && "pointer-events-none",
-          isRenaming && "animate-pulse"
+          isRenaming && "animate-pulse",
         )}
         disabled={!isEditing}
         autoFocus

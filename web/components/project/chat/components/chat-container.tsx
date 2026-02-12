@@ -2,18 +2,11 @@
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useEditorLayout } from "@/context/EditorLayoutContext"
+import { useContainer } from "@/context/container-context"
 import { cn } from "@/lib/utils"
 import { Slot } from "@radix-ui/react-slot"
 import { type VariantProps } from "class-variance-authority"
@@ -24,7 +17,6 @@ import {
   FoldHorizontal,
   MaximizeIcon,
   MinimizeIcon,
-  SettingsIcon,
 } from "lucide-react"
 import {
   createContext,
@@ -48,7 +40,7 @@ const useChatContainerContext = () => {
   const context = useContext(ChatContainerContext)
   if (!context) {
     throw new Error(
-      "useChatContainerContext must be used within a ChatContainerProvider"
+      "useChatContainerContext must be used within a ChatContainerProvider",
     )
   }
   return context
@@ -82,7 +74,7 @@ function ChatContainerRoot({
         !event.altKey &&
         !event.shiftKey &&
         !(event.target as HTMLElement)?.matches(
-          "input, textarea, [contenteditable]"
+          "input, textarea, [contenteditable]",
         )
       ) {
         if (document.startViewTransition) {
@@ -119,7 +111,7 @@ function ChatContainerRoot({
           maximized
             ? "fixed inset-4 z-50 rounded-lg shadow-[0_0_0_1px_hsl(var(--muted-foreground)_/_0.4)]"
             : "h-full",
-          className
+          className,
         )}
         style={style}
         {...props}
@@ -208,7 +200,7 @@ function ChatContainerHeader({
     <div
       className={cn(
         "flex justify-between items-center text-center sm:text-left p-2 sticky top-0 border-b border-border",
-        className
+        className,
       )}
       {...props}
     />
@@ -250,7 +242,8 @@ function ChatContainerActions({
 
 // #region Action
 export interface ChatContainerActionProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   label: string
   asChild?: boolean
@@ -273,7 +266,7 @@ function ChatContainerAction({
         <Comp
           className={cn(
             buttonVariants({ variant, size, className }),
-            "h-6 w-6"
+            "h-6 w-6",
           )}
           style={{ viewTransitionName: `chat-action-${id}`, ...style }}
           {...props}
@@ -305,7 +298,7 @@ function ChatContainerEmpty({
     <div
       className={cn(
         "flex-1 flex flex-col justify-center items-center gap-3",
-        className
+        className,
       )}
       {...props}
     >
@@ -344,7 +337,7 @@ function ScrollButton({
         !isAtBottom
           ? "translate-y-0 scale-100 opacity-100"
           : "pointer-events-none translate-y-4 scale-95 opacity-0",
-        className
+        className,
       )}
       onClick={() => scrollToBottom()}
       {...props}
@@ -355,7 +348,11 @@ function ScrollButton({
 }
 
 export function ChatContainerCollapse() {
-  const { toggleAIChat } = useEditorLayout()
+  const { gridRef } = useContainer()
+  function toggleAIChat() {
+    const panel = gridRef.current?.getPanel("chat")
+    panel?.api.setVisible(!panel.api.isVisible)
+  }
   const { maximized } = useChatContainerContext()
 
   return (

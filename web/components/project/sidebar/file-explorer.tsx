@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useContainer } from "@/context/container-context"
 import { useEditorLayout } from "@/context/EditorLayoutContext"
 import {
   FileExplorerProvider,
@@ -19,15 +20,90 @@ import New from "./new"
 
 export function FileExplorer() {
   const { id: projectId } = useParams<{ id: string }>()
-
+  const { dockRef } = useContainer()
   const { moveFile } = useFileTree()
+
+  // Ref to track the last pointer position during drag
+  const lastPointerPositionRef = React.useRef<{ x: number; y: number } | null>(
+    null,
+  )
+
+  // Track whether we're currently dragging a file (for external drop detection)
+  const isDraggingFileRef = React.useRef(false)
+  const isOverDockviewRef = React.useRef(false)
+
+  // Track pointer position during drag
+  React.useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      lastPointerPositionRef.current = { x: e.clientX, y: e.clientY }
+    }
+    document.addEventListener("pointermove", handlePointerMove)
+    return () => document.removeEventListener("pointermove", handlePointerMove)
+  }, [])
+
+  // Helper to check if pointer is over dockview
+  const checkIsOverDockview = React.useCallback(
+    (x: number, y: number): boolean => {
+      const dockviewElement = document.querySelector('[class*="dv-dockview"]')
+      if (dockviewElement) {
+        const rect = dockviewElement.getBoundingClientRect()
+        return (
+          x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+        )
+      }
+      return false
+    },
+    [],
+  )
+
+  // Update visual feedback on dockview when dragging over it
+  const updateDockviewFeedback = React.useCallback((isOver: boolean) => {
+    const dockviewElement = document.querySelector('[class*="dv-dockview"]')
+    if (dockviewElement) {
+      if (isOver) {
+        dockviewElement.setAttribute("data-file-drag-over", "true")
+        // Hide the drag feedback clone when over dockview
+        document.body.setAttribute("data-dragging-to-dockview", "true")
+      } else {
+        dockviewElement.removeAttribute("data-file-drag-over")
+        document.body.removeAttribute("data-dragging-to-dockview")
+      }
+    }
+  }, [])
 
   return (
     <FileExplorerProvider>
       <DragDropProvider
+        onDragStart={(event) => {
+          const { source } = event.operation
+          if (source?.type === "file") {
+            isDraggingFileRef.current = true
+          }
+        }}
+        onDragMove={(event) => {
+          // Only track for file drags
+          if (!isDraggingFileRef.current) return
+
+          const pointerPos = lastPointerPositionRef.current
+          if (pointerPos) {
+            const isOver = checkIsOverDockview(pointerPos.x, pointerPos.y)
+            if (isOver !== isOverDockviewRef.current) {
+              isOverDockviewRef.current = isOver
+              updateDockviewFeedback(isOver)
+            }
+          }
+        }}
         onDragEnd={(event) => {
+          // Clean up visual feedback
+          updateDockviewFeedback(false)
+          const wasOverDockview = isOverDockviewRef.current
+          isDraggingFileRef.current = false
+          isOverDockviewRef.current = false
+
           if (event.canceled) return
           const { source, target } = event.operation
+
+          // Handle file move within file explorer
           if (source && target) {
             if (source.type === "file" && target.type === "folder") {
               const fileId = source.id.toString() // e.g. "/src/hello.ts"
@@ -42,12 +118,43 @@ export function FileExplorer() {
                 folderId: targetFolderId,
                 fileId,
               })
+              return
+            }
+          }
+
+          // Handle file drop outside file explorer (into dockview)
+          // This happens when source exists but target is null/undefined
+          if (source && !target && source.type === "file" && wasOverDockview) {
+            const fileId = source.id.toString()
+            const fileName = fileId.split("/").pop() || fileId
+
+            // Abort the drag operation to prevent return animation
+            const suspension = event.suspend()
+            suspension.abort()
+
+            if (dockRef.current) {
+              // Check if file is already open
+              const existingPanel = dockRef.current.getPanel(fileId)
+              if (existingPanel) {
+                // Just activate the existing panel
+                existingPanel.api.setActive()
+              } else {
+                // Add the file as a new editor panel
+                dockRef.current.addPanel({
+                  id: fileId,
+                  component: "editor",
+                  title: fileName,
+                  tabComponent: "editor",
+                })
+              }
             }
           }
         }}
       >
-        <RootFolder />
-        <AIChatControl />
+        <div className="flex flex-col h-full">
+          <RootFolder />
+          {/* <AIChatControl /> */}
+        </div>
       </DragDropProvider>
     </FileExplorerProvider>
   )
@@ -79,14 +186,14 @@ function RootFolder() {
     (node: HTMLDivElement | null) => {
       ;(droppableRef as unknown as (node: HTMLDivElement | null) => void)(node)
     },
-    [droppableRef]
+    [droppableRef],
   )
 
   return (
     <div
       ref={setRefs}
       data-isdrop={isDropTarget}
-      className="styled-scrollbar hover-scrollbar flex-grow overflow-auto px-2 pt-0 pb-4 relative data-[isdrop=true]:bg-secondary/50 data-[isdrop=true]:rounded-sm data-[isdrop=true]:overflow-hidden min-w-0"
+      className="styled-scrollbar flex-1 hover-scrollbar flex-grow overflow-auto px-2 pt-0 pb-4 relative data-[isdrop=true]:bg-secondary/50 data-[isdrop=true]:rounded-sm data-[isdrop=true]:overflow-hidden min-w-0"
     >
       <div className="flex w-full items-center justify-between h-8 pb-1 isolate z-10 sticky pt-2 top-0 bg-background">
         <h2 className="font-medium">Explorer</h2>
@@ -121,7 +228,7 @@ function RootFolder() {
                 <SidebarFile key={child.id} {...child} />
               ) : (
                 <SidebarFolder key={child.id} {...child} />
-              )
+              ),
             )}
             {showNewFormAtRoot && creationType !== null && (
               <New
@@ -164,7 +271,7 @@ function AIChatControl() {
           "w-full justify-start text-sm font-normal h-8 px-2 mb-2 border-t",
           isAIChatOpen
             ? "bg-muted-foreground/25 text-foreground"
-            : "text-muted-foreground"
+            : "text-muted-foreground",
         )}
         onClick={toggleAIChat}
         aria-disabled={false}
@@ -173,7 +280,7 @@ function AIChatControl() {
         <MessageSquareMore
           className={cn(
             "h-4 w-4 mr-2",
-            isAIChatOpen ? "text-indigo-500" : "text-indigo-500 opacity-70"
+            isAIChatOpen ? "text-indigo-500" : "text-indigo-500 opacity-70",
           )}
         />
         AI Chat

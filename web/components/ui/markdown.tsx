@@ -181,7 +181,7 @@ const CodeComponent = ({
     <Suspense fallback={<CodeBlockSkeleton />}>
       <CodeBlock
         className={cn("overflow-x-auto border-border border-t", className)}
-        code={code}
+        code={code.trim()}
         language={language}
         filename={fileInfo?.fileName ?? undefined}
         filePath={fileInfo?.filePath ?? null}
@@ -191,7 +191,7 @@ const CodeComponent = ({
         {showCodeControls && (
           <>
             <CodeBlockRunButton language={language} />
-            <CodeBlockDownloadButton code={code} language={language} />
+            <CodeBlockDownloadButton code={code.trim()} language={language} />
             <CodeBlockCopyButton />
           </>
         )}

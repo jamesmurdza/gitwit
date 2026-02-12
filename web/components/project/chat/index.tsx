@@ -52,11 +52,11 @@ type AIChatProps = {
       >
       getCurrentFileContent?: (filePath: string) => Promise<string> | string
       getMergeStatus?: (
-        filePath: string
+        filePath: string,
       ) =>
         | { status: string; result?: FileMergeResult; error?: string }
         | undefined
-    }
+    },
   ) => Promise<void>
   onRejectCode?: () => void
   precomputeMergeForFile?: PrecomputeMergeFn
@@ -65,7 +65,6 @@ type AIChatProps = {
 
   getCurrentFileContent?: GetCurrentFileContentFn
 
-  activeFileId?: string
   onOpenFile?: (filePath: string) => void
 }
 
@@ -76,9 +75,7 @@ function AIChatBase({
   applyPrecomputedMerge,
   restoreOriginalFile,
 
-
   getCurrentFileContent,
-  activeFileId,
   onOpenFile,
 }: AIChatProps) {
   return (
@@ -102,7 +99,6 @@ function AIChatBase({
         applyPrecomputedMerge={applyPrecomputedMerge}
         restoreOriginalFile={restoreOriginalFile}
         getCurrentFileContent={getCurrentFileContent}
-        activeFileId={activeFileId}
         onApplyCode={onApplyCode}
         onOpenFile={onOpenFile}
       />
@@ -119,8 +115,7 @@ export const AIChat = React.memo(
     prev.applyPrecomputedMerge === next.applyPrecomputedMerge &&
     prev.restoreOriginalFile === next.restoreOriginalFile &&
     prev.getCurrentFileContent === next.getCurrentFileContent &&
-    prev.activeFileId === next.activeFileId &&
-    prev.onOpenFile === next.onOpenFile
+    prev.onOpenFile === next.onOpenFile,
 )
 function MainChatContent({
   onApplyCode,
@@ -132,21 +127,22 @@ function MainChatContent({
     code: string,
     language?: string,
     options?: {
+      targetFilePath?: string
       mergeStatuses?: Record<
         string,
         { status: string; result?: any; error?: string }
       >
       getCurrentFileContent?: (filePath: string) => Promise<string> | string
       getMergeStatus?: (
-        filePath: string
+        filePath: string,
       ) => { status: string; result?: any; error?: string } | undefined
-    }
+    },
   ) => Promise<void>
   onRejectCode?: () => void
   getCurrentFileContent?: GetCurrentFileContentFn
   onOpenFile?: (filePath: string) => void
 }) {
-  console.log("onOpenFile :", onOpenFile)
+  //console.log("onOpenFile :", onOpenFile)
   const { messages, isLoading, mergeStatuses } = useChat()
   const isEmpty = messages.length === 0
   const mergeStatusesRef = React.useRef(mergeStatuses)
@@ -165,7 +161,7 @@ function MainChatContent({
         })
       }
     },
-    [onApplyCode, mergeStatuses, getCurrentFileContent]
+    [onApplyCode, mergeStatuses, getCurrentFileContent],
   )
 
   if (isEmpty) {
@@ -206,7 +202,7 @@ function ChatLoading() {
         className={cn(
           "bg-[linear-gradient(to_right,hsl(var(--muted-foreground))_40%,hsl(var(--foreground))_60%,hsl(var(--muted-foreground))_80%)]",
           "bg-[length:200%_auto] bg-clip-text font-medium text-transparent",
-          "animate-[shimmer_4s_infinite_linear] text-sm"
+          "animate-[shimmer_4s_infinite_linear] text-sm",
         )}
       >
         Gitwit is thinking...
@@ -219,7 +215,6 @@ function MainChatInput({
   applyPrecomputedMerge,
   restoreOriginalFile,
   getCurrentFileContent,
-  activeFileId,
   onApplyCode,
   onOpenFile,
 }: {
@@ -228,7 +223,6 @@ function MainChatInput({
 
   restoreOriginalFile?: RestorePrecomputedMergeFn
   getCurrentFileContent?: GetCurrentFileContentFn
-  activeFileId?: string
   onApplyCode?: (code: string, language?: string) => Promise<void>
   onOpenFile?: (filePath: string) => void
 }) {
@@ -248,7 +242,6 @@ function MainChatInput({
         applyPrecomputedMerge={applyPrecomputedMerge}
         restoreOriginalFile={restoreOriginalFile}
         getCurrentFileContent={getCurrentFileContent}
-        activeFileId={activeFileId}
         onApplyCode={onApplyCode}
         onOpenFile={onOpenFile}
       />
@@ -305,14 +298,14 @@ function ChatContexts() {
         })
       }
     },
-    [editorRef, addContextTab, removeContextTab]
+    [editorRef, addContextTab, removeContextTab],
   )
 
   // Debounced variant for cursor selection changes
   const debouncedUpdateSelection = useRef(
     debounce((selection: monaco.Selection, activeTab?: TTab) => {
       updateSelection(selection, activeTab)
-    }, 500)
+    }, 500),
   ).current
 
   useEffect(() => {
