@@ -32,5 +32,8 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "react-resizable-panels": "^3.0.6"
   }
 }
