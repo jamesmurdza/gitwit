@@ -4,7 +4,7 @@ import { defaultTools } from "@/lib/ai/tools"
 import { createAIClient, AIMessage, mergeAiderDiff } from "@gitwit/ai"
 import { templateConfigs } from "@gitwit/templates"
 import { streamText } from "hono/streaming"
-import { validator as zValidator } from "hono-openapi/zod"
+import { zValidator } from "@hono/zod-validator"
 import z from "zod"
 
 const messageSchema = z.object({

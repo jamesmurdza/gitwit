@@ -1,5 +1,4 @@
 import { createRouter } from "@/lib/api/create-app"
-import jsonContent from "@/lib/api/utils"
 import { db } from "@gitwit/db"
 import {
   sandbox,
@@ -11,26 +10,13 @@ import {
   usersToSandboxes,
 } from "@gitwit/db/schema"
 import { and, eq, sql } from "drizzle-orm"
-import { describeRoute } from "hono-openapi"
-import { validator as zValidator } from "hono-openapi/zod"
+import { zValidator } from "@hono/zod-validator"
 import z from "zod"
 
 export const projectRouter = createRouter()
   // #region GET /
   .get(
     "/",
-    describeRoute({
-      tags: ["Project"],
-      description: "Get sandbox data",
-      responses: {
-        200: jsonContent(
-          z.object({
-            id: z.string(),
-          }),
-          "Sandbox data response"
-        ),
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -71,13 +57,6 @@ export const projectRouter = createRouter()
   // #region DELETE /
   .delete(
     "/",
-    describeRoute({
-      tags: ["Project"],
-      description: "Delete a sandbox",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox deletion response"),
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -102,13 +81,6 @@ export const projectRouter = createRouter()
   // #region POST /
   .post(
     "/",
-    describeRoute({
-      tags: ["Project"],
-      description: "Create or update a sandbox",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox creation/update response"),
-      },
-    }),
     zValidator(
       "json",
       sandboxInsertSchema.omit({
@@ -166,17 +138,10 @@ export const projectRouter = createRouter()
   // #region PATCH /
   .patch(
     "/",
-    describeRoute({
-      tags: ["Project"],
-      description: "Update a sandbox",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox update response"),
-      },
-    }),
     zValidator(
       "json",
       sandboxUpdateSchema.extend({
-        id: z.string().openapi({
+        id: z.string().meta({
           description: "Unique identifier for the sandbox to be updated",
           example: "sandbox_12345",
         }),
@@ -216,14 +181,6 @@ export const projectRouter = createRouter()
   // #region GET /share
   .get(
     "/share",
-    describeRoute({
-      tags: ["Project"],
-      description: "Get shared sandbox data",
-      responses: {
-        200: jsonContent(z.object({}), "Shared sandbox data response"),
-      },
-    }),
-
     async (c) => {
       const { id } = c.get("user")
 
@@ -256,13 +213,6 @@ export const projectRouter = createRouter()
   // #region POST /share
   .post(
     "/share",
-    describeRoute({
-      tags: ["Project"],
-      description: "Share a sandbox with a user",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox sharing response"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -326,13 +276,6 @@ export const projectRouter = createRouter()
   // #region DELETE /share
   .delete(
     "/share",
-    describeRoute({
-      tags: ["Project"],
-      description: "Remove sharing access from a user",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox sharing removal response"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -363,13 +306,6 @@ export const projectRouter = createRouter()
   // #region POST /like
   .post(
     "/like",
-    describeRoute({
-      tags: ["Project"],
-      description: "Like a sandbox",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox like response"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -444,13 +380,6 @@ export const projectRouter = createRouter()
   // #region GET /like
   .get(
     "/like",
-    describeRoute({
-      tags: ["Project"],
-      description: "Check if a sandbox is liked by a user",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox like check response"),
-      },
-    }),
     zValidator(
       "query",
       z.object({

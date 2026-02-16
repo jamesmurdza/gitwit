@@ -1,8 +1,6 @@
 import { createRouter } from "@/lib/api/create-app"
-import jsonContent from "@/lib/api/utils"
 import { CONTAINER_TIMEOUT } from "@gitwit/lib/utils/constants"
-import { describeRoute } from "hono-openapi"
-import { validator as zValidator } from "hono-openapi/zod"
+import { zValidator } from "@hono/zod-validator"
 import z from "zod"
 
 import { Project } from "@gitwit/lib/services/Project"
@@ -11,49 +9,6 @@ export const fileRouter = createRouter()
   // Get file content
   .get(
     "/",
-    describeRoute({
-      operationId: "getFile",
-      tags: ["File"],
-      parameters: [
-        {
-          in: "query",
-          name: "fileId",
-          required: true,
-          schema: {
-            type: "string",
-          },
-        },
-        {
-          in: "query",
-          name: "projectId",
-          required: true,
-          schema: {
-            type: "string",
-          },
-        },
-      ],
-      responses: {
-        200: {
-          description: "File content",
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  content: { type: "string" },
-                },
-              },
-            },
-          },
-        },
-        404: {
-          description: "File not found",
-        },
-        500: {
-          description: "Error reading file",
-        },
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -97,35 +52,6 @@ export const fileRouter = createRouter()
   // Save file content
   .post(
     "/save",
-    describeRoute({
-      tags: ["File"],
-      description: "Save file content",
-      requestBody: {
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                fileId: { type: "string" },
-                content: { type: "string" },
-                projectId: { type: "string" },
-              },
-              required: ["fileId", "content", "projectId"],
-            },
-          },
-        },
-      },
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "File save response"
-        ),
-        400: { description: "Invalid request" },
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -179,34 +105,6 @@ export const fileRouter = createRouter()
   // Create a new file
   .post(
     "/create",
-    describeRoute({
-      tags: ["File"],
-      description: "Create a new file",
-      requestBody: {
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                projectId: { type: "string" },
-              },
-              required: ["name", "projectId"],
-            },
-          },
-        },
-      },
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "File creation response"
-        ),
-        400: { description: "Invalid request" },
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -261,34 +159,6 @@ export const fileRouter = createRouter()
   // Delete a file
   .delete(
     "/",
-    describeRoute({
-      tags: ["File"],
-      description: "Delete a file",
-      parameters: [
-        {
-          in: "query",
-          name: "fileId",
-          required: true,
-          schema: { type: "string" },
-        },
-        {
-          in: "query",
-          name: "projectId",
-          required: true,
-          schema: { type: "string" },
-        },
-      ],
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "File deletion response"
-        ),
-        404: { description: "File not found" },
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -336,35 +206,6 @@ export const fileRouter = createRouter()
   // Move a file
   .post(
     "/move",
-    describeRoute({
-      tags: ["File"],
-      description: "Move a file to a different folder",
-      requestBody: {
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                fileId: { type: "string" },
-                folderId: { type: "string" },
-                projectId: { type: "string" },
-              },
-              required: ["fileId", "folderId", "projectId"],
-            },
-          },
-        },
-      },
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "File move response"
-        ),
-        400: { description: "Invalid request" },
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -409,35 +250,6 @@ export const fileRouter = createRouter()
   // Rename a file
   .post(
     "/rename",
-    describeRoute({
-      tags: ["File"],
-      description: "Rename a file",
-      requestBody: {
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                fileId: { type: "string" },
-                newName: { type: "string" },
-                projectId: { type: "string" },
-              },
-              required: ["fileId", "newName", "projectId"],
-            },
-          },
-        },
-      },
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "File rename response"
-        ),
-        400: { description: "Invalid request" },
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -481,34 +293,6 @@ export const fileRouter = createRouter()
   // Create a folder
   .post(
     "/folder",
-    describeRoute({
-      tags: ["File"],
-      description: "Create a new folder",
-      requestBody: {
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                projectId: { type: "string" },
-              },
-              required: ["name", "projectId"],
-            },
-          },
-        },
-      },
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "Folder creation response"
-        ),
-        400: { description: "Invalid request" },
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -555,34 +339,6 @@ export const fileRouter = createRouter()
   // Delete a folder
   .delete(
     "/folder",
-    describeRoute({
-      tags: ["File"],
-      description: "Delete a folder",
-      parameters: [
-        {
-          in: "query",
-          name: "folderId",
-          required: true,
-          schema: { type: "string" },
-        },
-        {
-          in: "query",
-          name: "projectId",
-          required: true,
-          schema: { type: "string" },
-        },
-      ],
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "Folder deletion response"
-        ),
-        404: { description: "Folder not found" },
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -626,36 +382,6 @@ export const fileRouter = createRouter()
   // Get folder contents
   .get(
     "/folder",
-    describeRoute({
-      tags: ["File"],
-      description: "Get folder contents",
-      parameters: [
-        {
-          in: "query",
-          name: "folderId",
-          required: true,
-          schema: { type: "string" },
-        },
-        {
-          in: "query",
-          name: "projectId",
-          required: true,
-          schema: { type: "string" },
-        },
-      ],
-      responses: {
-        200: jsonContent(
-          z.object({
-            id: z.string(),
-            name: z.string(),
-            files: z.array(z.any()),
-            folders: z.array(z.any()),
-          }),
-          "Folder contents response"
-        ),
-        404: { description: "Folder not found" },
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -694,36 +420,6 @@ export const fileRouter = createRouter()
   // Download files as archive
   .get(
     "/download",
-    describeRoute({
-      operationId: "downloadFilesArchive",
-      tags: ["File"],
-      parameters: [
-        {
-          in: "query",
-          name: "projectId",
-          required: true,
-          schema: { type: "string" },
-        },
-      ],
-      responses: {
-        200: {
-          description: "Download files as archive",
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  archive: { type: "string" },
-                },
-              },
-            },
-          },
-        },
-        500: {
-          description: "Error downloading files",
-        },
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -762,28 +458,6 @@ export const fileRouter = createRouter()
   // Get file tree
   .get(
     "/tree",
-    describeRoute({
-      tags: ["File"],
-      description: "Get the complete file tree structure",
-      parameters: [
-        {
-          in: "query",
-          name: "projectId",
-          required: true,
-          schema: { type: "string" },
-        },
-      ],
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            data: z.any(), // File tree structure
-          }),
-          "File tree response"
-        ),
-        500: { description: "Error getting file tree" },
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -825,33 +499,6 @@ export const fileRouter = createRouter()
   // Handle heartbeat
   .post(
     "/heartbeat",
-    describeRoute({
-      tags: ["File"],
-      description: "Handle heartbeat from socket connection",
-      requestBody: {
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                projectId: { type: "string" },
-                isOwner: { type: "boolean" },
-              },
-              required: ["projectId", "isOwner"],
-            },
-          },
-        },
-      },
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-          }),
-          "Heartbeat response"
-        ),
-        500: { description: "Error handling heartbeat" },
-      },
-    }),
     zValidator(
       "json",
       z.object({

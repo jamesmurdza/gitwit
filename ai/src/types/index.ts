@@ -43,7 +43,7 @@ export const AIRequestSchema = z.object({
     templateType: z.string().optional(),
     activeFileContent: z.string().optional(),
     fileTree: z.array(z.any()).optional(),
-    templateConfigs: z.record(z.any()).optional(),
+    templateConfigs: z.record(z.string(), z.any()).optional(),
     contextContent: z.string().optional(),
   }),
   mode: z.enum(["chat", "edit"]).default("chat"),

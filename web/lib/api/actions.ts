@@ -161,7 +161,7 @@ export async function updateUser(
     if (error instanceof z.ZodError) {
       return {
         message: "Invalid data",
-        error: error.errors,
+        error: error.issues,
         fields: data,
       }
     }

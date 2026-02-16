@@ -11,10 +11,7 @@ import {
 } from "drizzle-orm/pg-core"
 import { createInsertSchema, createUpdateSchema } from "drizzle-zod"
 import z from "zod"
-import { extendZodWithOpenApi } from "zod-openapi"
 import { KNOWN_PLATFORMS } from "./constants"
-
-extendZodWithOpenApi(z)
 
 export type KnownPlatform = (typeof KNOWN_PLATFORMS)[number]
 export type UserLink = {
@@ -72,69 +69,75 @@ export const user = pgTable("user", {
 export type User = typeof user.$inferSelect
 export const userInsertSchema = createInsertSchema(user, {
   id: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Unique identifier for the user",
     }),
   name: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Name of the user",
     }),
   email: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Email address of the user",
     }),
   username: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Username of the user",
     }),
   avatarUrl: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Avatar URL of the user",
     }),
   githubToken: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "GitHub token for the user",
     }),
   createdAt: (schema) =>
-    z.coerce.date().openapi({
+    z.coerce.date().meta({
       description: "Creation timestamp of the user",
     }),
+  links: (schema) => schema.optional(),
+  apiKeys: (schema) => schema.optional(),
+  generations: (schema) => schema.optional(),
+  tier: (schema) => schema.optional(),
+  tierExpiresAt: (schema) => schema.optional(),
+  lastResetDate: (schema) => schema.optional(),
 })
 
 export const userUpdateSchema = createUpdateSchema(user, {
   id: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Unique identifier for the user",
     }),
   name: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Name of the user",
     }),
   email: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Email address of the user",
     }),
   username: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Username of the user",
     }),
   avatarUrl: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Avatar URL of the user",
     }),
   githubToken: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "GitHub token for the user",
     }),
   createdAt: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Creation timestamp of the user",
     }),
   apiKeys: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Encrypted API keys for AI providers",
     }),
-  lastResetDate: z.coerce.date().optional().openapi({
+  lastResetDate: z.coerce.date().optional().meta({
     description: "Last reset date for the user",
   }),
 })
@@ -161,34 +164,34 @@ export const sandbox = pgTable("sandbox", {
 
 export const sandboxInsertSchema = createInsertSchema(sandbox, {
   name: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Name of the sandbox",
     }),
   type: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Type of the sandbox",
     }),
   visibility: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Visibility of the sandbox",
     }),
-  createdAt: z.coerce.date().optional().openapi({
+  createdAt: z.coerce.date().optional().meta({
     description: "Creation timestamp of the sandbox",
   }),
   userId: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "ID of the user who created the sandbox",
     }),
   containerId: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Container ID for the sandbox",
     }),
   repositoryId: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Repository ID for the sandbox",
     }),
   lastCommit: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Last synced commit SHA for the sandbox",
     }),
 }).omit({
@@ -196,34 +199,34 @@ export const sandboxInsertSchema = createInsertSchema(sandbox, {
 })
 export const sandboxUpdateSchema = createUpdateSchema(sandbox, {
   name: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Name of the sandbox",
     }),
   type: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Type of the sandbox",
     }),
   visibility: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Visibility of the sandbox",
     }),
-  createdAt: z.coerce.date().optional().openapi({
+  createdAt: z.coerce.date().optional().meta({
     description: "Creation timestamp of the sandbox",
   }),
   userId: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "ID of the user who created the sandbox",
     }),
   containerId: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Container ID for the sandbox",
     }),
   repositoryId: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Repository ID for the sandbox",
     }),
   lastCommit: (schema) =>
-    schema.openapi({
+    schema.meta({
       description: "Last synced commit SHA for the sandbox",
     }),
 }).omit({

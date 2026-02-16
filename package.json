@@ -30,5 +30,7 @@
   "devDependencies": {
     "turbo": "^2.8.9"
   },
-  "dependencies": {}
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
 }

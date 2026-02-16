@@ -1,12 +1,10 @@
 import { createRouter } from "@/lib/api/create-app"
-import jsonContent from "@/lib/api/utils"
 import { env } from "@/lib/env"
 import { db } from "@gitwit/db"
 import { sandbox as sandboxSchema, user } from "@gitwit/db/schema"
 import { Project } from "@gitwit/lib/services/Project"
 import { and, eq } from "drizzle-orm"
-import { describeRoute } from "hono-openapi"
-import { validator as zValidator } from "hono-openapi/zod"
+import { zValidator } from "@hono/zod-validator"
 import minimatch from "minimatch"
 import z from "zod"
 import { GithubSyncManager } from "@gitwit/lib/services/GithubSyncManager"
@@ -16,13 +14,6 @@ export const githubRouter = createRouter()
   // #region GET /auth_url
   .get(
     "/auth_url",
-    describeRoute({
-      tags: ["Github"],
-      description: "Get GitHub authentication URL",
-      responses: {
-        200: jsonContent(z.object({}), "GitHub authentication URL response"),
-      },
-    }),
     (c) => {
       return c.json(
         {
@@ -40,17 +31,6 @@ export const githubRouter = createRouter()
   // #region POST /login
   .post(
     "/login",
-    describeRoute({
-      tags: ["Github"],
-      description: "Authenticate user with GitHub",
-      responses: {
-        200: jsonContent(z.object({}), "User authenticated successfully"),
-        403: jsonContent(
-          z.object({}),
-          "Forbidden - GitHub authentication required"
-        ),
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -112,13 +92,6 @@ export const githubRouter = createRouter()
   // #region GET /user
   .get(
     "/user",
-    describeRoute({
-      tags: ["Github"],
-      description: "Get authenticated user data from GitHub",
-      responses: {
-        200: jsonContent(z.object({}), "Authenticated user data"),
-      },
-    }),
     async (c) => {
       const githubManager = c.get("manager")
       const githubUser = await githubManager.getUser()
@@ -136,13 +109,6 @@ export const githubRouter = createRouter()
   // #region POST /logout
   .post(
     "/logout",
-    describeRoute({
-      tags: ["Github"],
-      description: "Logout user from GitHub",
-      responses: {
-        200: jsonContent(z.object({}), "User logged out successfully"),
-      },
-    }),
     async (c) => {
       const githubManager = c.get("manager")
       try {
@@ -167,16 +133,6 @@ export const githubRouter = createRouter()
   // #region GET /repo/status
   .get(
     "/repo/status",
-    describeRoute({
-      tags: ["Github"],
-      description: "Check if a repository exists for the authenticated user",
-      responses: {
-        200: jsonContent(
-          z.object({ exists: z.boolean() }),
-          "Repository existence status"
-        ),
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -251,17 +207,6 @@ export const githubRouter = createRouter()
   // #region POST /repo/create
   .post(
     "/repo/create",
-    describeRoute({
-      tags: ["Github"],
-      description: "Create a new public repository for the authenticated user",
-      responses: {
-        200: jsonContent(
-          z.object({ id: z.string() }),
-          "Repository created successfully"
-        ),
-        404: jsonContent(z.object({}), "Not Found - Project not found"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -442,17 +387,6 @@ export const githubRouter = createRouter()
   // #region POST /repo/commit
   .post(
     "/repo/commit",
-    describeRoute({
-      tags: ["Github"],
-      description: "Commit changes to the repository",
-      responses: {
-        200: jsonContent(
-          z.object({ message: z.string(), data: z.any() }),
-          "Changes committed successfully"
-        ),
-        404: jsonContent(z.object({}), "Not Found - Project not found"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -524,14 +458,6 @@ export const githubRouter = createRouter()
   // #region POST /repo/remove
   .delete(
     "/repo/remove",
-    describeRoute({
-      tags: ["Github"],
-      description: "Remove repository from the sandbox",
-      responses: {
-        200: jsonContent(z.object({}), "Repository removed successfully"),
-        404: jsonContent(z.object({}), "Not Found - Project not found"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -588,14 +514,6 @@ export const githubRouter = createRouter()
   // #region GET /repo/pull/check
   .get(
     "/repo/pull/check",
-    describeRoute({
-      tags: ["Github"],
-      description: "Check if pull is needed from GitHub",
-      responses: {
-        200: jsonContent(z.object({}), "Pull check completed"),
-        404: jsonContent(z.object({}), "Not Found - Project not found"),
-      },
-    }),
     zValidator(
       "query",
       z.object({
@@ -670,14 +588,6 @@ export const githubRouter = createRouter()
   // #region POST /repo/pull
   .post(
     "/repo/pull",
-    describeRoute({
-      tags: ["Github"],
-      description: "Pull latest changes from GitHub",
-      responses: {
-        200: jsonContent(z.object({}), "Pull completed successfully"),
-        404: jsonContent(z.object({}), "Not Found - Project not found"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -769,14 +679,6 @@ export const githubRouter = createRouter()
   // #region POST /repo/resolve-conflicts
   .post(
     "/repo/resolve-conflicts",
-    describeRoute({
-      tags: ["Github"],
-      description: "Apply conflict resolutions to files",
-      responses: {
-        200: jsonContent(z.object({}), "Conflicts resolved successfully"),
-        404: jsonContent(z.object({}), "Not Found - Project not found"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -897,14 +799,6 @@ export const githubRouter = createRouter()
   // #region GET /repo/changed-files
   .get(
     "/repo/changed-files",
-    describeRoute({
-      tags: ["Github"],
-      description: "Get changed files since last commit",
-      responses: {
-        200: jsonContent(z.object({}), "Changed files retrieved successfully"),
-        404: jsonContent(z.object({}), "Not Found - Project not found"),
-      },
-    }),
     zValidator(
       "query",
       z.object({

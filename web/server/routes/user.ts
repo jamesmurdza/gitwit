@@ -1,5 +1,4 @@
 import { createRouter } from "@/lib/api/create-app"
-import jsonContent from "@/lib/api/utils"
 import { db } from "@gitwit/db"
 import {
   type Sandbox,
@@ -9,8 +8,7 @@ import {
   userUpdateSchema,
 } from "@gitwit/db/schema"
 import { eq, sql } from "drizzle-orm"
-import { describeRoute } from "hono-openapi"
-import { validator as zValidator } from "hono-openapi/zod"
+import { zValidator } from "@hono/zod-validator"
 import z from "zod"
 
 interface SandboxWithLiked extends Sandbox {
@@ -31,13 +29,6 @@ function transformApiKeys(apiKeys: any) {
 }
 export const openUserRouter = createRouter().get(
   "/profile",
-  describeRoute({
-    tags: ["User"],
-    description: "Get user profile",
-    responses: {
-      200: jsonContent(z.object({}), "User profile response"),
-    },
-  }),
   zValidator(
     "query",
     z.object({
@@ -85,18 +76,11 @@ export const userRouter = createRouter()
   // #region GET /
   .get(
     "/",
-    describeRoute({
-      tags: ["User"],
-      description: "Get user data",
-      responses: {
-        200: jsonContent(z.object({}), "User data response"),
-      },
-    }),
     zValidator(
       "query",
       z.object({
         username: z.string().optional(),
-        id: z.string().optional().openapi({
+        id: z.string().optional().meta({
           description: "Unique identifier for the user",
           example: "user_12345",
         }),
@@ -174,13 +158,6 @@ export const userRouter = createRouter()
   // #region POST /
   .post(
     "/",
-    describeRoute({
-      tags: ["User"],
-      description: "Persist clerk user data",
-      responses: {
-        200: jsonContent(z.object({}), "User data response"),
-      },
-    }),
     zValidator("json", userInsertSchema),
     async (c) => {
       const data = c.req.valid("json")
@@ -206,17 +183,10 @@ export const userRouter = createRouter()
   // #region DELETE /
   .delete(
     "/",
-    describeRoute({
-      tags: ["User"],
-      description: "Get user data",
-      responses: {
-        200: jsonContent(z.object({}), "User data response"),
-      },
-    }),
     zValidator(
       "query",
       z.object({
-        id: z.string().openapi({
+        id: z.string().meta({
           description: "Unique identifier for the user to be deleted",
           example: "user_12345",
         }),
@@ -238,17 +208,10 @@ export const userRouter = createRouter()
   // #region PATCH /
   .patch(
     "/",
-    describeRoute({
-      tags: ["User"],
-      description: "Update user data",
-      responses: {
-        200: jsonContent(z.object({}), "User data response"),
-      },
-    }),
     zValidator(
       "json",
       userUpdateSchema.extend({
-        id: z.string().openapi({
+        id: z.string().meta({
           description: "Unique identifier for the user to be updated",
           example: "user_12345",
         }),
@@ -291,27 +254,6 @@ export const userRouter = createRouter()
   // #region GET /api-keys
   .get(
     "/api-keys",
-    describeRoute({
-      tags: ["User"],
-      description:
-        "Get user's API key configuration (returns which providers are configured, not the keys themselves)",
-      responses: {
-        200: jsonContent(
-          z.object({
-            hasAnthropic: z.boolean(),
-            anthropicModel: z.string().optional(),
-            hasOpenai: z.boolean(),
-            openaiModel: z.string().optional(),
-            hasOpenrouter: z.boolean(),
-            openrouterModel: z.string().optional(),
-            hasAws: z.boolean(),
-            awsModel: z.string().optional(),
-            encryptionAvailable: z.boolean(),
-          }),
-          "API keys configuration response"
-        ),
-      },
-    }),
     async (c) => {
       // Check if encryption is available
       const { isEncryptionAvailable } = await import(
@@ -356,19 +298,6 @@ export const userRouter = createRouter()
   // #region PUT /api-keys
   .put(
     "/api-keys",
-    describeRoute({
-      tags: ["User"],
-      description: "Update user's API keys (keys are encrypted before storage)",
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "API keys update response"
-        ),
-      },
-    }),
     zValidator(
       "json",
       z.object({
@@ -451,19 +380,6 @@ export const userRouter = createRouter()
   // #region DELETE /api-keys/:provider
   .delete(
     "/api-keys/:provider",
-    describeRoute({
-      tags: ["User"],
-      description: "Delete a specific provider's API key",
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "API key deletion response"
-        ),
-      },
-    }),
     zValidator(
       "param",
       z.object({
@@ -528,22 +444,10 @@ export const userRouter = createRouter()
   // #region GET /check-username
   .get(
     "/check-username",
-    describeRoute({
-      tags: ["User"],
-      description: "Check if a username exists",
-      responses: {
-        200: jsonContent(
-          z.object({
-            exists: z.boolean(),
-          }),
-          "Username check response"
-        ),
-      },
-    }),
     zValidator(
       "query",
       z.object({
-        username: z.string().openapi({
+        username: z.string().meta({
           description: "Username to check for existence",
           example: "john_doe",
         }),
@@ -561,17 +465,10 @@ export const userRouter = createRouter()
   // #region POST /increment-generations
   .post(
     "/increment-generations",
-    describeRoute({
-      tags: ["User"],
-      description: "Increment user generations count",
-      responses: {
-        200: jsonContent(z.object({}), "Increment response"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
-        userId: z.string().openapi({
+        userId: z.string().meta({
           description:
             "ID of the user whose generations count will be incremented",
           example: "user_12345",
@@ -591,24 +488,17 @@ export const userRouter = createRouter()
   // #region POST /update-tier
   .post(
     "/update-tier",
-    describeRoute({
-      tags: ["User"],
-      description: "Update user tier and reset generations",
-      responses: {
-        200: jsonContent(z.object({}), "Tier update response"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
-        userId: z.string().openapi({
+        userId: z.string().meta({
           description: "ID of the user whose tier will be updated",
           example: "user_12345",
         }),
-        tier: z.enum(["FREE", "PRO", "ENTERPRISE"]).openapi({
+        tier: z.enum(["FREE", "PRO", "ENTERPRISE"]).meta({
           description: "New tier for the user",
         }),
-        tierExpiresAt: z.coerce.date().openapi({
+        tierExpiresAt: z.coerce.date().meta({
           description: "Expiration date for the new tier",
         }),
       })
@@ -630,17 +520,10 @@ export const userRouter = createRouter()
   // #region POST /check-reset
   .post(
     "/check-reset",
-    describeRoute({
-      tags: ["User"],
-      description: "Check if user can reset generations",
-      responses: {
-        200: jsonContent(z.object({}), "Reset check response"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
-        userId: z.string().openapi({
+        userId: z.string().meta({
           description: "ID of the user to check for reset eligibility",
           example: "user_12345",
         }),
@@ -685,27 +568,6 @@ export const userRouter = createRouter()
   // #region GET /available-models
   .get(
     "/available-models",
-    describeRoute({
-      tags: ["User"],
-      description:
-        "Get available AI models based on user's configured API keys",
-      responses: {
-        200: jsonContent(
-          z.object({
-            models: z.array(
-              z.object({
-                id: z.string(),
-                name: z.string(),
-                provider: z.string(),
-              })
-            ),
-            defaultModel: z.string().optional(),
-            selectedProvider: z.string().optional(),
-          }),
-          "Available models response"
-        ),
-      },
-    }),
     async (c) => {
       const userId = c.get("user").id
 
@@ -853,19 +715,6 @@ export const userRouter = createRouter()
   // #region PUT /selected-model
   .put(
     "/selected-model",
-    describeRoute({
-      tags: ["User"],
-      description: "Update user's selected AI model",
-      responses: {
-        200: jsonContent(
-          z.object({
-            success: z.boolean(),
-            message: z.string(),
-          }),
-          "Selected model update response"
-        ),
-      },
-    }),
     zValidator(
       "json",
       z.object({
