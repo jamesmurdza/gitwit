@@ -2,74 +2,47 @@ import { AIRequest } from "../types"
 import { formatFileTree } from "./file-tree-formatter"
 
 /**
- * Prompt builder class that generates context-aware system prompts for AI interactions
- * Supports different modes (chat, edit, generate) and project templates
- *
- * @example
- * ```typescript
- * const builder = new PromptBuilder()
- * const prompt = builder.build({
- *   mode: "chat",
- *   context: { templateType: "nextjs", userId: "user123" },
- *   messages: []
- * })
- * ```
+ * Builds a system prompt based on the AI request mode and context.
  */
-export class PromptBuilder {
-  /**
-   * Builds a system prompt based on the AI request mode and context
-   *
-   * @param request - AI request object containing mode and context information
-   * @returns Generated system prompt string tailored to the request
-   */
-  build(request: AIRequest): string {
-    const { mode } = request
-
-    switch (mode) {
-      case "edit":
-        return this.buildEditPrompt(request)
-      case "chat":
-      default:
-        return this.buildChatPrompt(request)
-    }
+export function buildPrompt(request: AIRequest): string {
+  switch (request.mode) {
+    case "edit":
+      return buildEditPrompt(request)
+    case "chat":
+    default:
+      return buildChatPrompt(request)
   }
+}
 
-  /**
-   * Builds a chat-oriented system prompt with project context and conventions
-   * Includes template-specific information when available
-   *
-   * @param request - AI request object with chat context
-   * @returns System prompt optimized for conversational AI interactions
-   */
-  private buildChatPrompt(request: AIRequest): string {
-    const { context } = request
-    const templateConfig =
-      context.templateType && context.templateConfigs
-        ? context.templateConfigs[context.templateType]
-        : null
+function buildChatPrompt(request: AIRequest): string {
+  const { context } = request
+  const templateConfig =
+    context.templateType && context.templateConfigs
+      ? context.templateConfigs[context.templateType]
+      : null
 
-    let prompt = `You are an intelligent programming assistant for a ${
-      context.templateType || "web"
-    } project.`
+  let prompt = `You are an intelligent programming assistant for a ${
+    context.templateType || "web"
+  } project.`
 
-    if (templateConfig) {
-      prompt += `
+  if (templateConfig) {
+    prompt += `
 File Tree:
 ${formatFileTree(context.fileTree || [])}
 
 Conventions:
 ${templateConfig.conventions.join("\n")}
 `
-    }
+  }
 
-    if (context.activeFileContent) {
-      prompt += `\n\nActive File Content:\n${context.activeFileContent}`
-    }
-    if (context.contextContent) {
-      prompt += `\n\nAdditional Context(selected files):\n${context.contextContent}`
-    }
+  if (context.activeFileContent) {
+    prompt += `\n\nActive File Content:\n${context.activeFileContent}`
+  }
+  if (context.contextContent) {
+    prompt += `\n\nAdditional Context(selected files):\n${context.contextContent}`
+  }
 
-    prompt += `
+  prompt += `
 
 🚨 CRITICAL INSTRUCTION: When providing code changes, show ONLY the modified sections, not the entire file. Use the **aider diff** format with search/replace blocks inside code blocks.
 
@@ -178,20 +151,13 @@ export function capitalize(str: string): string {
 >>>>>>> REPLACE
 \`\`\``
 
-    return prompt
-  }
+  return prompt
+}
 
-  /**
-   * Builds an edit-focused system prompt for code modification tasks
-   * Emphasizes minimal context and precise code changes
-   *
-   * @param request - AI request object with edit context
-   * @returns System prompt optimized for code editing operations
-   */
-  private buildEditPrompt(request: AIRequest): string {
-    const { context } = request
+function buildEditPrompt(request: AIRequest): string {
+  const { context } = request
 
-    return `You are a code editor AI. Your task is to generate ONLY the code needed for the edit.
+  return `You are a code editor AI. Your task is to generate ONLY the code needed for the edit.
 
 Rules:
 - Return ONLY code, no explanations
@@ -206,5 +172,13 @@ ${
     ? `\nFile content:\n${context.activeFileContent}`
     : ""
 }`
+}
+
+/**
+ * @deprecated Use buildPrompt() instead. Kept for backward compat.
+ */
+export class PromptBuilder {
+  build(request: AIRequest): string {
+    return buildPrompt(request)
   }
 }

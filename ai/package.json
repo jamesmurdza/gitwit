@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "jest"
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",
@@ -18,7 +18,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
+    "vitest": "^3.1.4",
     "typescript": "^5.8.3"
   },
   "exports": {

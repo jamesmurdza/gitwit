@@ -6,6 +6,7 @@ import { currentUser } from "@clerk/nextjs/server"
 import { AIMessage, createAIClient } from "@gitwit/ai"
 import { mergeAiderDiff } from "@gitwit/ai/utils"
 import { templateConfigs } from "@gitwit/templates"
+import { createStreamableValue } from "ai/rsc"
 import { getUserProviderConfig } from "./helpers"
 
 interface BaseContext {
@@ -24,35 +25,39 @@ export async function streamChat(messages: AIMessage[], context?: BaseContext) {
     throw new Error("Unauthorized")
   }
 
-  // Fetch user's custom API keys and determine provider configuration
   const providerConfig = await getUserProviderConfig(user.id)
 
-  const aiClient = await createAIClient({
+  const aiClient = createAIClient({
     userId: user.id,
     projectId: context?.projectId,
     projectName: context?.projectName,
     fileName: context?.fileName,
     tools: defaultTools,
-    disableTools: false,
     providerConfig,
+    templateType: context?.templateType,
+    fileTree: context?.fileTree,
+    templateConfigs: templateConfigs,
   })
 
-  return aiClient.streamChat({
-    messages,
-    mode: "chat",
-    maxSteps: 3,
-    context: {
-      userId: user.id,
-      projectId: context?.projectId,
-      projectName: context?.projectName,
-      fileName: context?.fileName,
-      templateType: context?.templateType,
-      activeFileContent: context?.activeFileContent,
-      fileTree: context?.fileTree,
-      contextContent: context?.contextContent,
-      templateConfigs: templateConfigs,
-    },
-  })
+  // Wrap AsyncIterable in RSC StreamableValue (RSC concern stays in web layer)
+  const stream = createStreamableValue("")
+  ;(async () => {
+    try {
+      for await (const chunk of aiClient.streamChat({
+        messages,
+        context: context?.contextContent,
+        activeFileContent: context?.activeFileContent,
+      })) {
+        stream.update(chunk)
+      }
+      stream.done()
+    } catch (error) {
+      console.error("Stream chat failed", error)
+      stream.error(error)
+    }
+  })()
+
+  return { output: stream.value }
 }
 
 export async function processEdit(
@@ -64,30 +69,21 @@ export async function processEdit(
     throw new Error("Unauthorized")
   }
 
-  // Fetch user's custom API keys and determine provider configuration
   const providerConfig = await getUserProviderConfig(user.id)
 
-  const aiClient = await createAIClient({
+  const aiClient = createAIClient({
     userId: user.id,
     projectId: context?.projectId,
     projectName: context?.projectName,
     fileName: context?.fileName,
     tools: defaultTools,
-    disableTools: true, // Tools disabled for edit mode
+    disableTools: true,
     providerConfig,
   })
 
   return aiClient.processEdit({
     messages,
-    mode: "edit",
-    maxSteps: 3,
-    context: {
-      userId: user.id,
-      projectId: context?.projectId,
-      projectName: context?.projectName,
-      fileName: context?.fileName,
-      activeFileContent: context?.activeFileContent,
-    },
+    activeFileContent: context?.activeFileContent,
   })
 }
 
@@ -114,16 +110,10 @@ export async function mergeCode(
   console.log("🔀 Code Merge - Original Code Length:", originalCode.length)
 
   try {
-    // Use aider diff merger to apply search/replace blocks
-    // mergeAiderDiff(originalCode, diffSnippet, filePath)
     const mergedCode = mergeAiderDiff(originalCode, partialCode, fileName)
-
-    // Log the merge result
-
     return mergedCode
   } catch (error) {
     console.error("🔀 Code Merge - Failed:", error)
-    // Fallback: return original code if merge fails
     return originalCode
   }
 }
