@@ -1,11 +1,11 @@
-import { useContainer } from "@/context/container-context"
+import { useEditor } from "@/context/editor-context"
 import { useSocket } from "@/context/SocketContext"
 import { useCallback, useEffect } from "react"
 import { toast } from "sonner"
 
 export const useEditorSocket = () => {
   const { socket } = useSocket()
-  const { dockRef } = useContainer()
+  const { dockRef } = useEditor()
 
   // Preview URL handler
   const handlePreviewURL = useCallback((url: string) => {

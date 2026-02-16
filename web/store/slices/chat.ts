@@ -21,9 +21,15 @@ interface ChatSlice {
   deleteThread: (threadId: string) => void
   setActiveThread: (threadId: string | null) => void
   addMessage: (threadId: string, message: Message) => void
+  /** @deprecated Use updateMessageById instead — index-based updates are racy */
   updateMessage: (
     threadId: string,
     messageIndex: number,
+    content: string
+  ) => void
+  updateMessageById: (
+    threadId: string,
+    messageId: string,
     content: string
   ) => void
   updateThreadTitle: (threadId: string, title: string) => void
@@ -118,6 +124,30 @@ const createChatSlice: StateCreator<ChatSlice> = (set, get) => ({
         ...updatedMessages[messageIndex],
         content,
       }
+
+      return {
+        threads: {
+          ...state.threads,
+          [threadId]: {
+            ...thread,
+            messages: updatedMessages,
+            updatedAt: Date.now(),
+          },
+        },
+      }
+    })
+  },
+
+  updateMessageById: (threadId, messageId, content) => {
+    set((state) => {
+      const thread = state.threads[threadId]
+      if (!thread) return state
+
+      const idx = thread.messages.findIndex((m) => m.id === messageId)
+      if (idx === -1) return state
+
+      const updatedMessages = [...thread.messages]
+      updatedMessages[idx] = { ...updatedMessages[idx], content }
 
       return {
         threads: {

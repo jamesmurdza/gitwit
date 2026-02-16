@@ -6,7 +6,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useContainer } from "@/context/container-context"
+import { useEditor } from "@/context/editor-context"
 import { cn } from "@/lib/utils"
 import { Slot } from "@radix-ui/react-slot"
 import { type VariantProps } from "class-variance-authority"
@@ -348,7 +348,7 @@ function ScrollButton({
 }
 
 export function ChatContainerCollapse() {
-  const { gridRef } = useContainer()
+  const { gridRef } = useEditor()
   function toggleAIChat() {
     const panel = gridRef.current?.getPanel("chat")
     panel?.api.setVisible(!panel.api.isVisible)

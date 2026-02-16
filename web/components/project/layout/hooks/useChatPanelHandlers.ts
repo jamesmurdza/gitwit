@@ -1,5 +1,4 @@
-import { useContainer } from "@/context/container-context"
-import { useEditorHandlers } from "@/context/editor-handlers-context"
+import { useEditor } from "@/context/editor-context"
 import { useProjectContext } from "@/context/project-context"
 import { TTab } from "@/lib/types"
 import { useAppStore } from "@/store/context"
@@ -13,8 +12,7 @@ import { useAIFileActions } from "../../hooks/useAIFileActions"
  * This bridges the new Dockview layout with the existing chat/diff functionality
  */
 export function useChatPanelHandlers() {
-  const { dockRef } = useContainer()
-  const { getHandlers } = useEditorHandlers()
+  const { dockRef, getHandlers } = useEditor()
   const {
     project: { id: projectId },
   } = useProjectContext()

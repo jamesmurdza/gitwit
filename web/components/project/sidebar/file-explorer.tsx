@@ -2,8 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useContainer } from "@/context/container-context"
-import { useEditorLayout } from "@/context/EditorLayoutContext"
+import { useEditor } from "@/context/editor-context"
 import {
   FileExplorerProvider,
   useFileExplorer,
@@ -20,7 +19,7 @@ import New from "./new"
 
 export function FileExplorer() {
   const { id: projectId } = useParams<{ id: string }>()
-  const { dockRef } = useContainer()
+  const { dockRef } = useEditor()
   const { moveFile } = useFileTree()
 
   // Ref to track the last pointer position during drag
@@ -246,7 +245,7 @@ function RootFolder() {
 }
 
 function AIChatControl() {
-  const { toggleAIChat, isAIChatOpen } = useEditorLayout()
+  const { toggleAIChat, isAIChatOpen } = useEditor()
 
   return (
     <div className="flex flex-col p-2 bg-background">

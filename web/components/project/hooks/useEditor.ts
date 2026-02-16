@@ -7,7 +7,7 @@ import { parseTSConfigToMonacoOptions } from "@/lib/monaco/parse-tsconfig"
 import { TFile, TFolder } from "@/lib/types"
 import { debounce, deepMerge } from "@/lib/utils"
 // Removed global store dependency
-import { useContainer } from "@/context/container-context"
+import { useEditor as useEditorContext } from "@/context/editor-context"
 import { useTerminal } from "@/context/TerminalContext"
 import { fileRouter } from "@/lib/api"
 import { useAppStore } from "@/store/context"
@@ -38,7 +38,7 @@ export interface DecorationsState {
 
 export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
   const { saveFile, fileTree: files = [] } = useFileTree()
-  const { terminalRef, gridRef } = useContainer()
+  const { terminalRef, gridRef } = useEditorContext()
   const { creatingTerminal, createNewTerminal } = useTerminal()
   const draft = useAppStore((s) => s.drafts[fileId ?? ""])
   const { data: serverFileContent = "", isLoading } =

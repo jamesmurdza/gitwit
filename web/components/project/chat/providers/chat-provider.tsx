@@ -1,11 +1,9 @@
 "use client"
-import { streamChat } from "@/app/actions/ai"
 import { useProjectContext } from "@/context/project-context"
 import { fileRouter } from "@/lib/api"
 import { sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import { useQueryClient } from "@tanstack/react-query"
-import { readStreamableValue } from "ai/rsc"
 import { nanoid } from "nanoid"
 import React, {
   createContext,
@@ -19,6 +17,7 @@ import React, {
 import { toast } from "sonner"
 import type { ContextTab, FileMergeResult, Message } from "../lib/types"
 import { getCombinedContext, normalizePath } from "../lib/utils"
+import { useStreamChat } from "../hooks/use-stream-chat"
 
 type ChatProviderProps = {
   children: ReactNode
@@ -73,7 +72,7 @@ function ChatProvider({ children }: ChatProviderProps) {
   const activeThreadId = useAppStore((s) => s.activeThreadId)
   const createThread = useAppStore((s) => s.createThread)
   const addMessage = useAppStore((s) => s.addMessage)
-  const updateMessage = useAppStore((s) => s.updateMessage)
+  const updateMessageById = useAppStore((s) => s.updateMessageById)
 
   // Get messages from active thread
   const messages = useAppStore((s) =>
@@ -82,10 +81,11 @@ function ChatProvider({ children }: ChatProviderProps) {
       : [],
   )
 
+  // Streaming hook (handles abort + concurrent guard)
+  const { streamChat, abort: abortStream, isStreamingRef } = useStreamChat()
+
   const { data: fileTree = [] } = fileRouter.fileTree.useQuery({
-    variables: {
-      projectId,
-    },
+    variables: { projectId },
     select(data) {
       return sortFileExplorer(data.data ?? [])
     },
@@ -93,10 +93,7 @@ function ChatProvider({ children }: ChatProviderProps) {
 
   const { data: serverActiveFile = "" } = fileRouter.fileContent.useQuery({
     enabled: !!activeTab?.id,
-    variables: {
-      fileId: activeTab?.id ?? "",
-      projectId,
-    },
+    variables: { fileId: activeTab?.id ?? "", projectId },
     select(data) {
       return data.data
     },
@@ -114,11 +111,19 @@ function ChatProvider({ children }: ChatProviderProps) {
       (t) => t.projectId === projectId,
     )
 
-    // If no threads exist for this project or no active thread, create one
     if (projectThreads.length === 0 || !activeThreadId) {
       createThread(projectId)
     }
   }, [hasHydrated, projectId, threads, activeThreadId, createThread])
+
+  // Abort stream on thread switch (race condition #3)
+  const prevThreadIdRef = useRef(activeThreadId)
+  useEffect(() => {
+    if (prevThreadIdRef.current !== activeThreadId) {
+      abortStream()
+      prevThreadIdRef.current = activeThreadId
+    }
+  }, [activeThreadId, abortStream])
 
   const [input, setInput] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -133,20 +138,26 @@ function ChatProvider({ children }: ChatProviderProps) {
   const [mergeStatuses, setMergeStatuses] = useState<
     Record<string, MergeState>
   >({})
-  const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Throttle ref for streaming updates (race condition #4: cleared in finally + unmount)
+  const throttleRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup throttle on unmount (race condition #4)
+  useEffect(() => {
+    return () => {
+      if (throttleRef.current) {
+        clearTimeout(throttleRef.current)
+        throttleRef.current = null
+      }
+    }
+  }, [])
 
   const addContextTab = useCallback((newTab: ContextTab) => {
     setContextTabs((prev) => {
-      // Check for duplicate by id
-      if (prev.some((tab) => tab.id === newTab.id)) {
-        return prev
-      }
+      if (prev.some((tab) => tab.id === newTab.id)) return prev
 
-      // Check for duplicate by type and name/content
       const isDuplicate = prev.some((tab) => {
         if (tab.type !== newTab.type) return false
-
-        // For files, images, and code (file context), check by name
         if (
           tab.type === "file" ||
           tab.type === "image" ||
@@ -154,24 +165,21 @@ function ChatProvider({ children }: ChatProviderProps) {
         ) {
           return tab.name === newTab.name
         }
-
-        // For text snippets, check by content
         if (tab.type === "text" && tab.content && newTab.content) {
           return tab.content === newTab.content
         }
-
         return false
       })
 
       if (isDuplicate) {
         const isSnippet = newTab.type === "text" || newTab.type === "code"
-        const message = isSnippet
-          ? "Snippet is already added"
-          : `"${newTab.name}" is already added`
-        toast.info(message)
+        toast.info(
+          isSnippet
+            ? "Snippet is already added"
+            : `"${newTab.name}" is already added`,
+        )
         return prev
       }
-
       return [...prev, newTab]
     })
   }, [])
@@ -180,61 +188,55 @@ function ChatProvider({ children }: ChatProviderProps) {
     setContextTabs((prev) => prev.filter((tab) => tab.id !== id))
   }, [])
 
-  // Throttle streaming updates to reduce render frequency
-  const throttledSetMessages = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  )
-  const updateAssistantMessage = useCallback(
-    (buffer: string, messageIndex: number) => {
-      if (!activeThreadId) return
-      updateMessage(activeThreadId, messageIndex, buffer)
-    },
-    [activeThreadId, updateMessage],
-  )
-
   const sendMessage = useCallback(
     async (message: string) => {
       if (!message.trim() || !activeThreadId) return
+      // Concurrent guard is in useStreamChat, but also guard UI state
+      if (isStreamingRef.current) return
+
       setIsGenerating(true)
       setIsLoading(true)
 
-      // Add user message to thread
+      // Capture context tabs before clearing (race condition #5)
+      const capturedContextTabs = [...contextTabs]
+
       addMessage(activeThreadId, {
         role: "user",
         content: message,
-        context: contextTabs,
+        context: capturedContextTabs,
       })
       setInput("")
 
       const contextContent = await getCombinedContext({
-        contextTabs,
+        contextTabs: capturedContextTabs,
         queryClient,
         projectId,
         drafts,
       })
       setContextTabs([])
 
-      abortControllerRef.current = new AbortController()
-
-      // Track latest assistant message ID for HEAD compatibility
       const assistantMessageId = nanoid()
       setLatestAssistantId(assistantMessageId)
 
-      // Add empty assistant message
       addMessage(activeThreadId, {
         id: assistantMessageId,
         role: "assistant",
         content: "",
       })
-      const assistantMessageIndex = messages.length + 1 // +1 for user message just added
 
-      try {
-        const { output } = await streamChat(
-          [
+      // Capture threadId for this stream — if user switches threads, writes go nowhere
+      const streamThreadId = activeThreadId
+
+      let buffer = ""
+      let firstChunk = true
+
+      await streamChat(
+        {
+          messages: [
             ...messages,
-            { role: "user", content: message, context: contextTabs },
+            { role: "user", content: message, context: capturedContextTabs },
           ],
-          {
+          context: {
             templateType: projectType,
             activeFileContent,
             fileTree,
@@ -242,46 +244,53 @@ function ChatProvider({ children }: ChatProviderProps) {
             projectName,
             fileName: activeFileName,
           },
-        )
-
-        let buffer = ""
-        let firstChunk = true
-        for await (const chunk of readStreamableValue(output)) {
-          if (abortControllerRef.current?.signal.aborted) break
+        },
+        // onChunk — leading-edge throttle for instant first chunk
+        (chunk) => {
           buffer += chunk
           if (firstChunk) {
             setIsLoading(false)
             firstChunk = false
+            // Immediately update on first chunk (leading-edge)
+            updateMessageById(streamThreadId, assistantMessageId, buffer)
+            return
           }
-          // Throttle updates to every 50ms
-          if (!throttledSetMessages.current) {
-            throttledSetMessages.current = setTimeout(() => {
-              updateAssistantMessage(buffer, assistantMessageIndex)
-              throttledSetMessages.current = null
+          // Throttle subsequent updates to every 50ms
+          if (!throttleRef.current) {
+            throttleRef.current = setTimeout(() => {
+              updateMessageById(streamThreadId, assistantMessageId, buffer)
+              throttleRef.current = null
             }, 50)
           }
-        }
-        // Final update after stream ends
-        updateAssistantMessage(buffer, assistantMessageIndex)
-      } catch (error: any) {
-        if (error.name === "AbortError") {
-          console.log("Generation aborted")
-        } else {
-          console.error("Error:", error)
-          updateAssistantMessage(
+        },
+        // onDone
+        () => {
+          // Clear any pending throttle (race condition #4)
+          if (throttleRef.current) {
+            clearTimeout(throttleRef.current)
+            throttleRef.current = null
+          }
+          // Final update with complete buffer (race condition #1: ID-based)
+          updateMessageById(streamThreadId, assistantMessageId, buffer)
+          setIsGenerating(false)
+          setIsLoading(false)
+        },
+        // onError
+        (error) => {
+          if (throttleRef.current) {
+            clearTimeout(throttleRef.current)
+            throttleRef.current = null
+          }
+          console.error("Stream error:", error)
+          updateMessageById(
+            streamThreadId,
+            assistantMessageId,
             error.message || "Sorry, an error occurred.",
-            assistantMessageIndex,
           )
-        }
-      } finally {
-        setIsGenerating(false)
-        setIsLoading(false)
-        abortControllerRef.current = null
-        if (throttledSetMessages.current) {
-          clearTimeout(throttledSetMessages.current)
-          throttledSetMessages.current = null
-        }
-      }
+          setIsGenerating(false)
+          setIsLoading(false)
+        },
+      )
     },
     [
       activeThreadId,
@@ -296,13 +305,22 @@ function ChatProvider({ children }: ChatProviderProps) {
       activeFileName,
       messages,
       addMessage,
-      updateAssistantMessage,
+      updateMessageById,
+      streamChat,
+      isStreamingRef,
     ],
   )
 
   const stopGeneration = useCallback(() => {
-    abortControllerRef.current?.abort()
-  }, [])
+    abortStream()
+    setIsGenerating(false)
+    setIsLoading(false)
+    // Clear pending throttle (race condition #4)
+    if (throttleRef.current) {
+      clearTimeout(throttleRef.current)
+      throttleRef.current = null
+    }
+  }, [abortStream])
 
   const markFileActionStatus = useCallback(
     (messageId: string, filePath: string, status: "applied" | "rejected") => {
@@ -319,7 +337,6 @@ function ChatProvider({ children }: ChatProviderProps) {
     [],
   )
 
-  // Memoize context value to avoid unnecessary re-renders
   const contextValue = useMemo(
     () => ({
       activeFileContent,

@@ -1,4 +1,4 @@
-import { useEditorLayout } from "@/context/EditorLayoutContext"
+import { useEditor } from "@/context/editor-context"
 import { useAppStore } from "@/store/context"
 import { useParams } from "next/navigation"
 import { useEffect } from "react"
@@ -13,7 +13,7 @@ export function useEditorShortcuts() {
   const hasUnsavedFiles = useAppStore((s) => s.tabs.some((tab) => !tab.saved))
   const draft = useAppStore((s) => s.drafts[activeFileId ?? ""] || "")
   const { saveFile } = useFileTree()
-  const { toggleAIChat } = useEditorLayout()
+  const { toggleAIChat } = useEditor()
 
   // Handle browser beforeunload event for unsaved changes
   useEffect(() => {

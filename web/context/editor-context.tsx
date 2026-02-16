@@ -1,5 +1,7 @@
 "use client"
 
+import { DockviewApi, GridviewApi } from "dockview"
+import * as monaco from "monaco-editor"
 import React, {
   createContext,
   ReactNode,
@@ -11,43 +13,63 @@ import React, {
 } from "react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 
-interface EditorLayoutContextValue {
-  // Layout state
+// --- Editor Handlers (per-file handler registry) ---
+
+interface EditorHandlers {
+  handleApplyCode: (
+    mergedCode: string,
+    originalCode: string,
+  ) => monaco.editor.IEditorDecorationsCollection | null
+  editorRef: monaco.editor.IStandaloneCodeEditor | null
+  hasActiveWidgets: () => boolean
+  acceptAll: () => void
+  rejectAll: () => void
+  forceClearAllDecorations: () => void
+}
+
+// --- Merged context type ---
+
+interface EditorContextType {
+  // Dockview refs (from ContainerContext)
+  gridRef: React.MutableRefObject<GridviewApi | undefined>
+  dockRef: React.MutableRefObject<DockviewApi | undefined>
+  terminalRef: React.MutableRefObject<DockviewApi | undefined>
+
+  // Layout state (from EditorLayoutContext)
   isHorizontalLayout: boolean
   isPreviewCollapsed: boolean
   isAIChatOpen: boolean
   previewURL: string
-
-  // Layout actions
   togglePreviewPanel: () => void
   toggleLayout: () => void
   toggleAIChat: () => void
   loadPreviewURL: (url: string) => void
-
-  // Exposed setters
   setIsAIChatOpen: React.Dispatch<React.SetStateAction<boolean>>
   setIsPreviewCollapsed: React.Dispatch<React.SetStateAction<boolean>>
-
-  // Refs
   previewPanelRef: React.RefObject<ImperativePanelHandle>
+
+  // Handler registry (from EditorHandlersContext)
+  registerHandlers: (fileId: string, handlers: EditorHandlers) => void
+  unregisterHandlers: (fileId: string) => void
+  getHandlers: (fileId: string) => EditorHandlers | undefined
 }
 
-const EditorLayoutContext = createContext<EditorLayoutContextValue | null>(null)
+const EditorContext = createContext<EditorContextType | null>(null)
 
-export function EditorLayoutProvider({ children }: { children: ReactNode }) {
+export function EditorProvider({ children }: { children: ReactNode }) {
+  // Dockview refs
+  const gridRef = useRef<GridviewApi>()
+  const dockRef = useRef<DockviewApi>()
+  const terminalRef = useRef<DockviewApi>()
+
   // Layout state
   const [isHorizontalLayout, setIsHorizontalLayout] = useState(false)
   const [previousLayout, setPreviousLayout] = useState(false)
   const [isPreviewCollapsed, setIsPreviewCollapsed] = useState(true)
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
-
-  // Preview state
   const [previewURL, setPreviewURL] = useState("")
-
-  // Panel ref
   const previewPanelRef = useRef<ImperativePanelHandle>(null)
 
-  // Toggle preview panel
   const togglePreviewPanel = useCallback(() => {
     if (isPreviewCollapsed) {
       previewPanelRef.current?.expand()
@@ -58,19 +80,16 @@ export function EditorLayoutProvider({ children }: { children: ReactNode }) {
     }
   }, [isPreviewCollapsed])
 
-  // Toggle layout
   const toggleLayout = useCallback(() => {
     if (!isAIChatOpen) {
       setIsHorizontalLayout((prev) => !prev)
     }
   }, [isAIChatOpen])
 
-  // Toggle AI chat
   const toggleAIChat = useCallback(() => {
     setIsAIChatOpen((prev) => !prev)
   }, [])
 
-  // Layout reaction to AI chat state
   useEffect(() => {
     if (isAIChatOpen) {
       setPreviousLayout(isHorizontalLayout)
@@ -80,14 +99,34 @@ export function EditorLayoutProvider({ children }: { children: ReactNode }) {
     }
   }, [isAIChatOpen, previousLayout])
 
-  // Load preview URL
   const loadPreviewURL = useCallback((url: string) => {
     setPreviewURL(url)
   }, [])
 
+  // Handler registry
+  const handlersMap = useRef<Map<string, EditorHandlers>>(new Map())
+
+  const registerHandlers = useCallback(
+    (fileId: string, handlers: EditorHandlers) => {
+      handlersMap.current.set(fileId, handlers)
+    },
+    [],
+  )
+
+  const unregisterHandlers = useCallback((fileId: string) => {
+    handlersMap.current.delete(fileId)
+  }, [])
+
+  const getHandlers = useCallback((fileId: string) => {
+    return handlersMap.current.get(fileId)
+  }, [])
+
   return (
-    <EditorLayoutContext.Provider
+    <EditorContext.Provider
       value={{
+        gridRef,
+        dockRef,
+        terminalRef,
         isHorizontalLayout,
         isPreviewCollapsed,
         isAIChatOpen,
@@ -99,17 +138,20 @@ export function EditorLayoutProvider({ children }: { children: ReactNode }) {
         setIsAIChatOpen,
         setIsPreviewCollapsed,
         previewPanelRef,
+        registerHandlers,
+        unregisterHandlers,
+        getHandlers,
       }}
     >
       {children}
-    </EditorLayoutContext.Provider>
+    </EditorContext.Provider>
   )
 }
 
-export const useEditorLayout = () => {
-  const ctx = useContext(EditorLayoutContext)
-  if (!ctx) {
-    throw new Error("useEditorLayout must be used within EditorLayoutProvider")
+export function useEditor() {
+  const context = useContext(EditorContext)
+  if (!context) {
+    throw new Error("useEditor must be used within an EditorProvider")
   }
-  return ctx
+  return context
 }

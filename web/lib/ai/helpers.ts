@@ -16,13 +16,13 @@ export async function getUserProviderConfig(
       const userRecord = await db.query.user.findFirst({
         where: eq(userTable.id, userId),
       })
-  
+
       if (!userRecord || !userRecord.apiKeys) {
         return undefined // Will use system defaults
       }
-  
+
       const encryptedKeys = userRecord.apiKeys as Record<string, string>
-  
+
       // Decrypt keys if they exist
       let anthropicKey: string | undefined
       let openaiKey: string | undefined
@@ -30,7 +30,7 @@ export async function getUserProviderConfig(
       let awsAccessKey: string | undefined
       let awsSecretKey: string | undefined
       let awsRegion: string | undefined
-  
+
       if (encryptedKeys.anthropic) {
         anthropicKey = decrypt(encryptedKeys.anthropic)
       }
@@ -45,15 +45,15 @@ export async function getUserProviderConfig(
         awsSecretKey = decrypt(encryptedKeys.awsSecretAccessKey)
         awsRegion = encryptedKeys.awsRegion // Region is not encrypted
       }
-  
+
       // Determine provider based on which model was LAST selected by the user
       // This ensures the user's choice is respected when multiple providers are configured
-  
+
       // Check for last selected provider/model first
       if (encryptedKeys.lastSelectedProvider && encryptedKeys.lastSelectedModel) {
         const provider = encryptedKeys.lastSelectedProvider
         const modelId = encryptedKeys.lastSelectedModel
-  
+
         if (provider === "openai" && openaiKey) {
           return {
             provider: "openai",
@@ -80,7 +80,7 @@ export async function getUserProviderConfig(
           }
         }
       }
-  
+
       // Fallback: Check if any provider has a model selected (for backward compatibility)
       if (encryptedKeys.openaiModel && openaiKey) {
         return {
@@ -89,7 +89,7 @@ export async function getUserProviderConfig(
           modelId: encryptedKeys.openaiModel,
         }
       }
-  
+
       if (encryptedKeys.anthropicModel && anthropicKey) {
         return {
           provider: "anthropic",
@@ -97,7 +97,7 @@ export async function getUserProviderConfig(
           modelId: encryptedKeys.anthropicModel,
         }
       }
-  
+
       if (encryptedKeys.openrouterModel && openrouterKey) {
         return {
           provider: "openrouter",
@@ -105,7 +105,7 @@ export async function getUserProviderConfig(
           modelId: encryptedKeys.openrouterModel,
         }
       }
-  
+
       if (encryptedKeys.awsModel && awsAccessKey && awsSecretKey) {
         return {
           provider: "bedrock",
@@ -113,7 +113,7 @@ export async function getUserProviderConfig(
           modelId: encryptedKeys.awsModel,
         }
       }
-  
+
       // Fallback: If no specific model selected, use priority order
       // Priority: OpenRouter > Anthropic > OpenAI > AWS
       if (openrouterKey) {
@@ -141,7 +141,7 @@ export async function getUserProviderConfig(
           modelId: DEFAULT_MODELS.aws.id,
         }
       }
-  
+
       return undefined // No custom keys configured, use system defaults
     } catch (error) {
       console.error("Failed to fetch user API keys:", error)

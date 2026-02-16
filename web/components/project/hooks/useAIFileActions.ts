@@ -1,4 +1,4 @@
-import { logFileDetected, mergeCode } from "@/app/actions/ai"
+import { apiClient } from "@/server/client"
 import { fileRouter } from "@/lib/api"
 import { TTab } from "@/lib/types"
 import { useAppStore } from "@/store/context"
@@ -152,18 +152,26 @@ export function useAIFileActions({
     }: PrecomputeMergeArgs): Promise<FileMergeResult> => {
       const normalizedPath = normalizePath(filePath)
 
-      // Log when file is detected from AI response
-      await logFileDetected(normalizedPath)
+      console.log(
+        "📄 File detected from AI response and added to preview:",
+        normalizedPath,
+      )
 
       const originalCode = await getCurrentFileContent(normalizedPath)
 
       try {
-        const mergedCode = await mergeCode(
-          code,
-          originalCode,
-          normalizedPath.split("/").pop() || normalizedPath,
-          projectId,
-        )
+        const res = await apiClient.ai["merge-code"].$post({
+          json: {
+            partialCode: code,
+            originalCode,
+            fileName: normalizedPath.split("/").pop() || normalizedPath,
+            projectId,
+          },
+        })
+        if (!res.ok) {
+          throw new Error("Merge request failed")
+        }
+        const { mergedCode } = await res.json()
         return { mergedCode, originalCode }
       } catch (error) {
         console.error("Auto-merge failed:", error)
@@ -283,12 +291,18 @@ export function useAIFileActions({
         // 4. If still no result, calculate fresh
         if (!mergeResult) {
           const originalCode = await getCurrentFileContent(targetTab.id)
-          const mergedCode = await mergeCode(
-            code,
-            originalCode,
-            targetTab.name,
-            projectId,
-          )
+          const res = await apiClient.ai["merge-code"].$post({
+            json: {
+              partialCode: code,
+              originalCode,
+              fileName: targetTab.name,
+              projectId,
+            },
+          })
+          if (!res.ok) {
+            throw new Error("Merge request failed")
+          }
+          const { mergedCode } = await res.json()
           mergeResult = { mergedCode, originalCode }
         }
 

@@ -1,11 +1,11 @@
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
-import { useContainer } from "@/context/container-context"
+import { useEditor } from "@/context/editor-context"
 import { useTerminal } from "@/context/TerminalContext"
 import type { IWatermarkPanelProps } from "dockview"
 import { Loader2, TerminalSquare } from "lucide-react"
 
 export function MainWatermark(_props: IWatermarkPanelProps) {
-  const { gridRef } = useContainer()
+  const { gridRef } = useEditor()
   function toggleAIChat() {
     const panel = gridRef.current?.getPanel("chat")
     panel?.api.setVisible(!panel.api.isVisible)

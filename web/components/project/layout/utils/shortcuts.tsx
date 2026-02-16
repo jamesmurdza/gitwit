@@ -1,4 +1,4 @@
-import { useContainer } from "@/context/container-context"
+import { useEditor } from "@/context/editor-context"
 import { useSocket } from "@/context/SocketContext"
 import { useTerminal } from "@/context/TerminalContext"
 import { DockviewApi, GridviewApi } from "dockview"
@@ -9,7 +9,7 @@ import { MutableRefObject, useEffect } from "react"
  * Hook to manage global keyboard shortcuts for the editor layout
  */
 export function useGlobalShortcut() {
-  const { gridRef, terminalRef, dockRef } = useContainer()
+  const { gridRef, terminalRef, dockRef } = useEditor()
   const { creatingTerminal, createNewTerminal } = useTerminal()
   const { isReady: isSocketReady } = useSocket()
 

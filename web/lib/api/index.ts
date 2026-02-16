@@ -494,3 +494,54 @@ export type AvailableModels = Awaited<
 >
 
 // #endregion
+
+// #region AI
+export const aiApiRouter = router("ai", {
+  processEdit: router.mutation({
+    mutationFn: async ({
+      messages,
+      context,
+    }: {
+      messages: Array<{ role: string; content: string }>
+      context?: {
+        templateType?: string
+        activeFileContent?: string
+        fileName?: string
+        projectId?: string
+        projectName?: string
+      }
+    }) => {
+      const res = await apiClient.ai["process-edit"].$post({
+        json: { messages: messages as any, context },
+      })
+      if (!res.ok) {
+        throw new Error("Failed to process edit")
+      }
+      const data = await res.json()
+      return data
+    },
+  }),
+  mergeCode: router.mutation({
+    mutationFn: async ({
+      partialCode,
+      originalCode,
+      fileName,
+      projectId,
+    }: {
+      partialCode: string
+      originalCode: string
+      fileName: string
+      projectId?: string
+    }) => {
+      const res = await apiClient.ai["merge-code"].$post({
+        json: { partialCode, originalCode, fileName, projectId },
+      })
+      if (!res.ok) {
+        throw new Error("Failed to merge code")
+      }
+      const data = await res.json()
+      return data
+    },
+  }),
+})
+// #endregion

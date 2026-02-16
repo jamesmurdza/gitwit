@@ -9,7 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useContainer } from "@/context/container-context"
+import { useEditor } from "@/context/editor-context"
 import { useProjectContext } from "@/context/project-context"
 import { useTerminal } from "@/context/TerminalContext"
 import { cn } from "@/lib/utils"
@@ -113,7 +113,7 @@ export const tabComponents = {
     )
   },
   terminal: (props: IDockviewPanelHeaderProps) => {
-    const { gridRef, terminalRef } = useContainer()
+    const { gridRef, terminalRef } = useEditor()
     const { api } = props
     const terminalId = api.id.split("-")[1] // Extract terminal ID from panel ID
 
