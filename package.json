@@ -1,7 +1,9 @@
 {
   "name": "gitwit",
   "private": true,
+  "packageManager": "npm@11.8.0",
   "workspaces": [
+    "packages/*",
     "web",
     "server",
     "db",
@@ -10,30 +12,23 @@
     "ai"
   ],
   "scripts": {
-    "build:deps": "npm run build -w lib && npm run build -w db && npm run build -w templates && npm run build -w ai",
-    "build": "npm run build:deps && npm run build -w web && npm run build -w server",
-    "build:web": "npm run build:deps && npm run build -w web",
-    "build:server": "npm run build:deps && npm run build -w server",
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "test": "turbo test",
     "db:migrate": "npm run migrate -w db",
     "db:migrate:prod": "NODE_ENV=production npm run migrate -w db",
     "db:generate": "npm run generate -w db",
     "db:generate:prod": "NODE_ENV=production npm run generate -w db",
     "db:studio": "npm run studio -w db",
     "db:studio:prod": "NODE_ENV=production npm run studio -w db",
-    "dev:deps": "concurrently -k -n LIB,DB -c yellow,magenta \"npm run dev -w lib\" \"npm run dev -w db\"",
-    "dev": "concurrently -k -n LIB,DB,WEB,SERVER,AI -c yellow,magenta,blue,green,cyan \"npm run dev -w lib\" \"npm run dev -w db\" \"npm run dev -w web\" \"npm run dev -w server\" \"npm run dev -w ai\"",
-    "dev:web": "concurrently -k -n LIB,DB,WEB -c yellow,magenta,blue \"npm run dev -w lib\" \"npm run dev -w db\" \"npm run dev -w web\"",
-    "dev:server": "concurrently -k -n LIB,DB,SERVER -c yellow,magenta,green \"npm run dev -w lib\" \"npm run dev -w db\" \"npm run dev -w server\"",
-    "dev:watch": "concurrently -k -n LIB,DB,WEB,SERVER -c yellow,magenta,blue,green \"npm run dev -w lib\" \"npm run dev -w db\" \"npm run dev -w web\" \"npm run dev -w server\"",
-    "start": "concurrently -k \"npm start -w web\" \"npm start -w server\"",
+    "start": "npm start -w web & npm start -w server",
     "start:web": "npm start -w web",
     "start:server": "npm start -w server",
     "templates:deploy": "npm run deploy -w templates"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "turbo": "^2.8.9"
   },
-  "dependencies": {
-    "react-resizable-panels": "^3.0.6"
-  }
+  "dependencies": {}
 }

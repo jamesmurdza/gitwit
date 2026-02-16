@@ -61,7 +61,7 @@
     "dockview": "^4.13.1",
     "dockview-react": "^4.13.1",
     "dotenv": "^16.6.1",
-    "drizzle-orm": "^0.44.1",
+    "drizzle-orm": "^0.44.2",
     "embla-carousel": "^8.3.0",
     "embla-carousel-react": "^8.3.0",
     "embla-carousel-wheel-gestures": "^8.0.1",
@@ -80,6 +80,7 @@
     "react-dom": "^19.1.2",
     "react-hook-form": "^7.54.2",
     "react-merge-refs": "^3.0.2",
+    "react-resizable-panels": "^3.0.6",
     "react-query-kit": "^3.3.1",
     "shiki": "^3.11.0",
     "socket.io-client": "^4.7.5",
@@ -91,7 +92,7 @@
     "use-stick-to-bottom": "^1.1.1",
     "vscode-icons-js": "^11.6.1",
     "yjs": "^13.6.15",
-    "zod": "^3.25.49",
+    "zod": "^3.25.76",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
