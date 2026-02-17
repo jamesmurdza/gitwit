@@ -1,4 +1,4 @@
-import { GenerateState } from "@/components/project/hooks/useMonacoEditor"
+import { GenerateState } from "@/components/project/hooks/useEditor"
 import { useProjectContext } from "@/context/project-context"
 import { TTab } from "@/lib/types"
 import * as monaco from "monaco-editor"

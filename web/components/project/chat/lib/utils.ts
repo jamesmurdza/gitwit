@@ -227,12 +227,10 @@ function shouldTreatAsContext(text: string) {
 }
 
 export {
-  formatLineInfo,
   getAllFiles,
   getCombinedContext,
   normalizePath,
   pathMatchesTab,
-  processCodeContext,
   shouldTreatAsContext,
   stringifyContent
 }

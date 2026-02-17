@@ -130,19 +130,18 @@ function MainChatContent({
       targetFilePath?: string
       mergeStatuses?: Record<
         string,
-        { status: string; result?: any; error?: string }
+        { status: string; result?: FileMergeResult; error?: string }
       >
       getCurrentFileContent?: (filePath: string) => Promise<string> | string
       getMergeStatus?: (
         filePath: string,
-      ) => { status: string; result?: any; error?: string } | undefined
+      ) => { status: string; result?: FileMergeResult; error?: string } | undefined
     },
   ) => Promise<void>
   onRejectCode?: () => void
   getCurrentFileContent?: GetCurrentFileContentFn
   onOpenFile?: (filePath: string) => void
 }) {
-  //console.log("onOpenFile :", onOpenFile)
   const { messages, isLoading, mergeStatuses } = useChat()
   const isEmpty = messages.length === 0
   const mergeStatusesRef = React.useRef(mergeStatuses)
@@ -228,7 +227,6 @@ function MainChatInput({
 }) {
   const { input, setInput, isLoading, isGenerating, sendMessage } = useChat()
   const handleSubmit = () => {
-    console.log("Submitting message:", input)
     sendMessage(input)
   }
   const handleValueChange = (value: string) => {
@@ -285,7 +283,6 @@ function ChatContexts() {
       if (!selection.isEmpty() && activeTab) {
         const tabId = `selection-${activeTab.id}`
         const content = editorRef?.getModel()?.getValueInRange(selection)
-        console.log("Adding context tab with content:", content)
         addContextTab({
           id: tabId,
           type: "code",

@@ -43,8 +43,7 @@ export default function Dashboard({
   const screen: TScreen =
     tab === "settings"
       ? "settings"
-      : // : tab === "shared" ? "shared" // TODO: Uncomment when shared functionality is ready
-        "projects"
+      : "projects"
 
   const activeScreen = (s: TScreen) => {
     if (screen === s) return "justify-start"
@@ -55,9 +54,6 @@ export default function Dashboard({
     if (screen === "settings") {
       router.push("/dashboard?tab=settings")
     }
-    // else if (screen === "shared") {
-    //   router.push("/dashboard?tab=shared")
-    // } // TODO: Uncomment when shared functionality is ready
     else {
       router.push("/dashboard")
     }
@@ -99,16 +95,6 @@ export default function Dashboard({
               <FolderDot className="w-4 h-4 mr-2" />
               My Projects
             </Button>
-            {/* TODO: Uncomment when shared functionality is ready
-            <Button
-              variant="ghost"
-              onClick={() => navigateToScreen("shared")}
-              className={activeScreen("shared")}
-            >
-              <Users className="w-4 h-4 mr-2" />
-              Shared with Me
-            </Button>
-            */}
             <Button
               variant="ghost"
               onClick={() => navigateToScreen("settings")}
@@ -145,16 +131,6 @@ export default function Dashboard({
                 return sandboxes ? (
                   <DashboardProjects sandboxes={sandboxes} q={q} />
                 ) : null
-              // TODO: Uncomment when shared functionality is ready
-              // case "shared":
-              //   return (
-              //     <DashboardSharedWithMe
-              //       shared={shared.map((item) => ({
-              //         ...item,
-              //         authorAvatarUrl: item.authorAvatarUrl || "",
-              //       }))}
-              //     />
-              //   )
               case "settings":
                 return <DashboardSettings userData={userData} />
               default:

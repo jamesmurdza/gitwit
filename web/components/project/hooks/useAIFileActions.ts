@@ -152,11 +152,6 @@ export function useAIFileActions({
     }: PrecomputeMergeArgs): Promise<FileMergeResult> => {
       const normalizedPath = normalizePath(filePath)
 
-      console.log(
-        "📄 File detected from AI response and added to preview:",
-        normalizedPath,
-      )
-
       const originalCode = await getCurrentFileContent(normalizedPath)
 
       try {
