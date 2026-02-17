@@ -1,5 +1,4 @@
-import { tool } from "ai"
-import { z } from "zod"
+import { tool, jsonSchema } from "ai"
 
 interface SerperResponse {
   organic?: Array<{
@@ -13,16 +12,22 @@ interface SerperResponse {
   }
 }
 
+// NOTE: AI SDK v4 uses zod-to-json-schema internally, which does NOT support
+// Zod v4. Using jsonSchema() directly to bypass the broken conversion.
+// See: https://github.com/vercel/ai/issues/7189
 export const webSearchTool = tool({
   description:
     "Search the web for current information using Google search results",
-  parameters: z.object({
-    query: z.string().describe("The search query to look up"),
-    maxResults: z
-      .number()
-      .optional()
-      .default(5)
-      .describe("Maximum number of results to return"),
+  parameters: jsonSchema<{ query: string; maxResults?: number }>({
+    type: "object",
+    properties: {
+      query: { type: "string", description: "The search query to look up" },
+      maxResults: {
+        type: "number",
+        description: "Maximum number of results to return",
+      },
+    },
+    required: ["query"],
   }),
   execute: async ({ query, maxResults = 5 }) => {
     try {

@@ -4,8 +4,7 @@ import { defaultTools } from "@/lib/ai/tools"
 import { createModel, buildPrompt, mergeAiderDiff } from "@gitwit/ai"
 import type { FileTree } from "@gitwit/ai"
 import { templateConfigs } from "@gitwit/templates"
-import { streamText as honoStream } from "hono/streaming"
-import { streamText, generateText } from "ai"
+import { generateText, streamText } from "ai"
 import { zValidator } from "@hono/zod-validator"
 import z from "zod"
 
@@ -26,8 +25,12 @@ const contextSchema = z
   })
   .optional()
 
+async function createUserModel(userId: string) {
+  const providerConfig = await getUserProviderConfig(userId)
+  return createModel(providerConfig)
+}
+
 export const aiRouter = createRouter()
-  // #region POST /stream-chat
   .post(
     "/stream-chat",
     zValidator(
@@ -39,10 +42,7 @@ export const aiRouter = createRouter()
     ),
     async (c) => {
       const { messages, context } = c.req.valid("json")
-      const userId = c.get("user").id
-
-      const providerConfig = await getUserProviderConfig(userId)
-      const model = createModel(providerConfig)
+      const model = await createUserModel(c.get("user").id)
 
       const system = buildPrompt({
         mode: "chat",
@@ -58,26 +58,12 @@ export const aiRouter = createRouter()
         system,
         messages,
         tools: defaultTools,
-        maxSteps: 1,
       })
 
-      return honoStream(c, async (stream) => {
-        try {
-          for await (const chunk of result.textStream) {
-            await stream.write(chunk)
-          }
-        } catch (error) {
-          console.error("Stream chat failed", error)
-          await stream.write(
-            `\n[ERROR] ${error instanceof Error ? error.message : "Stream failed"}`
-          )
-        }
-      })
+      return result.toTextStreamResponse()
     }
   )
-  // #endregion
 
-  // #region POST /process-edit
   .post(
     "/process-edit",
     zValidator(
@@ -89,10 +75,7 @@ export const aiRouter = createRouter()
     ),
     async (c) => {
       const { messages, context } = c.req.valid("json")
-      const userId = c.get("user").id
-
-      const providerConfig = await getUserProviderConfig(userId)
-      const model = createModel(providerConfig)
+      const model = await createUserModel(c.get("user").id)
 
       const system = buildPrompt({
         mode: "edit",
@@ -110,9 +93,7 @@ export const aiRouter = createRouter()
       return c.json({ content: result.text })
     }
   )
-  // #endregion
 
-  // #region POST /merge-code
   .post(
     "/merge-code",
     zValidator(
@@ -136,4 +117,3 @@ export const aiRouter = createRouter()
       }
     }
   )
-// #endregion
