@@ -2,7 +2,7 @@ export { createModel, resolveProviderConfig } from "./providers"
 export {
   type AIProviderType,
   type AIProviderConfig,
-  type FileTreeNode,
+  type FileTree,
   type PromptContext,
 } from "./types"
-export { buildPrompt, formatFileTree, parseStream, mergeAiderDiff } from "./utils"
+export { buildPrompt, formatFileTree, mergeAiderDiff } from "./utils"

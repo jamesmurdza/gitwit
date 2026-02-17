@@ -1,10 +1,10 @@
-import type { FileTreeNode } from "../types"
+import type { FileTree } from "../types"
 
 /**
  * Formats a file tree structure into a visual tree representation using box-drawing characters.
  */
 export function formatFileTree(
-  files: FileTreeNode[],
+  files: FileTree[],
   depth = 0,
   maxDepth = 3,
   isLast = true,
@@ -18,20 +18,14 @@ export function formatFileTree(
       const connector = isLastItem ? "└─ " : "├─ "
       const childPrefix = prefix + (isLastItem ? "  " : "│ ")
 
-      const hasChildren =
-        file.children && file.children.length > 0 && depth < maxDepth
+      const children = file.type === "folder" ? file.children : undefined
+      const hasChildren = children && children.length > 0 && depth < maxDepth
       let result = `${prefix}${connector}${file.name}${hasChildren ? "/" : ""}`
 
       if (hasChildren) {
         result +=
           "\n" +
-          formatFileTree(
-            file.children!,
-            depth + 1,
-            maxDepth,
-            isLastItem,
-            childPrefix
-          )
+          formatFileTree(children, depth + 1, maxDepth, isLastItem, childPrefix)
       }
 
       return result

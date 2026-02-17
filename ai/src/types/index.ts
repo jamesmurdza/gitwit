@@ -15,11 +15,13 @@ export interface AIProviderConfig {
 }
 
 /**
- * A node in a file tree structure.
+ * Structural type for file tree entries.
+ * Compatible with TFile | TFolder from @gitwit/lib without importing it.
  */
-export interface FileTreeNode {
+export interface FileTree {
   name: string
-  children?: FileTreeNode[]
+  type?: string
+  children?: FileTree[]
 }
 
 /**
@@ -29,7 +31,7 @@ export interface PromptContext {
   mode: "chat" | "edit"
   templateType?: string
   templateConfigs?: Record<string, unknown>
-  fileTree?: FileTreeNode[]
+  fileTree?: FileTree[]
   activeFileContent?: string
   contextContent?: string
   fileName?: string

@@ -1,7 +1,8 @@
 import { createRouter } from "@/lib/api/create-app"
 import { getUserProviderConfig } from "@/lib/ai/helpers"
 import { defaultTools } from "@/lib/ai/tools"
-import { createModel, buildPrompt, mergeAiderDiff, type FileTreeNode } from "@gitwit/ai"
+import { createModel, buildPrompt, mergeAiderDiff } from "@gitwit/ai"
+import type { FileTree } from "@gitwit/ai"
 import { templateConfigs } from "@gitwit/templates"
 import { streamText as honoStream } from "hono/streaming"
 import { streamText, generateText } from "ai"
@@ -47,7 +48,7 @@ export const aiRouter = createRouter()
         mode: "chat",
         templateType: context?.templateType,
         templateConfigs,
-        fileTree: context?.fileTree as FileTreeNode[],
+        fileTree: context?.fileTree as FileTree[],
         activeFileContent: context?.activeFileContent,
         contextContent: context?.contextContent,
       })
