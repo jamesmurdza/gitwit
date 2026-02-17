@@ -1,4 +1,4 @@
-import { AITool } from "@gitwit/ai"
+import { tool } from "ai"
 import { z } from "zod"
 
 interface SerperResponse {
@@ -13,7 +13,7 @@ interface SerperResponse {
   }
 }
 
-export const webSearchTool: AITool = {
+export const webSearchTool = tool({
   description:
     "Search the web for current information using Google search results",
   parameters: z.object({
@@ -66,7 +66,7 @@ export const webSearchTool: AITool = {
       }
     }
   },
-}
+})
 
 export const defaultTools = {
   webSearch: webSearchTool,

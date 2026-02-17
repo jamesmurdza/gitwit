@@ -1,45 +1,44 @@
-import { AIRequest } from "../types"
+import type { PromptContext } from "../types"
 import { formatFileTree } from "./file-tree-formatter"
 
 /**
- * Builds a system prompt based on the AI request mode and context.
+ * Build a system prompt based on mode and context.
  */
-export function buildPrompt(request: AIRequest): string {
-  switch (request.mode) {
+export function buildPrompt(ctx: PromptContext): string {
+  switch (ctx.mode) {
     case "edit":
-      return buildEditPrompt(request)
+      return buildEditPrompt(ctx)
     case "chat":
     default:
-      return buildChatPrompt(request)
+      return buildChatPrompt(ctx)
   }
 }
 
-function buildChatPrompt(request: AIRequest): string {
-  const { context } = request
+function buildChatPrompt(ctx: PromptContext): string {
   const templateConfig =
-    context.templateType && context.templateConfigs
-      ? context.templateConfigs[context.templateType]
+    ctx.templateType && ctx.templateConfigs
+      ? (ctx.templateConfigs[ctx.templateType] as { conventions?: string[] } | undefined)
       : null
 
   let prompt = `You are an intelligent programming assistant for a ${
-    context.templateType || "web"
+    ctx.templateType || "web"
   } project.`
 
   if (templateConfig) {
     prompt += `
 File Tree:
-${formatFileTree(context.fileTree || [])}
+${formatFileTree(ctx.fileTree || [])}
 
 Conventions:
-${templateConfig.conventions.join("\n")}
+${templateConfig.conventions?.join("\n") ?? ""}
 `
   }
 
-  if (context.activeFileContent) {
-    prompt += `\n\nActive File Content:\n${context.activeFileContent}`
+  if (ctx.activeFileContent) {
+    prompt += `\n\nActive File Content:\n${ctx.activeFileContent}`
   }
-  if (context.contextContent) {
-    prompt += `\n\nAdditional Context(selected files):\n${context.contextContent}`
+  if (ctx.contextContent) {
+    prompt += `\n\nAdditional Context(selected files):\n${ctx.contextContent}`
   }
 
   prompt += `
@@ -154,9 +153,7 @@ export function capitalize(str: string): string {
   return prompt
 }
 
-function buildEditPrompt(request: AIRequest): string {
-  const { context } = request
-
+function buildEditPrompt(ctx: PromptContext): string {
   return `You are a code editor AI. Your task is to generate ONLY the code needed for the edit.
 
 Rules:
@@ -166,19 +163,10 @@ Rules:
 - Preserve the exact formatting and style of the existing code
 - If multiple edits are needed, show them in order of appearance
 
-Current file: ${context.fileName || "unknown"}
+Current file: ${ctx.fileName || "unknown"}
 ${
-  context.activeFileContent
-    ? `\nFile content:\n${context.activeFileContent}`
+  ctx.activeFileContent
+    ? `\nFile content:\n${ctx.activeFileContent}`
     : ""
 }`
-}
-
-/**
- * @deprecated Use buildPrompt() instead. Kept for backward compat.
- */
-export class PromptBuilder {
-  build(request: AIRequest): string {
-    return buildPrompt(request)
-  }
 }

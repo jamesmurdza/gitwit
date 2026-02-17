@@ -17,22 +17,3 @@ export async function* parseStream(
     reader.releaseLock()
   }
 }
-
-/**
- * @deprecated Use parseStream() instead. Kept for backward compat.
- */
-export class StreamHandler {
-  static async *parseStream(stream: ReadableStream): AsyncGenerator<string> {
-    yield* parseStream(stream)
-  }
-
-  static createStreamResponse(stream: ReadableStream): Response {
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    })
-  }
-}

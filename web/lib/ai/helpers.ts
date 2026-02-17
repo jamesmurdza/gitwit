@@ -1,5 +1,5 @@
 import { AVAILABLE_MODELS, DEFAULT_MODELS } from "@/lib/available-models"
-import { AIProviderConfig } from "@gitwit/ai"
+import type { AIProviderConfig } from "@gitwit/ai"
 import { db } from "@gitwit/db"
 import { user as userTable } from "@gitwit/db/schema"
 import { decrypt } from "@gitwit/lib/utils/encryption"

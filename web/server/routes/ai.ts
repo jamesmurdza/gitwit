@@ -1,23 +1,23 @@
 import { createRouter } from "@/lib/api/create-app"
 import { getUserProviderConfig } from "@/lib/ai/helpers"
 import { defaultTools } from "@/lib/ai/tools"
-import { createAIClient, AIMessage, mergeAiderDiff } from "@gitwit/ai"
+import { createModel, buildPrompt, mergeAiderDiff, type FileTreeNode } from "@gitwit/ai"
 import { templateConfigs } from "@gitwit/templates"
-import { streamText } from "hono/streaming"
+import { streamText as honoStream } from "hono/streaming"
+import { streamText, generateText } from "ai"
 import { zValidator } from "@hono/zod-validator"
 import z from "zod"
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant", "system"]),
   content: z.string(),
-  context: z.any().optional(),
 })
 
 const contextSchema = z
   .object({
     templateType: z.string().optional(),
     activeFileContent: z.string().optional(),
-    fileTree: z.array(z.any()).optional(),
+    fileTree: z.array(z.unknown()).optional(),
     contextContent: z.string().optional(),
     projectId: z.string().optional(),
     projectName: z.string().optional(),
@@ -41,26 +41,28 @@ export const aiRouter = createRouter()
       const userId = c.get("user").id
 
       const providerConfig = await getUserProviderConfig(userId)
+      const model = createModel(providerConfig)
 
-      const client = createAIClient({
-        userId,
-        projectId: context?.projectId,
-        projectName: context?.projectName,
-        fileName: context?.fileName,
-        tools: defaultTools,
-        providerConfig,
+      const system = buildPrompt({
+        mode: "chat",
         templateType: context?.templateType,
-        fileTree: context?.fileTree,
-        templateConfigs: templateConfigs,
+        templateConfigs,
+        fileTree: context?.fileTree as FileTreeNode[],
+        activeFileContent: context?.activeFileContent,
+        contextContent: context?.contextContent,
       })
 
-      return streamText(c, async (stream) => {
+      const result = streamText({
+        model,
+        system,
+        messages,
+        tools: defaultTools,
+        maxSteps: 1,
+      })
+
+      return honoStream(c, async (stream) => {
         try {
-          for await (const chunk of client.streamChat({
-            messages: messages as AIMessage[],
-            context: context?.contextContent,
-            activeFileContent: context?.activeFileContent,
-          })) {
+          for await (const chunk of result.textStream) {
             await stream.write(chunk)
           }
         } catch (error) {
@@ -89,23 +91,22 @@ export const aiRouter = createRouter()
       const userId = c.get("user").id
 
       const providerConfig = await getUserProviderConfig(userId)
+      const model = createModel(providerConfig)
 
-      const client = createAIClient({
-        userId,
-        projectId: context?.projectId,
-        projectName: context?.projectName,
+      const system = buildPrompt({
+        mode: "edit",
         fileName: context?.fileName,
-        tools: defaultTools,
-        disableTools: true,
-        providerConfig,
-      })
-
-      const result = await client.processEdit({
-        messages: messages as AIMessage[],
         activeFileContent: context?.activeFileContent,
       })
 
-      return c.json(result)
+      const result = await generateText({
+        model,
+        system,
+        messages,
+        maxSteps: 1,
+      })
+
+      return c.json({ content: result.text })
     }
   )
   // #endregion

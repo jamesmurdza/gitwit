@@ -1,5 +1,4 @@
 export * from "./aider-diff-merger"
 export * from "./file-tree-formatter"
-export * from "./logger"
 export * from "./prompt-builder"
 export * from "./stream-handler"
