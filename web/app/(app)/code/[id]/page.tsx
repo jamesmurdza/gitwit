@@ -1,4 +1,3 @@
-// import { Room } from "@/components/editor/live/room"
 import Navbar from "@/components/project/navbar"
 import { ProjectWrapper as Project } from "@/components/project/project-wrapper"
 import { EditorProvider } from "@/context/editor-context"
@@ -141,7 +140,6 @@ export default async function CodePage({
         <AppStoreProvider>
           <TerminalProvider>
             <EditorProvider>
-              {/* <Room id={sandboxId}> */}
               <div className="overflow-hidden overscroll-none w-screen h-screen grid [grid-template-rows:3.5rem_auto] bg-background">
                 <Navbar
                   shared={
@@ -156,7 +154,6 @@ export default async function CodePage({
                   <Project />
                 </HydrationBoundary>
               </div>
-              {/* </Room> */}
             </EditorProvider>
           </TerminalProvider>
         </AppStoreProvider>

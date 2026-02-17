@@ -6,7 +6,6 @@ import UserButton from "@/components/ui/userButton"
 import { Pencil } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
-// import { Avatars } from "../live/avatars"
 import { useProjectContext } from "@/context/project-context"
 import DeployButtonModal from "./deploy"
 import DownloadButton from "./downloadButton"
@@ -64,8 +63,6 @@ export default function Navbar({
           sandboxData={project}
         />
         <div className="flex items-center h-full space-x-4">
-          {/* <Avatars /> */}
-
           {isOwner ? (
             <>
               <DeployButtonModal data={project} userData={user} />
