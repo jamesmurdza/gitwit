@@ -44,7 +44,6 @@ export function QueryClientProvider({
   children: React.ReactNode
 }) {
   const queryClient = getQueryClient()
-  // const token = await (await auth()).getToken()
   return (
     <TanstackQueryClientProvider client={queryClient}>
       {children}

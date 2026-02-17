@@ -86,17 +86,3 @@ function mapJSX(jsx: string | undefined): monaco.languages.typescript.JsxEmit {
   return jsxMap[jsx.toLowerCase()] || monaco.languages.typescript.JsxEmit.React
 }
 
-// Example usage:
-const tsconfigJSON = {
-  compilerOptions: {
-    strict: true,
-    target: "ES2020",
-    module: "ESNext",
-    lib: ["DOM", "ES2020"],
-    jsx: "react",
-    sourceMap: true,
-    outDir: "./dist",
-  },
-}
-
-const monacoOptions = parseTSConfigToMonacoOptions(tsconfigJSON.compilerOptions)

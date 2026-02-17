@@ -87,8 +87,13 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   }, [isAIChatOpen])
 
   const toggleAIChat = useCallback(() => {
+    const chatPanel = gridRef.current?.getPanel("chat")
+    if (chatPanel) {
+      const isVisible = chatPanel.api.isVisible
+      chatPanel.api.setVisible(!isVisible)
+    }
     setIsAIChatOpen((prev) => !prev)
-  }, [])
+  }, [gridRef])
 
   useEffect(() => {
     if (isAIChatOpen) {

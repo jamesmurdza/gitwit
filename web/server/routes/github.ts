@@ -256,9 +256,6 @@ export const githubRouter = createRouter()
                 eq(sandboxSchema.userId, userId)
               )
             )
-          console.log(
-            `Removed repository ID from sandbox ${projectId} for user ${userId}`
-          )
           return c.json(
             {
               success: false,
@@ -901,7 +898,6 @@ export const githubRouter = createRouter()
           }
         } catch (error) {
           // .gitignore doesn't exist, which is fine
-          console.log("No .gitignore file found")
         }
 
         return c.json(
@@ -1023,7 +1019,6 @@ async function collectFilesForCommit(project: Project) {
     }
   } catch (error) {
     // .gitignore doesn't exist, which is fine
-    console.log("No .gitignore file found")
   }
 
   const files: { id: any; data: any }[] = []

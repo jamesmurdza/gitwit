@@ -42,7 +42,6 @@ export type Sandbox = {
   userId: string
   likeCount: number
   viewCount: number
-  // usersToSandboxes: UsersToSandboxes[]
 }
 export type SandboxWithLiked = Sandbox & {
   liked: boolean
@@ -51,23 +50,6 @@ export type UsersToSandboxes = {
   userId: string
   sandboxId: string
   sharedOn: string
-}
-
-export type R2Files = {
-  objects: R2FileData[]
-  truncated: boolean
-  delimitedPrefixes: any[]
-}
-
-export type R2FileData = {
-  storageClass: string
-  uploaded: string
-  checksums: any
-  httpEtag: string
-  etag: string
-  size: number
-  version: string
-  key: string
 }
 
 export type TFolder = {
@@ -85,11 +67,6 @@ export type TFile = {
 
 export type TTab = TFile & {
   saved: boolean
-}
-
-export type TFileData = {
-  id: string
-  data: string
 }
 
 interface ConflictFile {

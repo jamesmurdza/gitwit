@@ -1,6 +1,31 @@
 import { apiClient } from "@/server/client"
 import { inferFnData, router } from "react-query-kit"
 
+function parseGithubError(
+  data: { message?: string; data?: string },
+  fallback: string
+): string {
+  if (
+    typeof data.message === "string" &&
+    typeof (data as any).data === "string"
+  ) {
+    const match = (data as any).data.match(/{.*}/)
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[0])
+        if (parsed.message) {
+          return `${fallback}: ${parsed.message}`
+        }
+      } catch (e) {
+        // ignore JSON parse errors
+      }
+    }
+  } else if (typeof data.message === "string") {
+    return data.message
+  }
+  return fallback
+}
+
 // #region Github
 export const githubRouter = router("github", {
   githubUser: router.query({
@@ -62,26 +87,7 @@ export const githubRouter = router("github", {
       })
       const data = await res.json()
       if (!res.ok) {
-        let errorMessage = "Failed to commit changes"
-        if (
-          typeof data.message === "string" &&
-          typeof (data as any).data === "string"
-        ) {
-          const match = (data as any).data.match(/{.*}/)
-          if (match) {
-            try {
-              const parsed = JSON.parse(match[0])
-              if (parsed.message) {
-                errorMessage += `: ${parsed.message}`
-              }
-            } catch (e) {
-              // ignore JSON parse errors
-            }
-          }
-        } else if (typeof data.message === "string") {
-          errorMessage = data.message
-        }
-        throw new Error(errorMessage)
+        throw new Error(parseGithubError(data, "Failed to commit changes"))
       }
       return data
     },
@@ -95,26 +101,7 @@ export const githubRouter = router("github", {
       })
       const data = await res.json()
       if (!res.ok) {
-        let errorMessage = "Failed to create repository"
-        if (
-          typeof data.message === "string" &&
-          typeof (data as any).data === "string"
-        ) {
-          const match = (data as any).data.match(/{.*}/)
-          if (match) {
-            try {
-              const parsed = JSON.parse(match[0])
-              if (parsed.message) {
-                errorMessage += `: ${parsed.message}`
-              }
-            } catch (e) {
-              // ignore JSON parse errors
-            }
-          }
-        } else if (typeof data.message === "string") {
-          errorMessage = data.message
-        }
-        throw new Error(errorMessage)
+        throw new Error(parseGithubError(data, "Failed to create repository"))
       }
       return data
     },
@@ -126,26 +113,7 @@ export const githubRouter = router("github", {
       })
       const data = await res.json()
       if (!res.ok) {
-        let errorMessage = "Failed to delete repository"
-        if (
-          typeof data.message === "string" &&
-          typeof (data as any).data === "string"
-        ) {
-          const match = (data as any).data.match(/{.*}/)
-          if (match) {
-            try {
-              const parsed = JSON.parse(match[0])
-              if (parsed.message) {
-                errorMessage += `: ${parsed.message}`
-              }
-            } catch (e) {
-              // ignore JSON parse errors
-            }
-          }
-        } else if (typeof data.message === "string") {
-          errorMessage = data.message
-        }
-        throw new Error(errorMessage)
+        throw new Error(parseGithubError(data, "Failed to delete repository"))
       }
       return data
     },
@@ -203,26 +171,7 @@ export const githubRouter = router("github", {
       })
       const data = await res.json()
       if (!res.ok) {
-        let errorMessage = "Failed to pull from GitHub"
-        if (
-          typeof data.message === "string" &&
-          typeof (data as any).data === "string"
-        ) {
-          const match = (data as any).data.match(/{.*}/)
-          if (match) {
-            try {
-              const parsed = JSON.parse(match[0])
-              if (parsed.message) {
-                errorMessage += `: ${parsed.message}`
-              }
-            } catch (e) {
-              // ignore JSON parse errors
-            }
-          }
-        } else if (typeof data.message === "string") {
-          errorMessage = data.message
-        }
-        throw new Error(errorMessage)
+        throw new Error(parseGithubError(data, "Failed to pull from GitHub"))
       }
       return data
     },

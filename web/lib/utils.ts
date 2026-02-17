@@ -1,5 +1,4 @@
 import { type ClassValue, clsx } from "clsx"
-// import { toast } from "sonner"
 import { twMerge } from "tailwind-merge"
 import fileExtToLang from "./file-extension-to-language.json"
 import { KnownPlatform, TFile, TFolder, UserLink } from "./types"

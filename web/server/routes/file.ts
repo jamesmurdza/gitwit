@@ -68,9 +68,6 @@ export const fileRouter = createRouter()
       await project.initialize()
 
       try {
-        // Apply rate limiting
-        // const user = c.get("user") as User
-        // await saveFileRL.consume(user.id, 1)
 
         if (!project.fileManager) {
           throw new Error("File manager not available")

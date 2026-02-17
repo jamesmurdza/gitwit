@@ -18,7 +18,6 @@ import {
   ThumbsUp,
 } from "lucide-react"
 import * as React from "react"
-// import { type ContextTab } from "../lib/types"
 import { CodeApplyProvider } from "../contexts/code-apply-context"
 import { stringifyContent } from "../lib/utils"
 import { ContextTab } from "./context-tab"
