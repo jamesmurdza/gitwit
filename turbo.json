@@ -1,5 +1,33 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": [
+    "CLERK_SECRET_KEY",
+    "DATABASE_URL",
+    "DATABASE_URL_UNPOOLED",
+    "POSTGRES_URL",
+    "POSTGRES_PRISMA_URL",
+    "POSTGRES_URL_NON_POOLING",
+    "POSTGRES_URL_NO_SSL",
+    "POSTGRES_HOST",
+    "POSTGRES_USER",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_DATABASE",
+    "PGHOST",
+    "PGHOST_UNPOOLED",
+    "PGUSER",
+    "PGPASSWORD",
+    "PGDATABASE",
+    "NEON_PROJECT_ID",
+    "E2B_API_KEY",
+    "E2B_DOMAIN",
+    "ENCRYPTION_KEY",
+    "SERPER_API_KEY",
+    "AWS_REGION",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_MODEL_ID",
+    "LIVEBLOCKS_SECRET_KEY"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
