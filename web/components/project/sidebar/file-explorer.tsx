@@ -152,7 +152,7 @@ export function FileExplorer() {
       >
         <div className="flex flex-col h-full">
           <RootFolder />
-          <AIChatControl />
+          {/* <AIChatControl /> */}
         </div>
       </DragDropProvider>
     </FileExplorerProvider>
