@@ -60,7 +60,6 @@ import { Button } from "../../../ui/button"
 import {
   ALLOWED_FILE_TYPES,
   ALLOWED_IMAGE_TYPES,
-  TEXT_LIKE_MIMES,
 } from "../lib/constants"
 import { ContextTab } from "../lib/types"
 import { getAllFiles, shouldTreatAsContext } from "../lib/utils"
@@ -168,11 +167,7 @@ function ChatInput({
               content: reader.result as string,
             })
           }
-          if (TEXT_LIKE_MIMES.has(file.type)) {
-            reader.readAsDataURL(file)
-          } else {
-            reader.readAsDataURL(file)
-          }
+          reader.readAsDataURL(file)
         }
       } else if (item.type === "text/plain") {
         // Get text synchronously to check if it should be treated as context
@@ -540,76 +535,49 @@ function ChatInputContextMenu() {
     },
     [codeContextTabs, addContextTab, removeContextTab]
   )
-  const handleFileUpload: React.MouseEventHandler<HTMLDivElement> = (event) => {
+  const createUploadHandler = (
+    acceptTypes: string[],
+    contextType: "file" | "image",
+    validate: (type: string) => boolean,
+    errorMessage: string,
+  ): React.MouseEventHandler<HTMLDivElement> => (event) => {
     event.preventDefault()
     const fileInput = document.createElement("input")
     fileInput.type = "file"
-    fileInput.accept = ALLOWED_FILE_TYPES.join(",")
+    fileInput.accept = acceptTypes.join(",")
     fileInput.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        const fileType = file.type
-        if (!fileType || !isAllowedFileType(fileType)) {
-          toast.error("Unsupported file type. Select a valid document or code file.")
-          return
-        }
-        if (isAllowedImageType(fileType)) {
-          toast.error("Use the Images option to upload image files.")
-          return
-        }
-        const reader = new FileReader()
-        reader.onload = () => {
-          addContextTab({
-            id: nanoid(),
-            type: "file",
-            name: file.name,
-            content: reader.result as string,
-          })
-          setContextOpenMenu(false)
-        }
-        if (TEXT_LIKE_MIMES.has(file.type)) {
-          reader.readAsDataURL(file)
-        } else {
-          reader.readAsDataURL(file)
-        }
+      if (!file) return
+      if (!file.type || !validate(file.type)) {
+        toast.error(errorMessage)
+        return
       }
+      if (contextType === "file" && isAllowedImageType(file.type)) {
+        toast.error("Use the Images option to upload image files.")
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = () => {
+        addContextTab({
+          id: nanoid(),
+          type: contextType,
+          name: file.name,
+          content: reader.result as string,
+        })
+        setContextOpenMenu(false)
+      }
+      reader.readAsDataURL(file)
     }
     fileInput.click()
   }
-  const handleImageUpload: React.MouseEventHandler<HTMLDivElement> = (
-    event
-  ) => {
-    event.preventDefault()
-    const fileInput = document.createElement("input")
-    fileInput.type = "file"
-    fileInput.accept = ALLOWED_IMAGE_TYPES.join(",")
-    fileInput.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        const fileType = file.type
-        if (!fileType || !isAllowedImageType(fileType)) {
-          toast.error("Only image files are supported in the Images section.")
-          return
-        }
-        const reader = new FileReader()
-        reader.onload = () => {
-          addContextTab({
-            id: nanoid(),
-            type: "image",
-            name: file.name,
-            content: reader.result as string,
-          })
-          setContextOpenMenu(false)
-        }
-        if (TEXT_LIKE_MIMES.has(file.type)) {
-          reader.readAsDataURL(file)
-        } else {
-          reader.readAsDataURL(file)
-        }
-      }
-    }
-    fileInput.click()
-  }
+  const handleFileUpload = createUploadHandler(
+    ALLOWED_FILE_TYPES, "file", isAllowedFileType,
+    "Unsupported file type. Select a valid document or code file.",
+  )
+  const handleImageUpload = createUploadHandler(
+    ALLOWED_IMAGE_TYPES, "image", isAllowedImageType,
+    "Only image files are supported in the Images section.",
+  )
   return (
     <DropdownMenu open={contextOpenMenu} onOpenChange={setContextOpenMenu}>
       <DropdownMenuTrigger asChild>
