@@ -17,7 +17,7 @@ type TScreen = "projects" | "shared" | "settings" | "search"
 
 export default function Dashboard({
   sandboxes,
-  shared,
+  shared: _shared,
   userData,
 }: {
   sandboxes: Sandbox[]

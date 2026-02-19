@@ -90,7 +90,7 @@ function processRemovedLines(
   const decorations: monaco.editor.IModelDeltaDecoration[] = []
   const blockStart = startLineNumber
 
-  lines.forEach((line: string, index: number) => {
+  lines.forEach((_: string, index: number) => {
     const lineNumber = startLineNumber + index
     decorations.push({
       range: new monaco.Range(lineNumber, 1, lineNumber, 1),
@@ -132,7 +132,7 @@ function processAddedLines(
   const decorations: monaco.editor.IModelDeltaDecoration[] = []
   const blockStart = startLineNumber
 
-  lines.forEach((line: string, index: number) => {
+  lines.forEach((_: string, index: number) => {
     const lineNumber = startLineNumber + index
     decorations.push({
       range: new monaco.Range(lineNumber, 1, lineNumber, 1),

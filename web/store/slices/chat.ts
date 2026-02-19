@@ -39,7 +39,7 @@ interface ChatSlice {
   setHasHydrated: (state: boolean) => void
 }
 
-const createChatSlice: StateCreator<ChatSlice> = (set, get) => ({
+const createChatSlice: StateCreator<ChatSlice> = (set) => ({
   // State
   threads: {},
   activeThreadId: null,

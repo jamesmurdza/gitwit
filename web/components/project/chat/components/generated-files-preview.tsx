@@ -110,14 +110,6 @@ export function GeneratedFilesPreview({
     return fileFingerprints
   }, [generatedFiles, sourceKey, shouldUseDerived])
 
-  // Create a stable key from file paths to track when new files arrive
-  const filesKey = React.useMemo(() => {
-    return generatedFiles
-      .map((file) => file.path)
-      .sort()
-      .join("|")
-  }, [generatedFiles])
-
   const mergeStatusRef = React.useRef(mergeStatuses)
   React.useEffect(() => {
     mergeStatusRef.current = mergeStatuses
@@ -182,8 +174,6 @@ export function GeneratedFilesPreview({
   React.useEffect(() => {
     if (!precomputeMergeRef.current || !batchKey) return
 
-    // Store current batch to check against during async operations
-    const currentBatch = batchKey
     const currentPrecomputeMerge = precomputeMergeRef.current
 
     // Collect all files to process first, then start ALL merges in parallel
@@ -574,9 +564,6 @@ export function GeneratedFilesPreview({
           const isRejecting = rejectingMap[file.path]
           const isProcessing = isApplying || isRejecting
           const isPreparing = status === "pending"
-
-          // Double check resolved status here to prevent flicker
-          const messageId = sourceKey || latestAssistantId
 
           if (resolvedFiles[file.path]) return null
 

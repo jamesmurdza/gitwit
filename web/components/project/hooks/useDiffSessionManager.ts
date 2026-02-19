@@ -17,8 +17,6 @@ export function useDiffSessionManager(
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const saveDiffSession = useAppStore((s) => s.saveDiffSession)
   const getDiffSession = useAppStore((s) => s.getDiffSession)
-  const clearDiffSession = useAppStore((s) => s.clearDiffSession)
-
   const previousActiveTabRef = useRef<string | undefined>(activeTab?.id)
 
   // Sync the ref with the current activeTab from store

@@ -60,8 +60,6 @@ export const CodeBlockCopyButton = ({
     [],
   )
 
-  const Icon = isCopied ? CheckIcon : CopyIcon
-
   return (
     <button
       className={cn(

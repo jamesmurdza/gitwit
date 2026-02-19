@@ -98,8 +98,6 @@ export type MessageAvatarProps = {
 const MessageAvatar = ({
   src,
   alt,
-  fallback,
-  delayMs,
   className,
 }: MessageAvatarProps) => {
   return (

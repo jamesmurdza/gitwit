@@ -52,7 +52,7 @@ export default async function AppAuthLayout({
       const error = await res.text()
       console.error("Failed to create user: " + error)
     } else {
-      const data = await res.json()
+      await res.json()
     }
   }
 

@@ -40,7 +40,7 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
   const { terminalRef, gridRef } = useEditorContext()
   const { creatingTerminal, createNewTerminal } = useTerminal()
   const draft = useAppStore((s) => s.drafts[fileId ?? ""])
-  const { data: serverFileContent = "", isLoading } =
+  const { data: serverFileContent = "" } =
     fileRouter.fileContent.useQuery({
       enabled: !!fileId,
       variables: { fileId, projectId },
@@ -236,7 +236,7 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
         })
       })
 
-      editor.onDidBlurEditorText((e) => {
+      editor.onDidBlurEditorText(() => {
         setDecorations((prev) => {
           return {
             ...prev,

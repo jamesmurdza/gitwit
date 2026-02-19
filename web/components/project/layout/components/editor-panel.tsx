@@ -101,9 +101,7 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>) {
     forceClearAllDecorations,
   } = useCodeDiffer({
     editorRef: editor.editorRef || null,
-    onDiffChange: (session) => {
-      // Save session to global store if needed, or local
-    },
+    onDiffChange: () => {},
     onDiffResolved,
   })
 

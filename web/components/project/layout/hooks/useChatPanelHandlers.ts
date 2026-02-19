@@ -104,8 +104,6 @@ export function useChatPanelHandlers() {
     getCurrentFileContent,
     precomputeMergeForFile,
     handleApplyCodeFromChat,
-    applyPrecomputedMerge: baseApplyPrecomputedMerge,
-    restoreOriginalFile: baseRestoreOriginalFile,
     openFile,
   } = useAIFileActions({
     projectId,
@@ -117,11 +115,6 @@ export function useChatPanelHandlers() {
     handleApplyCodeWithDecorations,
     updateFileDraft,
   })
-
-  // Get diff functions from active handlers
-  const hasActiveWidgets = useCallback(() => {
-    return activeHandlers?.hasActiveWidgets() || false
-  }, [activeHandlers])
 
   const forceClearAllDecorations = useCallback(() => {
     activeHandlers?.forceClearAllDecorations()

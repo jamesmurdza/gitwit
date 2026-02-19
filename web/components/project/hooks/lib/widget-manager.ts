@@ -1,4 +1,3 @@
-import { LineRange } from "@/lib/types"
 import * as monaco from "monaco-editor"
 import { DecorationManager } from "./decoration-manager"
 import {
@@ -120,7 +119,7 @@ export class WidgetManager {
         continue
       }
       processedAnchors.add(anchorLine)
-      const widget = this.createWidgetForBlock(type, range, anchorLine)
+      const widget = this.createWidgetForBlock(type, anchorLine)
       if (widget) {
         newWidgets.push(widget.widget)
         newAnchorDecorations.push(widget.anchorDecorationId)
@@ -143,7 +142,6 @@ export class WidgetManager {
    */
   private createWidgetForBlock(
     type: "added" | "removed",
-    range: LineRange,
     anchorLine: number
   ): {
     widget: monaco.editor.IContentWidget

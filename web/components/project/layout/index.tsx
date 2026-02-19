@@ -98,7 +98,7 @@ export function Dock(_props: DockProps) {
     terminal: TerminalPanel,
   }
   const gridComponents: PanelCollection<IGridviewPanelProps> = {
-    dock: (props: IGridviewPanelProps) => {
+    dock: (_props: IGridviewPanelProps) => {
       const { resolvedTheme } = useTheme()
 
       return (
@@ -117,7 +117,7 @@ export function Dock(_props: DockProps) {
       )
     },
 
-    terminal: (props: IGridviewPanelProps) => {
+    terminal: (_props: IGridviewPanelProps) => {
       const { resolvedTheme } = useTheme()
 
       return (

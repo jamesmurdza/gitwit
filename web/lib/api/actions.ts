@@ -99,7 +99,7 @@ interface FormState {
   fields?: Record<string, unknown>
 }
 export async function updateUser(
-  prevState: any,
+  _prevState: any,
   formData: FormData
 ): Promise<FormState> {
   let data = Object.fromEntries(formData)

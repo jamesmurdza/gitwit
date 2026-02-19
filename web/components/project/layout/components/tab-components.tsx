@@ -157,14 +157,6 @@ export const tabComponents = {
     )
   },
   preview: (props: IDockviewPanelHeaderProps) => {
-    const { api } = props
-    const title = api.title
-    const [imgSrc, setImgSrc] = React.useState(() =>
-      title ? `/icons/${getIconForFile(title)}` : `/icons/plaintext.svg`,
-    )
-    const handleImageError = React.useCallback(() => {
-      setImgSrc(DEFAULT_FILE_ICON)
-    }, [])
     return (
       <DockviewDefaultTab
         {...props}

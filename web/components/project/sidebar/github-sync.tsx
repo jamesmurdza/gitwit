@@ -36,7 +36,7 @@ import { ConflictResolution } from "./conflict-resolution"
 
 const REDIRECT_URI = "/loading"
 
-export function GitHubSync({ userId }: { userId: string }) {
+export function GitHubSync({ userId: _userId }: { userId: string }) {
   const { id: projectId } = useParams<{ id: string }>()
   const [commitMessage, setCommitMessage] = React.useState("")
   const [showConflictModal, setShowConflictModal] = useState(false)
@@ -125,7 +125,7 @@ export function GitHubSync({ userId }: { userId: string }) {
     },
   })
   const { mutate: syncToGithub } = githubRouter.createCommit.useMutation({
-    onSuccess(data: any) {
+    onSuccess() {
       toast.success("Commit created successfully")
 
       // Clear changed files after successful commit

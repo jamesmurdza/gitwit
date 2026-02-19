@@ -1,6 +1,6 @@
 import { useSocket } from "@/context/SocketContext"
 import { useChangedFilesOptimistic } from "@/hooks/useChangedFilesOptimistic"
-import { fileRouter, FileTree } from "@/lib/api"
+import { fileRouter } from "@/lib/api"
 import { TFile, TFolder } from "@/lib/types"
 import { sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
@@ -45,7 +45,7 @@ export function useFileTree() {
           return activeTab
         })
       },
-      onSuccess({ message }, { folderId }) {
+      onSuccess({ message }) {
         return queryClient
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
@@ -90,7 +90,7 @@ export function useFileTree() {
 
   const { mutate: renameFile, isPending: isRenamingFile } =
     fileRouter.rename.useMutation({
-      onSuccess({ message }, { newName }) {
+      onSuccess({ message }) {
         return queryClient
           .invalidateQueries(
             fileRouter.fileTree.getOptions({

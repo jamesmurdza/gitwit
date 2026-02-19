@@ -112,7 +112,7 @@ interface HandleTerminalDropResult {
 export function handleTerminalDrop(
   config: HandleTerminalDropConfig,
 ): HandleTerminalDropResult {
-  const { event, sourceContainerRef, targetContainerRef } = config
+  const { event, sourceContainerRef } = config
   const data = event.getData()
 
   // Validate panel data exists

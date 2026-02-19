@@ -1,15 +1,13 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useEditor } from "@/context/editor-context"
 import {
   FileExplorerProvider,
   useFileExplorer,
 } from "@/context/FileExplorerContext"
-import { cn } from "@/lib/utils"
 import { DragDropProvider, useDroppable } from "@dnd-kit/react"
-import { FilePlus, FolderPlus, MessageSquareMore, Sparkles } from "lucide-react"
+import { FilePlus, FolderPlus } from "lucide-react"
 import { useParams } from "next/navigation"
 import * as React from "react"
 import { useFileTree } from "../hooks/useFile"
@@ -79,7 +77,7 @@ export function FileExplorer() {
             isDraggingFileRef.current = true
           }
         }}
-        onDragMove={(event) => {
+        onDragMove={() => {
           // Only track for file drags
           if (!isDraggingFileRef.current) return
 
@@ -152,7 +150,6 @@ export function FileExplorer() {
       >
         <div className="flex flex-col h-full">
           <RootFolder />
-          {/* <AIChatControl /> */}
         </div>
       </DragDropProvider>
     </FileExplorerProvider>
@@ -244,51 +241,3 @@ function RootFolder() {
   )
 }
 
-function AIChatControl() {
-  const { toggleAIChat, isAIChatOpen } = useEditor()
-
-  return (
-    <div className="flex flex-col p-2 bg-background">
-      <Button
-        variant="ghost"
-        className="w-full justify-start text-sm text-muted-foreground font-normal h-8 px-2 mb-2"
-        disabled
-        aria-disabled="true"
-        style={{ opacity: 1 }}
-      >
-        <Sparkles className="h-4 w-4 mr-2 text-indigo-500 opacity-70" />
-        AI Editor
-        <div className="ml-auto">
-          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-            <span className="text-xs">⌘</span>G
-          </kbd>
-        </div>
-      </Button>
-      <Button
-        variant="ghost"
-        className={cn(
-          "w-full justify-start text-sm font-normal h-8 px-2 mb-2 border-t",
-          isAIChatOpen
-            ? "bg-muted-foreground/25 text-foreground"
-            : "text-muted-foreground",
-        )}
-        onClick={toggleAIChat}
-        aria-disabled={false}
-        style={{ opacity: 1 }}
-      >
-        <MessageSquareMore
-          className={cn(
-            "h-4 w-4 mr-2",
-            isAIChatOpen ? "text-indigo-500" : "text-indigo-500 opacity-70",
-          )}
-        />
-        AI Chat
-        <div className="ml-auto">
-          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-            <span className="text-xs">⌘</span>L
-          </kbd>
-        </div>
-      </Button>
-    </div>
-  )
-}
