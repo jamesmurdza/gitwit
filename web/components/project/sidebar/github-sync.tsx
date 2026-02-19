@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useChangedFilesOptimistic } from "@/hooks/useChangedFilesOptimistic"
 import { useGitHubLoadingStates } from "@/hooks/useGitHubLoadingStates"
 import { githubRouter, type GithubUser } from "@/lib/api"
+import type { ConflictFile, FileResolution } from "@/lib/types"
 import { cn, createPopupTracker } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import {
@@ -40,8 +41,8 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
   const { id: projectId } = useParams<{ id: string }>()
   const [commitMessage, setCommitMessage] = React.useState("")
   const [showConflictModal, setShowConflictModal] = useState(false)
-  const [conflictFiles, setConflictFiles] = useState<any[]>([])
-  const [fileResolutions, setFileResolutions] = useState<any[]>([])
+  const [conflictFiles, setConflictFiles] = useState<ConflictFile[]>([])
+  const [fileResolutions, setFileResolutions] = useState<FileResolution[]>([])
   const queryClient = useQueryClient()
   // Use global loading states
   const {
@@ -131,7 +132,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
       // Clear changed files after successful commit
       clearChangedFiles()
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(error.message || "Failed to create commit")
     },
   })
@@ -202,7 +203,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
           toast.success("Repository deleted successfully")
         })
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(error.message || "Failed to delete repository")
     },
   })
@@ -220,7 +221,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
           toast.success("Repository created successfully")
         })
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(error.message || "Failed to create repository")
     },
   })
@@ -235,8 +236,8 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
   })
 
   const { mutate: pullFromGithub } = githubRouter.pullFromGithub.useMutation({
-    onSuccess(data: any) {
-      const result = data?.data
+    onSuccess(data) {
+      const result = typeof data?.data === "object" ? data.data : undefined
 
       if (result?.conflicts && result.conflicts.length > 0) {
         // Show toast and modal for file-level conflict resolution
@@ -250,24 +251,24 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
         )
         setConflictFiles(result.conflicts)
         setShowConflictModal(true)
-      } else {
+      } else if (result) {
         // No conflicts, show success message
         const messages = []
-        if (result?.newFiles?.length > 0) {
+        if (result.newFiles.length > 0) {
           messages.push(
             `${result.newFiles.length} new file${
               result.newFiles.length !== 1 ? "s" : ""
             } added`
           )
         }
-        if (result?.updatedFiles?.length > 0) {
+        if (result.updatedFiles.length > 0) {
           messages.push(
             `${result.updatedFiles.length} file${
               result.updatedFiles.length !== 1 ? "s" : ""
             } updated`
           )
         }
-        if (result?.deletedFiles?.length > 0) {
+        if (result.deletedFiles.length > 0) {
           messages.push(
             `${result.deletedFiles.length} file${
               result.deletedFiles.length !== 1 ? "s" : ""
@@ -283,9 +284,12 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
 
         // Refresh file tree
         queryClient.invalidateQueries()
+      } else {
+        toast.success("Pull completed successfully")
+        queryClient.invalidateQueries()
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(error.message || "Failed to pull from GitHub")
     },
   })
@@ -298,7 +302,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
         toast.success("Conflicts resolved successfully")
         queryClient.invalidateQueries()
       },
-      onError: (error: any) => {
+      onError: (error: Error) => {
         toast.error(error.message || "Failed to resolve conflicts")
       },
     })
@@ -317,8 +321,8 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
       }
       // If pull is needed, perform the pull using the mutation
       pullFromGithub({ projectId })
-    } catch (error: any) {
-      toast.error(error.message || "Failed to check pull status")
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to check pull status")
     }
   }
 

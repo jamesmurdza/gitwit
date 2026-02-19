@@ -24,7 +24,7 @@ export function rebaseNodeIds<
     id: string
     name: string
     type: "file" | "folder"
-    children?: any
+    children?: N[]
   },
 >(node: N, newParentPath: string): N {
   const parent = newParentPath === "/" ? "" : newParentPath.replace(/\/$/, "")

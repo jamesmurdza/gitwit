@@ -359,16 +359,17 @@ export const githubRouter = createRouter()
           },
           200
         )
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
         console.error(
           "Failed to create repository or commit files:",
-          error instanceof Error ? error.message : error
+          message
         )
         return c.json(
           {
             success: false,
             message: "Failed to create repository or commit files",
-            data: error.message,
+            data: message,
           },
           500
         )
@@ -568,13 +569,14 @@ export const githubRouter = createRouter()
           },
           200
         )
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
         console.error("Failed to check pull status:", error)
         return c.json(
           {
             success: false,
             message: "Failed to check pull status",
-            data: error.message,
+            data: message,
           },
           500
         )
@@ -659,13 +661,14 @@ export const githubRouter = createRouter()
           },
           200
         )
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
         console.error("Failed to pull from GitHub:", error)
         return c.json(
           {
             success: false,
             message: "Failed to pull from GitHub",
-            data: error.message,
+            data: message,
           },
           500
         )
@@ -908,13 +911,14 @@ export const githubRouter = createRouter()
           },
           200
         )
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
         console.error("Failed to get changed files:", error)
         return c.json(
           {
             success: false,
             message: "Failed to get changed files",
-            data: error.message,
+            data: message,
           },
           500
         )
@@ -1021,7 +1025,7 @@ async function collectFilesForCommit(project: Project) {
     // .gitignore doesn't exist, which is fine
   }
 
-  const files: { id: any; data: any }[] = []
+  const files: { id: string; data: string }[] = []
 
   // Process each file path
   for (const filePath of currentFiles) {

@@ -69,7 +69,7 @@ export type TTab = TFile & {
   saved: boolean
 }
 
-interface ConflictFile {
+export interface ConflictFile {
   path: string
   localContent: string
   incomingContent: string

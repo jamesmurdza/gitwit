@@ -11,20 +11,33 @@ import { eq, sql } from "drizzle-orm"
 import { zValidator } from "@hono/zod-validator"
 import z from "zod"
 
-interface SandboxWithLiked extends Sandbox {
-  liked: boolean
+import type { SandboxWithLiked } from "@/lib/types"
+
+// Drizzle returns Date objects for timestamps, but SandboxWithLiked expects
+// string (since JSON serialization converts Date→string). This bridge type
+// lets us map DB results to the serialized type safely.
+type DbSandboxRow = Sandbox & { likes: Array<{ userId: string }> }
+
+interface ApiKeysRow {
+  anthropic?: string
+  openai?: string
+  openrouter?: string
+  awsAccessKeyId?: string
+  awsSecretAccessKey?: string
+  [key: string]: string | undefined
 }
 
 // Transform apiKeys from encrypted storage format to "has" boolean format for client
-function transformApiKeys(apiKeys: any) {
+function transformApiKeys(apiKeys: unknown) {
   if (!apiKeys || typeof apiKeys !== "object") {
     return undefined
   }
+  const keys = apiKeys as ApiKeysRow
   return {
-    hasAnthropic: !!apiKeys.anthropic,
-    hasOpenai: !!apiKeys.openai,
-    hasOpenrouter: !!apiKeys.openrouter,
-    hasAws: !!(apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey),
+    hasAnthropic: !!keys.anthropic,
+    hasOpenai: !!keys.openai,
+    hasOpenrouter: !!keys.openrouter,
+    hasAws: !!(keys.awsAccessKeyId && keys.awsSecretAccessKey),
   }
 }
 export const openUserRouter = createRouter().get(
@@ -44,7 +57,8 @@ export const openUserRouter = createRouter().get(
       where: (user, { eq }) => eq(user.username, username),
       with: {
         sandbox: {
-          orderBy: (sandbox: any, { desc }) => [desc(sandbox.createdAt)],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drizzle orderBy union type lacks createdAt
+          orderBy: (sandbox: any, { desc }: any) => [desc(sandbox.createdAt)],
           with: {
             likes: true,
           },
@@ -59,10 +73,10 @@ export const openUserRouter = createRouter().get(
       ...res,
       apiKeys: transformApiKeys(res.apiKeys),
       usersToSandboxes: res.usersToSandboxes as UsersToSandboxes[],
-      sandbox: (res.sandbox as Sandbox[]).map(
-        (sb: any): SandboxWithLiked => ({
-          ...sb,
-          liked: sb.likes.some((like: any) => like.userId === res.id),
+      sandbox: (res.sandbox as unknown as DbSandboxRow[]).map(
+        (sb): SandboxWithLiked => ({
+          ...(sb as unknown as SandboxWithLiked),
+          liked: sb.likes.some((like) => like.userId === res.id),
         })
       ),
     }
@@ -95,7 +109,8 @@ export const userRouter = createRouter()
           where: (user, { eq }) => eq(user.username, username),
           with: {
             sandbox: {
-              orderBy: (sandbox: any, { desc }) => [desc(sandbox.createdAt)],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drizzle orderBy union type lacks createdAt
+              orderBy: (sandbox: any, { desc }: any) => [desc(sandbox.createdAt)],
               with: {
                 likes: true,
               },
@@ -110,10 +125,10 @@ export const userRouter = createRouter()
           ...res,
           apiKeys: transformApiKeys(res.apiKeys),
           usersToSandboxes: res.usersToSandboxes as UsersToSandboxes[],
-          sandbox: (res.sandbox as Sandbox[]).map(
-            (sb: any): SandboxWithLiked => ({
-              ...sb,
-              liked: sb.likes.some((like: any) => like.userId === userId),
+          sandbox: (res.sandbox as unknown as DbSandboxRow[]).map(
+            (sb): SandboxWithLiked => ({
+              ...(sb as unknown as SandboxWithLiked),
+              liked: sb.likes.some((like) => like.userId === userId),
             })
           ),
         }
@@ -126,7 +141,8 @@ export const userRouter = createRouter()
         where: (user, { eq }) => eq(user.id, id ?? userId),
         with: {
           sandbox: {
-            orderBy: (sandbox: any, { desc }) => [desc(sandbox.createdAt)],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drizzle orderBy union type lacks createdAt
+            orderBy: (sandbox: any, { desc }: any) => [desc(sandbox.createdAt)],
             with: {
               likes: true,
             },
@@ -141,10 +157,10 @@ export const userRouter = createRouter()
         ...res,
         apiKeys: transformApiKeys(res.apiKeys),
         usersToSandboxes: res.usersToSandboxes as UsersToSandboxes[],
-        sandbox: (res.sandbox as Sandbox[]).map(
-          (sb: any): SandboxWithLiked => ({
-            ...sb,
-            liked: sb.likes.some((like: any) => like.userId === (id ?? userId)),
+        sandbox: (res.sandbox as unknown as DbSandboxRow[]).map(
+          (sb): SandboxWithLiked => ({
+            ...(sb as unknown as SandboxWithLiked),
+            liked: sb.likes.some((like) => like.userId === (id ?? userId)),
           })
         ),
       }

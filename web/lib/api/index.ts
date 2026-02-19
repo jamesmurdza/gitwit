@@ -1,4 +1,5 @@
 import { apiClient } from "@/server/client"
+import type { TFile, TFolder } from "@/lib/types"
 import { inferFnData, router } from "react-query-kit"
 
 function parseGithubError(
@@ -7,9 +8,9 @@ function parseGithubError(
 ): string {
   if (
     typeof data.message === "string" &&
-    typeof (data as any).data === "string"
+    typeof data.data === "string"
   ) {
-    const match = (data as any).data.match(/{.*}/)
+    const match = data.data.match(/{.*}/)
     if (match) {
       try {
         const parsed = JSON.parse(match[0])
@@ -26,6 +27,10 @@ function parseGithubError(
   return fallback
 }
 
+// Common API response shapes (Hono client can't infer these due to type inference limitations)
+type ApiMsg = { success: boolean; message: string }
+type ApiData<T> = ApiMsg & { data: T }
+
 // #region Github
 export const githubRouter = router("github", {
   githubUser: router.query({
@@ -34,7 +39,12 @@ export const githubRouter = router("github", {
       if (!res.ok) {
         return null
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiData<{
+        login: string
+        name: string | null
+        avatar_url: string
+        html_url: string
+      }>
 
       return data
     },
@@ -47,7 +57,7 @@ export const githubRouter = router("github", {
       if (!res.ok) {
         throw new Error("Login failed")
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiMsg
       return data
     },
   }),
@@ -57,7 +67,7 @@ export const githubRouter = router("github", {
       if (!res.ok) {
         throw new Error("Logout failed")
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiMsg
       return data
     },
   }),
@@ -67,7 +77,7 @@ export const githubRouter = router("github", {
       if (!res.ok) {
         throw new Error("Failed to get GitHub auth URL")
       }
-      const data = await res.json()
+      const data = (await res.json()) as { success: boolean; data: { auth_url: string } }
       return data
     },
   }),
@@ -85,7 +95,7 @@ export const githubRouter = router("github", {
           message,
         },
       })
-      const data = await res.json()
+      const data = (await res.json()) as ApiMsg & { data?: string }
       if (!res.ok) {
         throw new Error(parseGithubError(data, "Failed to commit changes"))
       }
@@ -99,7 +109,7 @@ export const githubRouter = router("github", {
           projectId,
         },
       })
-      const data = await res.json()
+      const data = (await res.json()) as ApiMsg & { data?: string }
       if (!res.ok) {
         throw new Error(parseGithubError(data, "Failed to create repository"))
       }
@@ -111,7 +121,7 @@ export const githubRouter = router("github", {
       const res = await apiClient.github.repo.remove.$delete({
         json: { projectId },
       })
-      const data = await res.json()
+      const data = (await res.json()) as ApiMsg & { data?: string }
       if (!res.ok) {
         throw new Error(parseGithubError(data, "Failed to delete repository"))
       }
@@ -130,13 +140,18 @@ export const githubRouter = router("github", {
         }
         throw new Error("Failed to get repo status")
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiData<{
+        existsInDB: boolean
+        existsInGitHub: boolean
+        repo: { id: string; name: string } | null
+      }>
       return data
     },
   }),
   checkPullStatus: router.query({
     fetcher: async ({ projectId }: { projectId: string }) => {
-      const res = await (apiClient.github.repo as any)["pull/check"].$get({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Hono can't type compound path segments
+      const res = await (apiClient.github.repo as Record<string, any>)["pull/check"].$get({
         query: { projectId },
       })
       if (!res.ok) {
@@ -146,19 +161,27 @@ export const githubRouter = router("github", {
         }
         throw new Error("Failed to check pull status")
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiData<{
+        needsPull: boolean
+        behind?: number
+      }>
       return data
     },
   }),
   getChangedFiles: router.query({
     fetcher: async ({ projectId }: { projectId: string }) => {
-      const res = await (apiClient.github.repo as any)["changed-files"].$get({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Hono can't type compound path segments
+      const res = await (apiClient.github.repo as Record<string, any>)["changed-files"].$get({
         query: { projectId },
       })
       if (!res.ok) {
         throw new Error("Failed to get changed files")
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiData<{
+        modified?: Array<{ path: string }>
+        created?: Array<{ path: string }>
+        deleted?: Array<{ path: string }>
+      }>
       return data
     },
   }),
@@ -169,9 +192,18 @@ export const githubRouter = router("github", {
           projectId,
         },
       })
-      const data = await res.json()
+      const data = (await res.json()) as ApiMsg & {
+        data?: {
+          success: boolean
+          conflicts: Array<{ path: string; localContent: string; incomingContent: string }>
+          newFiles: string[]
+          deletedFiles: string[]
+          updatedFiles: string[]
+        } | string
+      }
       if (!res.ok) {
-        throw new Error(parseGithubError(data, "Failed to pull from GitHub"))
+        const errData = { message: data.message, data: typeof data.data === "string" ? data.data : undefined }
+        throw new Error(parseGithubError(errData, "Failed to pull from GitHub"))
       }
       return data
     },
@@ -197,14 +229,10 @@ export const githubRouter = router("github", {
           projectId,
           conflictResolutions,
         },
-      } as any)
-      const data = await res.json()
+      })
+      const data = (await res.json()) as ApiMsg
       if (!res.ok) {
-        let errorMessage = "Failed to resolve conflicts"
-        if (typeof data.message === "string") {
-          errorMessage = data.message
-        }
-        throw new Error(errorMessage)
+        throw new Error(data.message || "Failed to resolve conflicts")
       }
       return data
     },
@@ -234,7 +262,7 @@ export const fileRouter = router("file", {
       if (!res.ok) {
         throw new Error("Failed to fetch hearbeat")
       }
-      const data = await res.json()
+      const data = (await res.json()) as { success: boolean }
       return data
     },
     refetchInterval: HEARTBEAT_POLL_INTERVERAL_MS,
@@ -251,9 +279,9 @@ export const fileRouter = router("file", {
         query: { fileId, projectId },
       })
       if (!res.ok) {
-        throw new Error("Failed to fetch file tree")
+        throw new Error("Failed to fetch file content")
       }
-      const data = await res.json()
+      const data = (await res.json()) as { message: string; data: string }
       return data
     },
   }),
@@ -267,11 +295,10 @@ export const fileRouter = router("file", {
         json: options,
       })
       if (!res.ok) {
-        const data = await res.json()
+        const data = (await res.json()) as { message?: string }
         throw new Error(data.message || "Failed to save file")
       }
-      const data = await res.json()
-
+      const data = (await res.json()) as ApiMsg
       return data
     },
   }),
@@ -283,7 +310,7 @@ export const fileRouter = router("file", {
       if (!res.ok) {
         throw new Error("Failed to create new file")
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiMsg
       return data
     },
   }),
@@ -295,7 +322,7 @@ export const fileRouter = router("file", {
       if (!res.ok) {
         throw new Error("Failed to create new folder")
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiMsg
       return data
     },
   }),
@@ -309,9 +336,9 @@ export const fileRouter = router("file", {
         json: options,
       })
       if (!res.ok) {
-        throw new Error("Failed to create new file")
+        throw new Error("Failed to move file")
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiData<(TFile | TFolder)[]>
       return data
     },
   }),
@@ -323,7 +350,7 @@ export const fileRouter = router("file", {
       if (!res.ok) {
         throw new Error("Failed to fetch file tree")
       }
-      const data = await res.json()
+      const data = (await res.json()) as { success: boolean; data: (TFile | TFolder)[] }
       return data
     },
   }),
@@ -342,10 +369,10 @@ export const fileRouter = router("file", {
         },
       })
       if (!res.ok) {
-        const data = await res.json()
+        const data = (await res.json()) as { message?: string }
         throw new Error(data.message || "Failed to delete file")
       }
-      return res.json()
+      return (await res.json()) as ApiMsg
     },
   }),
   deleteFolder: router.mutation({
@@ -363,10 +390,10 @@ export const fileRouter = router("file", {
         },
       })
       if (!res.ok) {
-        const data = await res.json()
+        const data = (await res.json()) as { message?: string }
         throw new Error(data.message || "Failed to delete folder")
       }
-      return res.json()
+      return (await res.json()) as ApiMsg
     },
   }),
   rename: router.mutation({
@@ -388,11 +415,10 @@ export const fileRouter = router("file", {
         },
       })
       if (!res.ok) {
-        const data = await res.json()
-
+        const data = (await res.json()) as { message?: string }
         throw new Error(data.message || "Failed to rename file")
       }
-      return res.json()
+      return (await res.json()) as ApiMsg
     },
   }),
 })
@@ -411,7 +437,11 @@ export const userRouter = router("user", {
       if (!res.ok) {
         throw new Error("Failed to fetch available models")
       }
-      const data = await res.json()
+      const data = (await res.json()) as {
+        models: Array<{ id: string; name: string; provider: string }>
+        defaultModel?: string
+        selectedProvider?: string
+      }
       return data
     },
   }),
@@ -432,7 +462,7 @@ export const userRouter = router("user", {
       if (!res.ok) {
         throw new Error("Failed to update selected model")
       }
-      const data = await res.json()
+      const data = (await res.json()) as ApiMsg
       return data
     },
   }),
@@ -461,12 +491,12 @@ export const aiApiRouter = router("ai", {
       }
     }) => {
       const res = await apiClient.ai["process-edit"].$post({
-        json: { messages: messages as any, context },
+        json: { messages: messages as Array<{ role: "user" | "assistant"; content: string }>, context },
       })
       if (!res.ok) {
         throw new Error("Failed to process edit")
       }
-      const data = await res.json()
+      const data = (await res.json()) as { content: string }
       return data
     },
   }),
@@ -488,7 +518,7 @@ export const aiApiRouter = router("ai", {
       if (!res.ok) {
         throw new Error("Failed to merge code")
       }
-      const data = await res.json()
+      const data = (await res.json()) as { mergedCode: string }
       return data
     },
   }),

@@ -48,7 +48,7 @@ export class DecorationManager {
     for (let lineNumber = range.start; lineNumber <= range.end; lineNumber++) {
       const decorations = this.model.getLineDecorations(lineNumber) || []
       decorations.forEach((decoration) => {
-        const className = (decoration.options as any)?.className
+        const className = decoration.options.className
         if (
           className === "added-line-decoration" ||
           className === "removed-line-decoration"
@@ -77,7 +77,7 @@ export class DecorationManager {
     const hasClass = (lineNumber: number) => {
       const decorations = this.model.getLineDecorations(lineNumber) || []
       return decorations.some(
-        (d) => (d.options as any)?.className === className
+        (d) => d.options.className === className
       )
     }
 
@@ -111,7 +111,7 @@ export class DecorationManager {
    */
   lineHasClass(lineNumber: number, className: string): boolean {
     const decorations = this.model.getLineDecorations(lineNumber) || []
-    return decorations.some((d) => (d.options as any)?.className === className)
+    return decorations.some((d) => d.options.className === className)
   }
 
   /**

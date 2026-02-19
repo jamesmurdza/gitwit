@@ -19,12 +19,12 @@ export default function DownloadButton({
         },
       })
 
-      const data = await response.json()
-      if ("error" in data) {
+      const data = (await response.json()) as { archive?: string; error?: string }
+      if (data.error) {
         throw new Error(data.error)
       }
 
-      const bytes = Uint8Array.from(atob(data.archive), (char) =>
+      const bytes = Uint8Array.from(atob(data.archive!), (char) =>
         char.charCodeAt(0)
       )
       const blob = new Blob([bytes], { type: "application/gzip" })

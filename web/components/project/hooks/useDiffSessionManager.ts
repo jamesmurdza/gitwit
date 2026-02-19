@@ -1,4 +1,4 @@
-import { TTab } from "@/lib/types"
+import { DiffSession, TTab } from "@/lib/types"
 import { useAppStore } from "@/store/context"
 import { useCallback, useEffect, useRef } from "react"
 
@@ -8,8 +8,8 @@ import { useCallback, useEffect, useRef } from "react"
  */
 export function useDiffSessionManager(
   hasActiveWidgets: () => boolean,
-  getUnresolvedSnapshot: (fileId: string) => any,
-  restoreFromSnapshot: (session: any) => void,
+  getUnresolvedSnapshot: (fileId: string) => DiffSession | null,
+  restoreFromSnapshot: (session: DiffSession) => void,
   clearVisuals: () => void,
   forceClearAllDecorations: () => void
 ) {

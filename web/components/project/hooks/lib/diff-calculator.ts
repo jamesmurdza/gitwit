@@ -36,7 +36,7 @@ export function calculateDiff(
     config
   )
 
-  diffResult.forEach((part: any) => {
+  diffResult.forEach((part: diff.Change) => {
     if (part.removed) {
       const {
         lines,

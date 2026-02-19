@@ -1,5 +1,6 @@
 import * as monaco from "monaco-editor"
 import { DecorationManager } from "./decoration-manager"
+import { setEditorCleanup } from "./model-metadata"
 import {
   createContentWidget,
   createDiffButton,
@@ -79,10 +80,10 @@ export class WidgetManager {
     for (let lineNumber = 1; lineNumber <= maxLines; lineNumber++) {
       const decorations = this.model.getLineDecorations(lineNumber) || []
       const hasRemoved = decorations.some(
-        (d) => (d.options as any)?.className === "removed-line-decoration",
+        (d) => d.options.className === "removed-line-decoration",
       )
       const hasAdded = decorations.some(
-        (d) => (d.options as any)?.className === "added-line-decoration",
+        (d) => d.options.className === "added-line-decoration",
       )
 
       if (hasRemoved || hasAdded) {
@@ -357,7 +358,7 @@ export class WidgetManager {
    * Attaches cleanup function to the editor for external access
    */
   private attachCleanupToEditor(): void {
-    ;(this.editorRef as any).cleanupDiffWidgets = () => this.cleanupAllWidgets()
+    setEditorCleanup(this.editorRef, () => this.cleanupAllWidgets())
   }
 
   /**

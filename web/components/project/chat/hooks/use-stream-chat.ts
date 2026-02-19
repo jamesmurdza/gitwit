@@ -71,11 +71,11 @@ export function useStreamChat(): UseStreamChatReturn {
           onChunk(decoder.decode(value, { stream: true }))
         }
         onDone()
-      } catch (error: any) {
-        if (error.name === "AbortError") {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError") {
           // Expected — user cancelled or thread switched
         } else {
-          onError(error)
+          onError(error instanceof Error ? error : new Error(String(error)))
         }
       } finally {
         isStreamingRef.current = false

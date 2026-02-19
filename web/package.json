@@ -18,7 +18,7 @@
     "@gitwit/db": "*",
     "@gitwit/lib": "*",
     "@gitwit/templates": "*",
-    "@hono/zod-validator": "^0.4.3",
+    "@hono/zod-validator": "^0.7.6",
     "@hookform/resolvers": "^3.9.1",
     "@monaco-editor/react": "^4.6.0",
     "@paralleldrive/cuid2": "^2.2.2",

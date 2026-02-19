@@ -14,8 +14,8 @@ interface EditorSlice {
   editorRef?: editor.IStandaloneCodeEditor
   diffFunctions: {
     hasActiveWidgets: () => boolean
-    getUnresolvedSnapshot: (fileId: string) => any
-    restoreFromSnapshot: (session: any) => void
+    getUnresolvedSnapshot: (fileId: string) => DiffSession | null
+    restoreFromSnapshot: (session: DiffSession) => void
     clearVisuals: () => void
     forceClearAllDecorations: () => void
   } | null
@@ -38,8 +38,8 @@ interface EditorSlice {
   setEditorRef: (ref: editor.IStandaloneCodeEditor | undefined) => void
   setDiffFunctions: (functions: {
     hasActiveWidgets: () => boolean
-    getUnresolvedSnapshot: (fileId: string) => any
-    restoreFromSnapshot: (session: any) => void
+    getUnresolvedSnapshot: (fileId: string) => DiffSession | null
+    restoreFromSnapshot: (session: DiffSession) => void
     clearVisuals: () => void
     forceClearAllDecorations: () => void
   }) => void

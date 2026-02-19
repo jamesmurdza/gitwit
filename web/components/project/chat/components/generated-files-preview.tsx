@@ -11,7 +11,7 @@ import type {
   PrecomputeMergeArgs,
 } from "../lib/types"
 import { normalizePath } from "../lib/utils"
-import { useChat } from "../providers/chat-provider"
+import { type MergeState, useChat } from "../providers/chat-provider"
 
 type GeneratedFilesPreviewProps = {
   files?: GeneratedFile[]
@@ -156,10 +156,10 @@ export function GeneratedFilesPreview({
 
   React.useEffect(() => {
     setMergeStatuses((prev) => {
-      const next: Record<string, any> = {}
+      const next: Record<string, MergeState> = {}
       generatedFiles.forEach((file) => {
         // Only set to idle if it doesn't exist, preserve existing statuses
-        next[file.path] = prev[file.path] ?? { status: "idle" }
+        next[file.path] = prev[file.path] ?? { status: "idle" as const }
       })
       return next
     })

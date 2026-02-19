@@ -41,5 +41,3 @@ export const DEFAULT_MODELS = {
     name: "Claude 3 Sonnet",
   },
 } as const
-
-export type Provider = keyof typeof AVAILABLE_MODELS

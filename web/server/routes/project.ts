@@ -240,7 +240,7 @@ export const projectRouter = createRouter()
 
       if (
         Array.isArray(user.sandbox) &&
-        user.sandbox.find((sb: any) => sb.id === sandboxId)
+        user.sandbox.find((sb) => sb.id === sandboxId)
       ) {
         return c.json(
           { success: false, message: "Cannot share with yourself!" },
@@ -250,7 +250,7 @@ export const projectRouter = createRouter()
 
       if (
         Array.isArray(user.usersToSandboxes) &&
-        user.usersToSandboxes.find((uts: any) => uts.sandboxId === sandboxId)
+        user.usersToSandboxes.find((uts) => uts.sandboxId === sandboxId)
       ) {
         return c.json(
           { success: false, message: "User already has access." },

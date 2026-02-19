@@ -1,8 +1,8 @@
 import { githubRouter } from "@/lib/api"
-import { useQueryClient } from "@tanstack/react-query"
+import { QueryClient, useQueryClient } from "@tanstack/react-query"
 import { useParams } from "next/navigation"
 
-interface ChangedFilesData {
+export interface ChangedFilesData {
   modified?: Array<{
     path: string
     localContent: string
@@ -15,7 +15,7 @@ interface ChangedFilesData {
 // Manager to handle optimistic updates for changed files
 class ChangedFilesOptimisticManager {
   private static instances = new Map<string, ChangedFilesOptimisticManager>()
-  private queryClient: any
+  private queryClient: QueryClient | null = null
   private projectId: string | null = null
 
   private constructor() {}
@@ -30,7 +30,7 @@ class ChangedFilesOptimisticManager {
     return ChangedFilesOptimisticManager.instances.get(projectId)!
   }
 
-  initialize(queryClient: any, projectId: string) {
+  initialize(queryClient: QueryClient, projectId: string) {
     this.queryClient = queryClient
     this.projectId = projectId
   }
@@ -60,7 +60,7 @@ class ChangedFilesOptimisticManager {
     }
 
     const currentData = this.queryClient.getQueryData(queryKey) as
-      | { data: ChangedFilesData }
+      | { success: boolean; message: string; data: ChangedFilesData }
       | undefined
 
     if (!currentData?.data) {
@@ -173,7 +173,11 @@ class ChangedFilesOptimisticManager {
     }
 
     // Update the cache optimistically
-    this.queryClient.setQueryData(queryKey, { data: newData })
+    this.queryClient.setQueryData(queryKey, {
+      success: true,
+      message: "Optimistic update",
+      data: newData,
+    })
   }
 
   refreshChangedFiles() {
@@ -196,6 +200,8 @@ class ChangedFilesOptimisticManager {
       return
     }
     this.queryClient.setQueryData(queryKey, {
+      success: true,
+      message: "Cleared",
       data: { modified: [], created: [], deleted: [] },
     })
   }

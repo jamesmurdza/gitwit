@@ -9,7 +9,7 @@ import { useRouter } from "@bprogress/next/app"
 import { useUser } from "@clerk/nextjs"
 import { projectTemplates } from "@gitwit/templates"
 import { AnimatePresence, motion } from "framer-motion"
-import { Clock, Eye, Globe, Heart, Lock } from "lucide-react"
+import { Clock, Eye, Globe, Heart, Lock, type LucideIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -53,7 +53,7 @@ type ProjectCardProps =
   | AuthenticatedProjectCardProps
   | UnauthenticatedProjectCardProps
 
-const StatItem = memo(({ icon: Icon, value }: { icon: any; value: number }) => (
+const StatItem = memo(({ icon: Icon, value }: { icon: LucideIcon; value: number }) => (
   <div className="flex items-center space-x-1">
     <Icon className="size-4" />
     <span className="text-xs">{value}</span>

@@ -1,6 +1,6 @@
 import { apiClient } from "@/server/client"
 import { fileRouter } from "@/lib/api"
-import { TTab } from "@/lib/types"
+import { DiffSession, TTab } from "@/lib/types"
 import { useAppStore } from "@/store/context"
 import * as monaco from "monaco-editor"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -40,7 +40,7 @@ export function useAIFileActions({
 }: UseAIFileActionsProps) {
   const getDraft = useAppStore((s) => s.getDraft)
 
-  const pendingDiffsQueueRef = useRef<Map<string, any>>(new Map())
+  const pendingDiffsQueueRef = useRef<Map<string, { code: string; language?: string; options?: Record<string, unknown> }>>(new Map())
   const pendingApplyReadyRef = useRef<
     Map<string, { mergedCode: string; originalCode: string }>
   >(new Map())
@@ -435,7 +435,7 @@ export function useAIFileActions({
     (
       filePath: string,
       fallbackCode: string,
-      sessionTransform: (session: any) => string,
+      sessionTransform: (session: DiffSession) => string,
       errorLabel: string,
     ) => {
       const normalizedPath = normalizePath(filePath)

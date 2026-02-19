@@ -84,7 +84,7 @@ export function ChangedFiles({ className }: ChangedFilesProps) {
 
       <div className="space-y-1 min-w-0">
         {/* Modified files */}
-        {changedFiles.modified?.map((file: any) => (
+        {changedFiles.modified?.map((file) => (
           <div
             key={`modified-${file.path}`}
             className="flex items-center gap-2 text-sm py-1 min-w-0"
@@ -100,7 +100,7 @@ export function ChangedFiles({ className }: ChangedFilesProps) {
         ))}
 
         {/* Created files */}
-        {changedFiles.created?.map((file: any) => (
+        {changedFiles.created?.map((file) => (
           <div
             key={`created-${file.path}`}
             className="flex items-center gap-2 text-sm py-1 min-w-0"
@@ -116,7 +116,7 @@ export function ChangedFiles({ className }: ChangedFilesProps) {
         ))}
 
         {/* Deleted files */}
-        {changedFiles.deleted?.map((file: any) => (
+        {changedFiles.deleted?.map((file) => (
           <div
             key={`deleted-${file.path}`}
             className="flex items-center gap-2 text-sm py-1 min-w-0"

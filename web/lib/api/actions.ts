@@ -94,12 +94,12 @@ const UpdateErrorSchema = z.object({
 
 interface FormState {
   message: string
-  error?: any
+  error?: unknown
   newRoute?: string
   fields?: Record<string, unknown>
 }
 export async function updateUser(
-  _prevState: any,
+  _prevState: FormState,
   formData: FormData
 ): Promise<FormState> {
   let data = Object.fromEntries(formData)

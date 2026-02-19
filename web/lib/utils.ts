@@ -149,15 +149,15 @@ export function debounce<T extends (...args: any[]) => void>(
 }
 
 // Deep merge utility function
-export const deepMerge = (target: any, source: any) => {
-  const output = { ...target }
+export const deepMerge = (target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> => {
+  const output: Record<string, unknown> = { ...target }
   if (isObject(target) && isObject(source)) {
     Object.keys(source).forEach((key) => {
       if (isObject(source[key])) {
         if (!(key in target)) {
           Object.assign(output, { [key]: source[key] })
         } else {
-          output[key] = deepMerge(target[key], source[key])
+          output[key] = deepMerge(target[key] as Record<string, unknown>, source[key] as Record<string, unknown>)
         }
       } else {
         Object.assign(output, { [key]: source[key] })
@@ -167,8 +167,8 @@ export const deepMerge = (target: any, source: any) => {
   return output
 }
 
-const isObject = (item: any) => {
-  return item && typeof item === "object" && !Array.isArray(item)
+const isObject = (item: unknown): item is Record<string, unknown> => {
+  return !!item && typeof item === "object" && !Array.isArray(item)
 }
 
 export function sortFileExplorer(

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { normalizePath } from "../chat/lib/utils"
 import { DecorationManager } from "./lib/decoration-manager"
 import { calculateDiff } from "./lib/diff-calculator"
+import { getEditorCleanup, getModelMeta, setModelMeta } from "./lib/model-metadata"
 import { WidgetManager } from "./lib/widget-manager"
 
 export interface UseCodeDifferProps {
@@ -85,11 +86,9 @@ export function useCodeDiffer({
         if (count === 0) {
           try {
             const fileId = normalizePath(model.uri.fsPath)
-            ;(window as any).__clearDiffSession?.(fileId)
-
             if (resolveStatus && onDiffResolved) {
               const currentContent = model.getValue()
-              const original = (model as any).originalContent || ""
+              const original = getModelMeta(model).originalContent || ""
               const status =
                 currentContent !== original ? "applied" : "rejected"
               onDiffResolved(fileId, status)
@@ -148,8 +147,7 @@ export function useCodeDiffer({
       const model = currentEditorRef.getModel()
       if (!model) return null
 
-      ;(model as any).originalContent = originalCode
-      ;(model as any).mergedContent = mergedCode
+      setModelMeta(model, { originalContent: originalCode, mergedContent: mergedCode })
 
       const eolSequence =
         model.getEOL() === "\r\n"
@@ -166,8 +164,7 @@ export function useCodeDiffer({
       const newDecorations = currentEditorRef.createDecorationsCollection(
         diffResult.decorations,
       )
-      ;(model as any).granularBlocks = diffResult.granularBlocks
-      ;(model as any).diffDecorationsCollection = newDecorations
+      setModelMeta(model, { granularBlocks: diffResult.granularBlocks, diffDecorationsCollection: newDecorations })
 
       const checkAndResolve = createCheckAndResolve(model, true)
       replaceWidgetManager(currentEditorRef, model, checkAndResolve)
@@ -193,9 +190,7 @@ export function useCodeDiffer({
         }
 
         const currentEditorRef = editorRefRef.current
-        const cleanup = (currentEditorRef as any)?.cleanupDiffWidgets as
-          | (() => void)
-          | undefined
+        const cleanup = getEditorCleanup(currentEditorRef)
         if (cleanup) cleanup()
       } catch (error) {
         console.warn("Failed to cleanup diff widgets:", error)
@@ -252,8 +247,9 @@ export function useCodeDiffer({
 
       const eolStr = model.getEOL()
       const eol: "LF" | "CRLF" = eolStr === "\r\n" ? "CRLF" : "LF"
-      const originalCode = (model as any).originalContent ?? ""
-      const mergedCode = (model as any).mergedContent ?? ""
+      const meta = getModelMeta(model)
+      const originalCode = meta.originalContent ?? ""
+      const mergedCode = meta.mergedContent ?? ""
       const combinedText = model.getValue()
 
       return {
@@ -284,8 +280,7 @@ export function useCodeDiffer({
           ? monaco.editor.EndOfLineSequence.CRLF
           : monaco.editor.EndOfLineSequence.LF,
       )
-      ;(model as any).originalContent = session.originalCode
-      ;(model as any).mergedContent = session.mergedCode
+      setModelMeta(model, { originalContent: session.originalCode, mergedContent: session.mergedCode })
 
       // Recreate diff decorations only for unresolved blocks
       const decorations: monaco.editor.IModelDeltaDecoration[] =
