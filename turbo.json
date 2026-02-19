@@ -3,6 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "../../packages/typescript-config/**"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
@@ -11,6 +12,7 @@
       "persistent": true
     },
     "lint": {
+      "inputs": ["$TURBO_DEFAULT$", "../../packages/eslint-config/**"],
       "dependsOn": ["^lint"]
     },
     "test": {

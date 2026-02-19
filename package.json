@@ -9,7 +9,8 @@
     "db",
     "lib",
     "templates",
-    "ai"
+    "ai",
+    "tests"
   ],
   "scripts": {
     "build": "turbo build",

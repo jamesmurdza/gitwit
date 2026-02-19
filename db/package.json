@@ -7,7 +7,8 @@
     "dev": "tsc --watch",
     "migrate": "npx drizzle-kit migrate",
     "generate": "npx drizzle-kit generate",
-    "studio": "npx drizzle-kit studio"
+    "studio": "npx drizzle-kit studio",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^2.2.2",
@@ -17,6 +18,8 @@
     "drizzle-zod": "^0.8.3"
   },
   "devDependencies": {
+    "@gitwit/eslint-config": "*",
+    "@gitwit/typescript-config": "*",
     "@types/node": "^20.19.1",
     "typescript": "^5.8.3"
   }
