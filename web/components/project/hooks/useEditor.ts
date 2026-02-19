@@ -92,8 +92,9 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
   // Helper function to fetch file content
   const fetchFileContent = useCallback(
     (fileId: string): Promise<string> => {
+      if (!socket) return Promise.resolve("")
       return new Promise((resolve) => {
-        socket?.emit("getFile", { fileId }, (content: string) => {
+        socket.emit("getFile", { fileId }, (content: string) => {
           resolve(content)
         })
       })
@@ -197,10 +198,7 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
         defaultCompilerOptions,
       )
 
-      // Load TSConfig
-      await loadTSConfig(files, editor, monaco)
-
-      // Set up editor event handlers
+      // Set up editor event handlers (register before loadTSConfig which may be async)
       editor.onDidChangeCursorPosition((e) => {
         setIsSelected(false)
         const selection = editor.getSelection()
@@ -253,6 +251,9 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
           "editorTextFocus && !suggestWidgetVisible && !renameInputVisible && !inSnippetMode && !quickFixWidgetVisible",
         run: (editor) => handleAiEdit(editor),
       })
+
+      // Load TSConfig async (non-blocking — cursor handlers already registered above)
+      await loadTSConfig(files, editor, monaco)
     },
     [files, loadTSConfig, cursorLine, handleAiEdit, debouncedSetIsSelected],
   )
