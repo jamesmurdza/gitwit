@@ -10,6 +10,7 @@ import {
   PrecomputeMergeArgs,
 } from "../chat/lib/types"
 import { normalizePath, pathMatchesTab } from "../chat/lib/utils"
+import { applyKeepToSession, applyRejectToSession } from "./lib/diff-session-utils"
 
 interface UseAIFileActionsProps {
   projectId: string
@@ -464,65 +465,6 @@ export function useAIFileActions({
     processNextInQueue,
     updateFileDraft,
   ])
-
-  // --- Helper: Diff Session Logic ---
-  const applyKeepToSession = (session: {
-    combinedText: string
-    unresolvedBlocks: {
-      type: "added" | "removed"
-      start: number
-      end: number
-    }[]
-  }) => {
-    const lines = session.combinedText.split("\n")
-    const rangesToRemove: { start: number; end: number }[] = []
-
-    session.unresolvedBlocks.forEach((block) => {
-      if (block.type === "removed") {
-        rangesToRemove.push({ start: block.start, end: block.end })
-      }
-    })
-
-    rangesToRemove.sort((a, b) => b.start - a.start)
-
-    rangesToRemove.forEach((range) => {
-      // 1-based index to 0-based
-      lines.splice(range.start - 1, range.end - range.start + 1)
-    })
-
-    return lines.join("\n")
-  }
-
-  const applyRejectToSession = (session: {
-    combinedText: string
-    unresolvedBlocks: {
-      type: "added" | "removed"
-      start: number
-      end: number
-    }[]
-  }) => {
-    const lines = session.combinedText.split("\n")
-    const rangesToRemove: { start: number; end: number }[] = []
-
-    // For "Reject" (Reject Remaining):
-    // - Remove lines from "added" blocks (reject addition)
-    // - Keep lines from "removed" blocks (reject deletion -> keep original)
-    session.unresolvedBlocks.forEach((block) => {
-      if (block.type === "added") {
-        rangesToRemove.push({ start: block.start, end: block.end })
-      }
-    })
-
-    // Sort ranges descending to remove successfully
-    rangesToRemove.sort((a, b) => b.start - a.start)
-
-    rangesToRemove.forEach((range) => {
-      // 1-based index to 0-based
-      lines.splice(range.start - 1, range.end - range.start + 1)
-    })
-
-    return lines.join("\n")
-  }
 
   const getDiffSession = useAppStore((s) => s.getDiffSession)
   const clearDiffSession = useAppStore((s) => s.clearDiffSession)

@@ -67,6 +67,40 @@ export function useCodeDiffer({
     ((fileId: string) => DiffSession | null) | null
   >(null)
 
+  // Shared helper: creates a checkAndResolve callback for a given model.
+  // When `resolveStatus` is true, also detects applied/rejected and calls onDiffResolved.
+  const createCheckAndResolve = useCallback(
+    (model: monaco.editor.ITextModel, resolveStatus: boolean) => {
+      return (count: number) => {
+        setActiveWidgetsState(count > 0)
+
+        if (suppressZeroNotifyRef.current) return
+
+        if (onDiffChange && getUnresolvedSnapshotRef.current) {
+          const fileId = normalizePath(model.uri.fsPath)
+          const session = getUnresolvedSnapshotRef.current(fileId)
+          onDiffChange(session)
+        }
+
+        if (count === 0) {
+          try {
+            const fileId = normalizePath(model.uri.fsPath)
+            ;(window as any).__clearDiffSession?.(fileId)
+
+            if (resolveStatus && onDiffResolved) {
+              const currentContent = model.getValue()
+              const original = (model as any).originalContent || ""
+              const status =
+                currentContent !== original ? "applied" : "rejected"
+              onDiffResolved(fileId, status)
+            }
+          } catch {}
+        }
+      }
+    },
+    [onDiffChange, onDiffResolved],
+  )
+
   /**
    * Applies a diff view to the Monaco editor with interactive accept/reject buttons
    *
@@ -113,53 +147,7 @@ export function useCodeDiffer({
 
       ;(model as any).granularBlocks = diffResult.granularBlocks
 
-      // Verify decorations are readable immediately
-      let readableDecorations = 0
-      for (let i = 1; i <= Math.min(model.getLineCount(), 20); i++) {
-        const lineDecs = model.getLineDecorations(i) || []
-        if (
-          lineDecs.some(
-            (d) =>
-              (d.options as any)?.className === "added-line-decoration" ||
-              (d.options as any)?.className === "removed-line-decoration",
-          )
-        ) {
-          readableDecorations++
-        }
-      }
-      const checkAndResolve = (count: number) => {
-        // Update state for UI
-        setActiveWidgetsState(count > 0)
-
-        if (suppressZeroNotifyRef.current) {
-          return
-        }
-
-        // Notify about diff changes
-        if (onDiffChange && getUnresolvedSnapshotRef.current) {
-          const fileId = normalizePath(model.uri.fsPath)
-          const session = getUnresolvedSnapshotRef.current(fileId)
-          onDiffChange(session)
-        }
-
-        if (count === 0) {
-          try {
-            // Use fsPath to ensure we get backslashes on Windows if applicable, or consistent path logic
-            // Normalize immediately to ensure consistent use across the app
-            const fileId = normalizePath(model.uri.fsPath)
-            // Detect if applied or rejected (simplistic check: if content == merged, it's applied)
-            const currentContent = model.getValue()
-            const original = (model as any).originalContent || ""
-            const status = currentContent !== original ? "applied" : "rejected"
-
-            ;(window as any).__clearDiffSession?.(fileId)
-
-            if (onDiffResolved) {
-              onDiffResolved(fileId, status)
-            }
-          } catch {}
-        }
-      }
+      const checkAndResolve = createCheckAndResolve(model, true)
 
       // Always create a new widget manager for each diff application
       // This ensures it's bound to the current model
@@ -194,7 +182,7 @@ export function useCodeDiffer({
 
       return newDecorations
     },
-    [onDiffResolved], // editorRef is accessed via ref, so no dependency needed
+    [createCheckAndResolve], // editorRef is accessed via ref, so no dependency needed
   )
 
   /**
@@ -331,28 +319,7 @@ export function useCodeDiffer({
 
       currentEditorRef.createDecorationsCollection(decorations)
 
-      const checkAndResolve = (count: number) => {
-        // Update state for UI
-        setActiveWidgetsState(count > 0)
-
-        if (suppressZeroNotifyRef.current) {
-          return
-        }
-
-        // Notify about diff changes
-        if (onDiffChange && getUnresolvedSnapshotRef.current) {
-          const fileId = normalizePath(model.uri.fsPath)
-          const session = getUnresolvedSnapshotRef.current(fileId)
-          onDiffChange(session)
-        }
-
-        if (count === 0) {
-          try {
-            const fileId = normalizePath(model.uri.fsPath)
-            ;(window as any).__clearDiffSession?.(fileId)
-          } catch {}
-        }
-      }
+      const checkAndResolve = createCheckAndResolve(model, false)
 
       // Rebuild widgets for current decorations
       if (widgetManagerRef.current) {

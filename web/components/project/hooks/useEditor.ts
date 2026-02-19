@@ -3,10 +3,7 @@ import {
   configureEditorKeybindings,
   defaultCompilerOptions,
 } from "@/lib/monaco/config"
-import { parseTSConfigToMonacoOptions } from "@/lib/monaco/parse-tsconfig"
-import { TFile, TFolder } from "@/lib/types"
-import { debounce, deepMerge } from "@/lib/utils"
-// Removed global store dependency
+import { debounce } from "@/lib/utils"
 import { useEditor as useEditorContext } from "@/context/editor-context"
 import { useTerminal } from "@/context/TerminalContext"
 import { fileRouter } from "@/lib/api"
@@ -16,6 +13,7 @@ import * as monaco from "monaco-editor"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { enableEditorShortcuts } from "../layout/utils/shortcuts"
 import { useFileTree } from "./useFile"
+import { loadAndApplyTSConfig } from "./lib/tsconfig-loader"
 
 export interface UseEditorProps {
   fileId: string
@@ -105,56 +103,14 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
   // Load and merge TSConfig
   const loadTSConfig = useCallback(
     async (
-      files: (TFolder | TFile)[],
+      files: Parameters<typeof loadAndApplyTSConfig>[0],
       editor: monaco.editor.IStandaloneCodeEditor,
-      monaco: typeof import("monaco-editor"),
+      monacoInstance: typeof monaco,
     ) => {
-      const tsconfigFiles = files.filter((file) =>
-        file.name.endsWith("tsconfig.json"),
-      )
-      let mergedConfig: any = { compilerOptions: {} }
+      await loadAndApplyTSConfig(files, monacoInstance, fetchFileContent)
 
-      for (const file of tsconfigFiles) {
-        const content = await fetchFileContent(file.id)
-
-        try {
-          let tsConfig = JSON.parse(content)
-
-          // Handle references
-          if (tsConfig.references) {
-            for (const ref of tsConfig.references) {
-              const path = ref.path.replace("./", "")
-              const refContent = await fetchFileContent(path)
-              const referenceTsConfig = JSON.parse(refContent)
-
-              // Merge configurations
-              mergedConfig = deepMerge(mergedConfig, referenceTsConfig)
-            }
-          }
-
-          // Merge current file's config
-          mergedConfig = deepMerge(mergedConfig, tsConfig)
-        } catch (error) {
-          console.error("Error parsing TSConfig:", error)
-        }
-      }
-
-      // Apply merged compiler options
-      if (mergedConfig.compilerOptions) {
-        const updatedOptions = parseTSConfigToMonacoOptions({
-          ...defaultCompilerOptions,
-          ...mergedConfig.compilerOptions,
-        })
-        monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
-          updatedOptions,
-        )
-        monaco.languages.typescript.javascriptDefaults.setCompilerOptions(
-          updatedOptions,
-        )
-      }
-
-      // Store the last copied range in the editor to be used in the AIChat component
-      editor.onDidChangeCursorSelection((e) => {
+      // Track cursor selection for AIChat context
+      editor.onDidChangeCursorSelection(() => {
         const selection = editor.getSelection()
         if (!selection) return
         lastCopiedRangeRef.current = {
