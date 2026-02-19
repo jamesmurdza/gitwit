@@ -40,10 +40,7 @@ export default function Dashboard({
   const router = useRouter()
 
   // Derive screen from URL parameter
-  const screen: TScreen =
-    tab === "settings"
-      ? "settings"
-      : "projects"
+  const screen: TScreen = tab === "settings" ? "settings" : "projects"
 
   const activeScreen = (s: TScreen) => {
     if (screen === s) return "justify-start"
@@ -53,8 +50,7 @@ export default function Dashboard({
   const navigateToScreen = (screen: TScreen) => {
     if (screen === "settings") {
       router.push("/dashboard?tab=settings")
-    }
-    else {
+    } else {
       router.push("/dashboard")
     }
   }

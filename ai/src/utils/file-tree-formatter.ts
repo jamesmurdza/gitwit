@@ -8,7 +8,7 @@ export function formatFileTree(
   depth = 0,
   maxDepth = 3,
   isLast = true,
-  prefix = ""
+  prefix = "",
 ): string {
   if (!files || depth > maxDepth) return ""
 

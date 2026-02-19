@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { normalizePath } from "../chat/lib/utils"
 import { DecorationManager } from "./lib/decoration-manager"
 import { calculateDiff } from "./lib/diff-calculator"
-import { getEditorCleanup, getModelMeta, setModelMeta } from "./lib/model-metadata"
+import {
+  getEditorCleanup,
+  getModelMeta,
+  setModelMeta,
+} from "./lib/model-metadata"
 import { WidgetManager } from "./lib/widget-manager"
 
 export interface UseCodeDifferProps {
@@ -147,7 +151,10 @@ export function useCodeDiffer({
       const model = currentEditorRef.getModel()
       if (!model) return null
 
-      setModelMeta(model, { originalContent: originalCode, mergedContent: mergedCode })
+      setModelMeta(model, {
+        originalContent: originalCode,
+        mergedContent: mergedCode,
+      })
 
       const eolSequence =
         model.getEOL() === "\r\n"
@@ -164,7 +171,10 @@ export function useCodeDiffer({
       const newDecorations = currentEditorRef.createDecorationsCollection(
         diffResult.decorations,
       )
-      setModelMeta(model, { granularBlocks: diffResult.granularBlocks, diffDecorationsCollection: newDecorations })
+      setModelMeta(model, {
+        granularBlocks: diffResult.granularBlocks,
+        diffDecorationsCollection: newDecorations,
+      })
 
       const checkAndResolve = createCheckAndResolve(model, true)
       replaceWidgetManager(currentEditorRef, model, checkAndResolve)
@@ -280,7 +290,10 @@ export function useCodeDiffer({
           ? monaco.editor.EndOfLineSequence.CRLF
           : monaco.editor.EndOfLineSequence.LF,
       )
-      setModelMeta(model, { originalContent: session.originalCode, mergedContent: session.mergedCode })
+      setModelMeta(model, {
+        originalContent: session.originalCode,
+        mergedContent: session.mergedCode,
+      })
 
       // Recreate diff decorations only for unresolved blocks
       const decorations: monaco.editor.IModelDeltaDecoration[] =

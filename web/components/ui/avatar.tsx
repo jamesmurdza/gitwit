@@ -22,7 +22,7 @@ export default function Avatar({
     <div
       className={cn(
         "size-9 font-mono rounded-full overflow-hidden bg-gradient-to-t from-neutral-800 to-neutral-600 flex items-center justify-center text-sm font-medium",
-        className
+        className,
       )}
     >
       {avatarUrl ? (

@@ -39,7 +39,7 @@ type BaseProjectCardProps = {
 type AuthenticatedProjectCardProps = BaseProjectCardProps & {
   isAuthenticated: true
   onVisibilityChange: (
-    sandbox: Pick<Sandbox, "id" | "name" | "visibility">
+    sandbox: Pick<Sandbox, "id" | "name" | "visibility">,
   ) => void
   onDelete: (sandbox: Pick<Sandbox, "id" | "name">) => void
   deletingId: string
@@ -53,12 +53,14 @@ type ProjectCardProps =
   | AuthenticatedProjectCardProps
   | UnauthenticatedProjectCardProps
 
-const StatItem = memo(({ icon: Icon, value }: { icon: LucideIcon; value: number }) => (
-  <div className="flex items-center space-x-1">
-    <Icon className="size-4" />
-    <span className="text-xs">{value}</span>
-  </div>
-))
+const StatItem = memo(
+  ({ icon: Icon, value }: { icon: LucideIcon; value: number }) => (
+    <div className="flex items-center space-x-1">
+      <Icon className="size-4" />
+      <span className="text-xs">{value}</span>
+    </div>
+  ),
+)
 
 StatItem.displayName = "StatItem"
 
@@ -115,7 +117,7 @@ const ProjectMetadata = memo(
         </div>
       </div>
     )
-  }
+  },
 )
 
 ProjectMetadata.displayName = "ProjectMetadata"
@@ -141,7 +143,7 @@ export function LikeButton({
         isLiked: optimisticValue,
         likeCount: state.likeCount + (optimisticValue ? 1 : -1),
       }
-    }
+    },
   )
 
   const [isPending, startTransition] = useTransition()
@@ -157,7 +159,7 @@ export function LikeButton({
         await toggleLike(sandboxId, userId)
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : "Failed to like project"
+          error instanceof Error ? error.message : "Failed to like project",
         )
         optimisticUpdateLike(!newLikeState)
       }
@@ -196,7 +198,7 @@ function ProjectCardComponent({
     () =>
       projectTemplates.find((p) => p.id === type)?.icon ??
       "/project-icons/node.svg",
-    [type]
+    [type],
   )
 
   const handleVisibilityChange = () => {

@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     console.error("Tier upgrade error:", error)
     return new Response(
       error instanceof Error ? error.message : "Internal Server Error",
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

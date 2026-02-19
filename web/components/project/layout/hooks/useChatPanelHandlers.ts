@@ -188,7 +188,8 @@ export function useChatPanelHandlers() {
       const dock = dockRef.current
       if (!dock) return
       const normalizedPath = normalizePath(filePath)
-      const panel = dock.getPanel(normalizedPath) ?? findPanelByPath(dock, normalizedPath)
+      const panel =
+        dock.getPanel(normalizedPath) ?? findPanelByPath(dock, normalizedPath)
       if (panel) {
         panel.api.setActive()
       } else {

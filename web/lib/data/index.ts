@@ -14,10 +14,7 @@ import {
 } from "lucide-react"
 import { KnownPlatform } from "../types"
 
-export const socialIcons: Record<
-  KnownPlatform | "website",
-  LucideIcon
-> = {
+export const socialIcons: Record<KnownPlatform | "website", LucideIcon> = {
   github: Github,
   twitter: Twitter,
   instagram: Instagram,

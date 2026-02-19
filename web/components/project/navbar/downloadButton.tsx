@@ -19,13 +19,16 @@ export default function DownloadButton({
         },
       })
 
-      const data = (await response.json()) as { archive?: string; error?: string }
+      const data = (await response.json()) as {
+        archive?: string
+        error?: string
+      }
       if (data.error) {
         throw new Error(data.error)
       }
 
       const bytes = Uint8Array.from(atob(data.archive!), (char) =>
-        char.charCodeAt(0)
+        char.charCodeAt(0),
       )
       const blob = new Blob([bytes], { type: "application/gzip" })
 
@@ -38,7 +41,7 @@ export default function DownloadButton({
       window.URL.revokeObjectURL(url)
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to download files"
+        error instanceof Error ? error.message : "Failed to download files",
       )
     }
   }

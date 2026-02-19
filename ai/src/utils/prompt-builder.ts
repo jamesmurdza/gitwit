@@ -17,7 +17,9 @@ export function buildPrompt(ctx: PromptContext): string {
 function buildChatPrompt(ctx: PromptContext): string {
   const templateConfig =
     ctx.templateType && ctx.templateConfigs
-      ? (ctx.templateConfigs[ctx.templateType] as { conventions?: string[] } | undefined)
+      ? (ctx.templateConfigs[ctx.templateType] as
+          | { conventions?: string[] }
+          | undefined)
       : null
 
   let prompt = `You are an intelligent programming assistant for a ${
@@ -164,9 +166,5 @@ Rules:
 - If multiple edits are needed, show them in order of appearance
 
 Current file: ${ctx.fileName || "unknown"}
-${
-  ctx.activeFileContent
-    ? `\nFile content:\n${ctx.activeFileContent}`
-    : ""
-}`
+${ctx.activeFileContent ? `\nFile content:\n${ctx.activeFileContent}` : ""}`
 }

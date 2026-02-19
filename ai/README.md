@@ -6,11 +6,11 @@ Thin utility layer over the [Vercel AI SDK](https://sdk.vercel.ai/) for GitWit. 
 
 ```typescript
 import {
-  createModel,          // (config?) => LanguageModel
-  resolveProviderConfig,// (overrides?) => AIProviderConfig
-  buildPrompt,          // (ctx: PromptContext) => string
-  formatFileTree,       // (files: FileTree[]) => string
-  mergeAiderDiff,       // (original, partial, fileName) => string
+  createModel, // (config?) => LanguageModel
+  resolveProviderConfig, // (overrides?) => AIProviderConfig
+  buildPrompt, // (ctx: PromptContext) => string
+  formatFileTree, // (files: FileTree[]) => string
+  mergeAiderDiff, // (original, partial, fileName) => string
 } from "@gitwit/ai"
 ```
 
@@ -52,12 +52,12 @@ const model = createModel({ provider: "anthropic", apiKey: "sk-..." })
 
 ## Environment Variables
 
-| Provider | Variables |
-|----------|-----------|
-| Anthropic | `ANTHROPIC_API_KEY` |
-| OpenAI | `OPENAI_API_KEY` |
-| OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL_ID` |
-| Bedrock | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_MODEL_ID` |
+| Provider   | Variables                                                                  |
+| ---------- | -------------------------------------------------------------------------- |
+| Anthropic  | `ANTHROPIC_API_KEY`                                                        |
+| OpenAI     | `OPENAI_API_KEY`                                                           |
+| OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL_ID`                                |
+| Bedrock    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_MODEL_ID` |
 
 ## Types
 

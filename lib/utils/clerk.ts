@@ -4,7 +4,7 @@ import "dotenv/config"
 const clerkSecretKey = process.env.CLERK_SECRET_KEY
 if (!clerkSecretKey) {
   console.warn(
-    "Missing CLERK_SECRET_KEY in environment variables. Authentication will not work."
+    "Missing CLERK_SECRET_KEY in environment variables. Authentication will not work.",
   )
 }
 

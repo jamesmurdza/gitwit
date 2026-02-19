@@ -88,7 +88,7 @@ export function decrypt(encryptedData: string): string {
  * @returns Object with encrypted values
  */
 export function encryptApiKeys(
-  apiKeys: Record<string, string>
+  apiKeys: Record<string, string>,
 ): Record<string, string> {
   const encrypted: Record<string, string> = {}
 
@@ -107,7 +107,7 @@ export function encryptApiKeys(
  * @returns Object with decrypted values
  */
 export function decryptApiKeys(
-  encryptedKeys: Record<string, string>
+  encryptedKeys: Record<string, string>,
 ): Record<string, string> {
   const decrypted: Record<string, string> = {}
 

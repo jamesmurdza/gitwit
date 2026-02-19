@@ -20,7 +20,7 @@ export default async function AppAuthLayout({
   if (!dbUser.ok) {
     // Try to get GitHub username if available
     const githubUsername = user.externalAccounts.find(
-      (account) => account.provider === "github"
+      (account) => account.provider === "github",
     )?.username
 
     const username =

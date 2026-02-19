@@ -60,7 +60,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
     githubRouter.login.useMutation({
       onSuccess: () => {
         return queryClient.invalidateQueries(
-          githubRouter.githubUser.getOptions()
+          githubRouter.githubUser.getOptions(),
         )
       },
       onError: () => {
@@ -117,7 +117,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
         })
         .catch((error) => {
           toast.error(
-            error instanceof Error ? error.message : "Authentication failed"
+            error instanceof Error ? error.message : "Authentication failed",
           )
         })
     },
@@ -179,7 +179,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
             label: "Pull Now",
             onClick: () => handlePull(),
           },
-        }
+        },
       )
       return
     }
@@ -196,7 +196,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
         .invalidateQueries(
           githubRouter.repoStatus.getOptions({
             projectId: projectId,
-          })
+          }),
         )
         .then(() => {
           setCommitMessage("")
@@ -213,7 +213,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
         .invalidateQueries(
           githubRouter.repoStatus.getOptions({
             projectId: projectId,
-          })
+          }),
         )
         .then(() => {
           // Clear changed files optimistically after repo creation
@@ -247,7 +247,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
           } have conflicts that need to be resolved.`,
           {
             duration: 4000,
-          }
+          },
         )
         setConflictFiles(result.conflicts)
         setShowConflictModal(true)
@@ -258,21 +258,21 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
           messages.push(
             `${result.newFiles.length} new file${
               result.newFiles.length !== 1 ? "s" : ""
-            } added`
+            } added`,
           )
         }
         if (result.updatedFiles.length > 0) {
           messages.push(
             `${result.updatedFiles.length} file${
               result.updatedFiles.length !== 1 ? "s" : ""
-            } updated`
+            } updated`,
           )
         }
         if (result.deletedFiles.length > 0) {
           messages.push(
             `${result.deletedFiles.length} file${
               result.deletedFiles.length !== 1 ? "s" : ""
-            } deleted`
+            } deleted`,
           )
         }
 
@@ -322,7 +322,9 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
       // If pull is needed, perform the pull using the mutation
       pullFromGithub({ projectId })
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to check pull status")
+      toast.error(
+        error instanceof Error ? error.message : "Failed to check pull status",
+      )
     }
   }
 
@@ -337,7 +339,7 @@ export function GitHubSync({ userId: _userId }: { userId: string }) {
 
   const handleFileResolutionChange = (
     fileIdx: number,
-    resolution: "local" | "incoming"
+    resolution: "local" | "incoming",
   ) => {
     setFileResolutions((prev) => {
       const updated = [...prev]

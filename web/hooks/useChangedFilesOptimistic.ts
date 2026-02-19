@@ -24,7 +24,7 @@ class ChangedFilesOptimisticManager {
     if (!ChangedFilesOptimisticManager.instances.has(projectId)) {
       ChangedFilesOptimisticManager.instances.set(
         projectId,
-        new ChangedFilesOptimisticManager()
+        new ChangedFilesOptimisticManager(),
       )
     }
     return ChangedFilesOptimisticManager.instances.get(projectId)!
@@ -49,12 +49,12 @@ class ChangedFilesOptimisticManager {
   updateChangedFilesOptimistically(
     operation: "create" | "update" | "delete",
     filePath: string,
-    content?: string
+    content?: string,
   ) {
     const queryKey = this.getChangedFilesKey()
     if (!queryKey || !this.queryClient) {
       console.warn(
-        "Cannot update changed files: missing query key or query client"
+        "Cannot update changed files: missing query key or query client",
       )
       return
     }
@@ -75,7 +75,7 @@ class ChangedFilesOptimisticManager {
       case "create":
         // Check if file was previously deleted
         const deletedIndex = newData.deleted?.findIndex(
-          (f) => this.normalizePath(f.path) === normalizedPath
+          (f) => this.normalizePath(f.path) === normalizedPath,
         )
         if (deletedIndex !== undefined && deletedIndex !== -1) {
           // File was deleted and now recreated - treat as new file
@@ -88,7 +88,7 @@ class ChangedFilesOptimisticManager {
 
           // Add to deleted (only if not already there)
           const alreadyCreated = newData.created.some(
-            (f) => this.normalizePath(f.path) === normalizedPath
+            (f) => this.normalizePath(f.path) === normalizedPath,
           )
           if (!alreadyCreated) {
             newData.created.push({
@@ -106,7 +106,7 @@ class ChangedFilesOptimisticManager {
 
         // Check if file was in created list
         const createdIndex = newData.created?.findIndex(
-          (f) => this.normalizePath(f.path) === normalizedPath
+          (f) => this.normalizePath(f.path) === normalizedPath,
         )
 
         if (createdIndex !== undefined && createdIndex !== -1) {
@@ -115,7 +115,7 @@ class ChangedFilesOptimisticManager {
         } else {
           // Check if file was previously deleted
           const deletedIndex = newData.deleted?.findIndex(
-            (f) => this.normalizePath(f.path) === normalizedPath
+            (f) => this.normalizePath(f.path) === normalizedPath,
           )
           if (deletedIndex !== undefined && deletedIndex !== -1) {
             // File was deleted and now modified
@@ -130,7 +130,7 @@ class ChangedFilesOptimisticManager {
             // Add to modified files (existing file modified)
             if (!newData.modified) newData.modified = []
             const alreadyModified = newData.modified.some(
-              (f) => this.normalizePath(f.path) === normalizedPath
+              (f) => this.normalizePath(f.path) === normalizedPath,
             )
             if (!alreadyModified) {
               newData.modified.push({
@@ -150,20 +150,20 @@ class ChangedFilesOptimisticManager {
         // Remove from created
         if (newData.created) {
           newData.created = newData.created.filter(
-            (f) => this.normalizePath(f.path) !== normalizedPath
+            (f) => this.normalizePath(f.path) !== normalizedPath,
           )
         }
 
         // Remove from modified
         if (newData.modified) {
           newData.modified = newData.modified.filter(
-            (f) => this.normalizePath(f.path) !== normalizedPath
+            (f) => this.normalizePath(f.path) !== normalizedPath,
           )
         }
 
         // Add to deleted (only if not already there)
         const alreadyDeleted = newData.deleted.some(
-          (f) => this.normalizePath(f.path) === normalizedPath
+          (f) => this.normalizePath(f.path) === normalizedPath,
         )
         if (!alreadyDeleted) {
           newData.deleted.push({ path: normalizedPath })
@@ -184,7 +184,7 @@ class ChangedFilesOptimisticManager {
     const queryKey = this.getChangedFilesKey()
     if (!queryKey || !this.queryClient) {
       console.warn(
-        "Cannot refresh changed files: missing query key or query client"
+        "Cannot refresh changed files: missing query key or query client",
       )
       return
     }
@@ -195,7 +195,7 @@ class ChangedFilesOptimisticManager {
     const queryKey = this.getChangedFilesKey()
     if (!queryKey || !this.queryClient) {
       console.warn(
-        "Cannot clear changed files: missing query key or query client"
+        "Cannot clear changed files: missing query key or query client",
       )
       return
     }

@@ -11,7 +11,7 @@ export class TerminalManager {
 
   async createTerminal(
     id: string,
-    onData: (responseString: string) => void
+    onData: (responseString: string) => void,
   ): Promise<void> {
     if (this.terminals[id]) {
       return
@@ -68,7 +68,7 @@ export class TerminalManager {
       Object.entries(this.terminals).map(async ([key, terminal]) => {
         await terminal.close()
         delete this.terminals[key]
-      })
+      }),
     )
   }
 }

@@ -10,15 +10,13 @@ interface ModelMetadata {
 
 const modelMetadata = new WeakMap<monaco.editor.ITextModel, ModelMetadata>()
 
-export function getModelMeta(
-  model: monaco.editor.ITextModel
-): ModelMetadata {
+export function getModelMeta(model: monaco.editor.ITextModel): ModelMetadata {
   return modelMetadata.get(model) ?? {}
 }
 
 export function setModelMeta(
   model: monaco.editor.ITextModel,
-  meta: Partial<ModelMetadata>
+  meta: Partial<ModelMetadata>,
 ): void {
   modelMetadata.set(model, { ...getModelMeta(model), ...meta })
 }
@@ -31,13 +29,13 @@ const editorCleanups = new WeakMap<
 
 export function setEditorCleanup(
   editor: monaco.editor.IStandaloneCodeEditor,
-  cleanup: () => void
+  cleanup: () => void,
 ): void {
   editorCleanups.set(editor, cleanup)
 }
 
 export function getEditorCleanup(
-  editor: monaco.editor.IStandaloneCodeEditor | null | undefined
+  editor: monaco.editor.IStandaloneCodeEditor | null | undefined,
 ): (() => void) | undefined {
   if (!editor) return undefined
   return editorCleanups.get(editor)

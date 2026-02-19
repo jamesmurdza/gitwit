@@ -73,11 +73,11 @@ A **Panel** is a content container with:
 
 ```typescript
 interface Panel {
-  id: string                    // e.g., "editor-/src/App.tsx"
-  component: string             // e.g., "editor"
-  tabComponent?: string         // Custom tab appearance
-  title?: string                // Display name
-  params?: Record<string, any>  // Data for the panel
+  id: string // e.g., "editor-/src/App.tsx"
+  component: string // e.g., "editor"
+  tabComponent?: string // Custom tab appearance
+  title?: string // Display name
+  params?: Record<string, any> // Data for the panel
 }
 ```
 
@@ -192,11 +192,11 @@ export const tabComponents = {
   editor: (props: IDockviewPanelHeaderProps<EditorPanelParams>) => {
     return <DockviewDefaultTab {...props} icon={<FileIcon />} />
   },
-  
+
   terminal: (props: IDockviewPanelHeaderProps) => {
     return <DockviewDefaultTab {...props} icon={<SquareTerminal />} />
   },
-  
+
   preview: (props: IDockviewPanelHeaderProps) => {
     return <DockviewDefaultTab {...props} icon={<TvMinimal />} />
   }
@@ -251,8 +251,8 @@ dockRef.current?.addPanel({
   params: {
     filePath: "/src/App.tsx",
     fileContent: "...",
-    saved: true
-  }
+    saved: true,
+  },
 })
 
 // Updating panel params
@@ -276,7 +276,7 @@ panel.api.setVisible(false)
 // TerminalContext stores terminal instances
 interface TerminalState {
   id: string
-  terminal: Terminal | null  // XTerm instance
+  terminal: Terminal | null // XTerm instance
   isBusy: boolean
 }
 
@@ -293,7 +293,10 @@ const [terminals, setTerminals] = useState<TerminalState[]>([])
 
 ```typescript
 // In terminal.tsx - reattachment logic
-if (terminalElement && terminalElement.parentElement !== terminalContainerRef.current) {
+if (
+  terminalElement &&
+  terminalElement.parentElement !== terminalContainerRef.current
+) {
   terminalContainerRef.current.appendChild(terminalElement)
   setTimeout(() => fitAddonRef.current?.fit(), 10)
 }
@@ -325,11 +328,11 @@ Auto-hide source if empty
 
 ```typescript
 const DIRECTION_MAP = {
-  left: 'left',
-  right: 'right',
-  top: 'above',    // Note: 'top' → 'above'
-  bottom: 'below',  // Note: 'bottom' → 'below'
-  center: undefined // Center = add as tab
+  left: "left",
+  right: "right",
+  top: "above", // Note: 'top' → 'above'
+  bottom: "below", // Note: 'bottom' → 'below'
+  center: undefined, // Center = add as tab
 }
 ```
 
@@ -365,7 +368,7 @@ const handleDockUnhandledDragOver = useCallback(
   (event: DockviewDndOverlayEvent) => {
     event.accept() // Allow drops even in empty containers
   },
-  []
+  [],
 )
 
 // 2. Handle drops
@@ -373,23 +376,23 @@ const handleDockDidDrop = useCallback(
   (event: DockviewDidDropEvent) => {
     const data = event.getData()
     const panelId = data?.panelId
-    
+
     // Check if it's a terminal
     if (!panelId?.startsWith("terminal-")) return
-    
+
     // Use utility function
     const result = handleTerminalDrop({
       event,
       sourceContainerRef: terminalRef,
       targetContainerRef: dockRef,
     })
-    
+
     // Auto-hide source if empty
     if (terminalRef.current?.panels.length === 0) {
       gridRef.current?.getPanel("terminal")?.api.setVisible(false)
     }
   },
-  [terminalRef, dockRef, gridRef]
+  [terminalRef, dockRef, gridRef],
 )
 ```
 
@@ -463,7 +466,7 @@ useEffect(() => {
 // ✅ Good - only dispose on explicit close
 const closeActionOverride = () => {
   terminal.terminal.dispose()
-  setTerminals(prev => prev.filter(t => t.id !== terminalId))
+  setTerminals((prev) => prev.filter((t) => t.id !== terminalId))
   api.close()
 }
 ```
@@ -493,7 +496,7 @@ const { dockRef } = useContainer()
 const panel = dockRef.current?.getPanel(panelId)
 
 // ❌ Bad
-const panel = document.querySelector('[data-panel-id]')
+const panel = document.querySelector("[data-panel-id]")
 ```
 
 ### 2. Generate Unique Panel IDs
@@ -570,7 +573,11 @@ useEffect(() => {
 
 ```typescript
 // ✅ Good - DRY
-const result = handleTerminalDrop({ event, sourceContainerRef, targetContainerRef })
+const result = handleTerminalDrop({
+  event,
+  sourceContainerRef,
+  targetContainerRef,
+})
 
 // ❌ Bad - repeated logic
 const data = event.getData()
@@ -599,17 +606,17 @@ if (panel && !panel.api.isVisible) {
 ```typescript
 const openFile = async (filePath: string) => {
   const panelId = `editor-${filePath}`
-  
+
   // Check if already open
   const existingPanel = dockRef.current?.getPanel(panelId)
   if (existingPanel) {
     existingPanel.api.setActive()
     return
   }
-  
+
   // Load file content
   const content = await fetchFileContent(filePath)
-  
+
   // Create panel
   dockRef.current?.addPanel({
     id: panelId,
@@ -631,13 +638,13 @@ const openFile = async (filePath: string) => {
 const createNewTerminal = async () => {
   // Create terminal instance in context
   const terminalId = await createNewTerminal()
-  
+
   // Show terminal dock if hidden
   const terminalPanel = gridRef.current?.getPanel("terminal")
   if (terminalPanel && !terminalPanel.api.isVisible) {
     terminalPanel.api.setVisible(true)
   }
-  
+
   // Add panel to terminal dock
   terminalRef.current?.addPanel({
     id: `terminal-${terminalId}`,
@@ -662,7 +669,7 @@ useEffect(() => {
       const panel = gridRef.current?.getPanel("terminal")
       panel?.api.setVisible(!panel.api.isVisible)
     }
-    
+
     // Toggle sidebar (Cmd+B)
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
       e.preventDefault()
@@ -670,7 +677,7 @@ useEffect(() => {
       panel?.api.setVisible(!panel.api.isVisible)
     }
   }
-  
+
   window.addEventListener("keydown", handleKeyDown)
   return () => window.removeEventListener("keydown", handleKeyDown)
 }, [])
@@ -692,7 +699,10 @@ console.log("Panel visible:", panel?.api.isVisible)
 
 ```typescript
 const panels = dockRef.current?.panels || []
-console.log("All panels:", panels.map(p => ({ id: p.id, visible: p.api.isVisible })))
+console.log(
+  "All panels:",
+  panels.map((p) => ({ id: p.id, visible: p.api.isVisible })),
+)
 ```
 
 ### Monitor Drop Events
@@ -733,7 +743,7 @@ console.log("Grid panels:", gridRef.current?.panels.length)
 ```typescript
 // Panel API
 panel.api.close()
-panel.api.setVisible(true/false)
+panel.api.setVisible(true / false)
 panel.api.setActive()
 panel.api.updateParameters({ key: value })
 panel.api.isVisible
@@ -756,9 +766,9 @@ grid.layout(config) // set layout configuration
 ### Event Types
 
 ```typescript
-DockviewDidDropEvent      // Drop completed
-DockviewDndOverlayEvent   // Drag over container
-IDockviewPanelProps       // Panel component props
+DockviewDidDropEvent // Drop completed
+DockviewDndOverlayEvent // Drag over container
+IDockviewPanelProps // Panel component props
 IDockviewPanelHeaderProps // Tab component props
-IGridviewPanelProps       // Grid panel props
+IGridviewPanelProps // Grid panel props
 ```

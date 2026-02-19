@@ -249,4 +249,3 @@ export function useFileContent(
     prefetchFileContent,
   }
 }
-

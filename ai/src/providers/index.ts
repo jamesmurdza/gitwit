@@ -62,7 +62,8 @@ function fillFromEnv(config: AIProviderConfig): AIProviderConfig {
     return {
       ...config,
       region: config.region || process.env.AWS_REGION || "us-east-1",
-      modelId: config.modelId || process.env.AWS_MODEL_ID || DEFAULT_MODELS.bedrock,
+      modelId:
+        config.modelId || process.env.AWS_MODEL_ID || DEFAULT_MODELS.bedrock,
     }
   }
 
@@ -79,11 +80,14 @@ function fillFromEnv(config: AIProviderConfig): AIProviderConfig {
  * Provider specified → fill missing apiKey/region from env.
  */
 export function resolveProviderConfig(
-  overrides?: Partial<AIProviderConfig>
+  overrides?: Partial<AIProviderConfig>,
 ): AIProviderConfig {
   if (!overrides?.provider) {
     const detected = detectFromEnv()
-    const base = detected || { provider: "anthropic" as const, modelId: DEFAULT_MODELS.anthropic }
+    const base = detected || {
+      provider: "anthropic" as const,
+      modelId: DEFAULT_MODELS.anthropic,
+    }
     return { ...base, ...overrides }
   }
 
@@ -128,6 +132,8 @@ export function createModel(config?: Partial<AIProviderConfig>): LanguageModel {
       return bedrock(modelId)
 
     default:
-      throw new Error(`Unsupported provider: ${resolved.provider satisfies never}`)
+      throw new Error(
+        `Unsupported provider: ${resolved.provider satisfies never}`,
+      )
   }
 }

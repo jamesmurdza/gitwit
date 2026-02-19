@@ -135,7 +135,9 @@ function MainChatContent({
       getCurrentFileContent?: (filePath: string) => Promise<string> | string
       getMergeStatus?: (
         filePath: string,
-      ) => { status: string; result?: FileMergeResult; error?: string } | undefined
+      ) =>
+        | { status: string; result?: FileMergeResult; error?: string }
+        | undefined
     },
   ) => Promise<void>
   onRejectCode?: () => void

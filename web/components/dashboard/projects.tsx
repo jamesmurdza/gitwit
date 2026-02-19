@@ -25,7 +25,7 @@ export default function DashboardProjects({
         visibility: newVisibility,
       })
     },
-    []
+    [],
   )
 
   const onDelete = useMemo(
@@ -34,7 +34,7 @@ export default function DashboardProjects({
       toast(`Project ${sandbox.name} deleted.`)
       await deleteSandbox(sandbox.id)
     },
-    []
+    [],
   )
 
   useEffect(() => {

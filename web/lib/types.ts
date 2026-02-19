@@ -90,7 +90,7 @@ export interface ConflictResolutionProps {
   fileResolutions: FileResolution[]
   onFileResolutionChange: (
     fileIdx: number,
-    resolution: "local" | "incoming"
+    resolution: "local" | "incoming",
   ) => void
   onResolve: () => void
   onCancel: () => void

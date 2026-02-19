@@ -84,8 +84,8 @@ export class SSHSocketClient {
             .on("close", (code: number, signal: string) => {
               reject(
                 new Error(
-                  `Stream closed with code ${code} and signal ${signal}`
-                )
+                  `Stream closed with code ${code} and signal ${signal}`,
+                ),
               )
             })
             .on("data", (data: Buffer) => {
@@ -97,7 +97,7 @@ export class SSHSocketClient {
               reject(new Error(data.toString()))
               stream.close()
             })
-        }
+        },
       )
     })
   }

@@ -289,7 +289,9 @@ export function GeneratedFilesPreview({
   const createFileAction = React.useCallback(
     (
       actionFn: ((args: ApplyMergedFileArgs) => Promise<void>) | undefined,
-      setLoadingMap: React.Dispatch<React.SetStateAction<Record<string, boolean>>>,
+      setLoadingMap: React.Dispatch<
+        React.SetStateAction<Record<string, boolean>>
+      >,
       resolvedStatus: "applied" | "rejected",
     ) => {
       return (file: GeneratedFile) => {

@@ -60,7 +60,7 @@ export default function New({
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
               projectId,
-            })
+            }),
           )
           .then(() => {
             stopEditing()
@@ -78,14 +78,14 @@ export default function New({
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
               projectId,
-            })
+            }),
           )
           .then(() => {
             // Invalidate changed files query to refresh the list
             queryClient.invalidateQueries(
               githubRouter.getChangedFiles.getOptions({
                 projectId,
-              })
+              }),
             )
             stopEditing()
           })
@@ -101,8 +101,8 @@ export default function New({
   const displayName = value.split("/").filter(Boolean).pop() || ""
   const icon =
     type === "file"
-      ? getIconForFile(displayName) ?? DEFAULT_FILE
-      : getIconForFolder(displayName) ?? DEFAULT_FOLDER
+      ? (getIconForFile(displayName) ?? DEFAULT_FILE)
+      : (getIconForFolder(displayName) ?? DEFAULT_FOLDER)
 
   // Validate and create the new item
   const createNew = useCallback(() => {
@@ -143,7 +143,7 @@ export default function New({
         stopEditing()
       }
     },
-    [stopEditing]
+    [stopEditing],
   )
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,7 +156,7 @@ export default function New({
       e.preventDefault()
       createNew()
     },
-    [createNew]
+    [createNew],
   )
 
   return (
@@ -185,7 +185,7 @@ export default function New({
           }
           className={cn(
             "bg-transparent transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring rounded-sm w-full truncate",
-            error && "ring-2 ring-destructive"
+            error && "ring-2 ring-destructive",
           )}
           autoFocus
           disabled={isPending}

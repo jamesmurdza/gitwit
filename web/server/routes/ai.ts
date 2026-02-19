@@ -38,7 +38,7 @@ export const aiRouter = createRouter()
       z.object({
         messages: z.array(messageSchema),
         context: contextSchema,
-      })
+      }),
     ),
     async (c) => {
       const { messages, context } = c.req.valid("json")
@@ -61,7 +61,7 @@ export const aiRouter = createRouter()
       })
 
       return result.toTextStreamResponse()
-    }
+    },
   )
 
   .post(
@@ -71,7 +71,7 @@ export const aiRouter = createRouter()
       z.object({
         messages: z.array(messageSchema),
         context: contextSchema,
-      })
+      }),
     ),
     async (c) => {
       const { messages, context } = c.req.valid("json")
@@ -91,7 +91,7 @@ export const aiRouter = createRouter()
       })
 
       return c.json({ content: result.text })
-    }
+    },
   )
 
   .post(
@@ -103,7 +103,7 @@ export const aiRouter = createRouter()
         originalCode: z.string(),
         fileName: z.string(),
         projectId: z.string().optional(),
-      })
+      }),
     ),
     async (c) => {
       const { partialCode, originalCode, fileName } = c.req.valid("json")
@@ -115,5 +115,5 @@ export const aiRouter = createRouter()
         console.error("Code merge failed:", error)
         return c.json({ mergedCode: originalCode })
       }
-    }
+    },
   )

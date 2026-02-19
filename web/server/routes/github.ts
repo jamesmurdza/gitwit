@@ -12,21 +12,18 @@ import { githubAuth } from "../middlewares/githubAuth"
 
 export const githubRouter = createRouter()
   // #region GET /auth_url
-  .get(
-    "/auth_url",
-    (c) => {
-      return c.json(
-        {
-          success: true,
-          messaege: "GitHub authentication URL retrieved successfully",
-          data: {
-            auth_url: `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&scope=repo%20delete_repo`,
-          },
+  .get("/auth_url", (c) => {
+    return c.json(
+      {
+        success: true,
+        messaege: "GitHub authentication URL retrieved successfully",
+        data: {
+          auth_url: `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&scope=repo%20delete_repo`,
         },
-        200
-      )
-    }
-  )
+      },
+      200,
+    )
+  })
   // #endregion
   // #region POST /login
   .post(
@@ -35,7 +32,7 @@ export const githubRouter = createRouter()
       "query",
       z.object({
         code: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { code } = c.req.valid("query")
@@ -53,14 +50,14 @@ export const githubRouter = createRouter()
               client_secret: env.GITHUB_CLIENT_SECRET,
               code,
             }),
-          }
+          },
         )
 
         const accessToken = (await response.json()).access_token as string
         if (!accessToken) {
           return c.json(
             { success: false, message: "GitHub authentication failed" },
-            403
+            403,
           )
         }
         // update user in database with GitHub token
@@ -82,53 +79,44 @@ export const githubRouter = createRouter()
             success: true,
             message: "GitHub authentication successful",
           },
-          200
+          200,
         )
       } catch (e) {}
-    }
+    },
   )
   // #endregion
   .use(githubAuth)
   // #region GET /user
-  .get(
-    "/user",
-    async (c) => {
-      const githubManager = c.get("manager")
-      const githubUser = await githubManager.getUser()
-      return c.json(
-        {
-          success: true,
-          message: "User data retrieved successfully",
-          data: githubUser,
-        },
-        200
-      )
-    }
-  )
+  .get("/user", async (c) => {
+    const githubManager = c.get("manager")
+    const githubUser = await githubManager.getUser()
+    return c.json(
+      {
+        success: true,
+        message: "User data retrieved successfully",
+        data: githubUser,
+      },
+      200,
+    )
+  })
   // #endregion
   // #region POST /logout
-  .post(
-    "/logout",
-    async (c) => {
-      const githubManager = c.get("manager")
-      try {
-        const res = await githubManager.logoutUser(c.get("user").id)
-        return c.json(
-          {
-            success: res.success,
-            message: "User logged out successfully",
-          },
-          200
-        )
-      } catch (error) {
-        console.error("Logout error:", error) // Log the error for debugging
-        return c.json(
-          { success: false, message: "Failed to log out user" },
-          500
-        )
-      }
+  .post("/logout", async (c) => {
+    const githubManager = c.get("manager")
+    try {
+      const res = await githubManager.logoutUser(c.get("user").id)
+      return c.json(
+        {
+          success: res.success,
+          message: "User logged out successfully",
+        },
+        200,
+      )
+    } catch (error) {
+      console.error("Logout error:", error) // Log the error for debugging
+      return c.json({ success: false, message: "Failed to log out user" }, 500)
     }
-  )
+  })
   // #endregion
   // #region GET /repo/status
   .get(
@@ -137,7 +125,7 @@ export const githubRouter = createRouter()
       "query",
       z.object({
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const githubManager = c.get("manager")
@@ -168,7 +156,7 @@ export const githubRouter = createRouter()
                 },
               },
             },
-            200
+            200,
           )
         }
         return c.json(
@@ -178,7 +166,7 @@ export const githubRouter = createRouter()
             message: "Repository found in DB, not in GitHub",
             data: { existsInDB: true, existsInGitHub: false, repo: null },
           },
-          200
+          200,
         )
       }
       const { exists } = await githubManager.repoExistsByName(repoName)
@@ -189,7 +177,7 @@ export const githubRouter = createRouter()
             message: "Repository found in GitHub, not in DB",
             data: { existsInDB: false, existsInGitHub: true, repo: null },
           },
-          200
+          200,
         )
       }
 
@@ -199,9 +187,9 @@ export const githubRouter = createRouter()
           message: "Repository not found in DB or GitHub",
           data: { existsInDB: false, existsInGitHub: false, repo: null },
         },
-        200
+        200,
       )
-    }
+    },
   )
   // #endregion
   // #region POST /repo/create
@@ -211,7 +199,7 @@ export const githubRouter = createRouter()
       "json",
       z.object({
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const githubManager = c.get("manager")
@@ -229,7 +217,7 @@ export const githubRouter = createRouter()
         }
         if (sandbox.repositoryId) {
           const repoExists = await githubManager.repoExistsByID(
-            sandbox.repositoryId
+            sandbox.repositoryId,
           )
           if (repoExists.exists) {
             return c.json(
@@ -241,7 +229,7 @@ export const githubRouter = createRouter()
                   repoName: repoExists.repoName,
                 },
               },
-              400
+              400,
             )
           }
           // If repository exists in DB but not in GitHub, remove it from DB
@@ -253,15 +241,15 @@ export const githubRouter = createRouter()
             .where(
               and(
                 eq(sandboxSchema.id, projectId),
-                eq(sandboxSchema.userId, userId)
-              )
+                eq(sandboxSchema.userId, userId),
+              ),
             )
           return c.json(
             {
               success: false,
               message: "Repository exists in DB but not in GitHub",
             },
-            400
+            400,
           )
         }
         let repoName = sandbox.name
@@ -269,7 +257,7 @@ export const githubRouter = createRouter()
         // Check if repo exists and handle naming conflicts
         repoName = await resolveRepoNameConflict(
           repoName,
-          githubManager.repoExistsByName.bind(githubManager)
+          githubManager.repoExistsByName.bind(githubManager),
         )
 
         // Create the repository
@@ -282,8 +270,8 @@ export const githubRouter = createRouter()
           .where(
             and(
               eq(sandboxSchema.id, projectId),
-              eq(sandboxSchema.userId, userId)
-            )
+              eq(sandboxSchema.userId, userId),
+            ),
           )
 
         // Pull the README.md that GitHub auto-created
@@ -297,25 +285,25 @@ export const githubRouter = createRouter()
         const githubSyncManager = new GithubSyncManager(
           githubManager,
           project.fileManager,
-          project.container
+          project.container,
         )
 
         // Get the README.md file that GitHub created
         const githubFiles = (await githubSyncManager.getFilesFromCommit(
-          id
+          id,
         )) as Array<{ path: string; content: string }>
         const readmeFile = githubFiles.find((file) => file.path === "README.md")
 
         // Check if user already has a README.md file locally
         const localReadmeExists = await project.fileManager?.safeReadFile(
-          "/home/user/project/README.md"
+          "/home/user/project/README.md",
         )
 
         if (readmeFile && project.fileManager && !localReadmeExists) {
           // Only add GitHub's README.md if user doesn't have one locally
           await project.fileManager.writeFileByPath(
             "/home/user/project/README.md",
-            readmeFile.content
+            readmeFile.content,
           )
           // Refresh file tree to include the new README.md
           await project.fileManager.getFileTree()
@@ -330,14 +318,14 @@ export const githubRouter = createRouter()
               message: "No files to commit",
               data: null,
             },
-            400
+            400,
           )
         }
         const username = githubManager.getUsername()
         const repo = await githubManager.createCommit(
           id,
           files,
-          "initial commit from GitWit"
+          "initial commit from GitWit",
         )
         const repoUrl = `https://github.com/${username}/${repo.repoName}`
         // Update lastCommit in DB
@@ -347,8 +335,8 @@ export const githubRouter = createRouter()
           .where(
             and(
               eq(sandboxSchema.id, projectId),
-              eq(sandboxSchema.userId, userId)
-            )
+              eq(sandboxSchema.userId, userId),
+            ),
           )
 
         return c.json(
@@ -357,21 +345,18 @@ export const githubRouter = createRouter()
             message: "Repository created and files committed successfully",
             data: { repoUrl },
           },
-          200
+          200,
         )
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error)
-        console.error(
-          "Failed to create repository or commit files:",
-          message
-        )
+        console.error("Failed to create repository or commit files:", message)
         return c.json(
           {
             success: false,
             message: "Failed to create repository or commit files",
             data: message,
           },
-          500
+          500,
         )
       } finally {
         // Clean up project resources
@@ -379,7 +364,7 @@ export const githubRouter = createRouter()
           await project.disconnect()
         }
       }
-    }
+    },
   )
   // #endregion
   // #region POST /repo/commit
@@ -390,7 +375,7 @@ export const githubRouter = createRouter()
       z.object({
         projectId: z.string(),
         message: z.string().optional(),
-      })
+      }),
     ),
     async (c) => {
       const githubManager = c.get("manager")
@@ -408,7 +393,7 @@ export const githubRouter = createRouter()
         if (!sandbox.repositoryId) {
           return c.json(
             { success: false, message: "Repository not found" },
-            404
+            404,
           )
         }
         const project = new Project(projectId)
@@ -417,13 +402,13 @@ export const githubRouter = createRouter()
         if (files.length === 0) {
           return c.json(
             { success: false, message: "No files to commit", data: null },
-            400
+            400,
           )
         }
         const repo = await githubManager.createCommit(
           sandbox.repositoryId,
           files,
-          commitMessage || "commit from GitWit"
+          commitMessage || "commit from GitWit",
         )
         // Update lastCommit in DB
         await db
@@ -432,8 +417,8 @@ export const githubRouter = createRouter()
           .where(
             and(
               eq(sandboxSchema.id, projectId),
-              eq(sandboxSchema.userId, userId)
-            )
+              eq(sandboxSchema.userId, userId),
+            ),
           )
         return c.json(
           {
@@ -441,16 +426,16 @@ export const githubRouter = createRouter()
             message: "Changes committed successfully",
             data: repo,
           },
-          200
+          200,
         )
       } catch (error) {
         console.error("Failed to commit changes:", error)
         return c.json(
           { success: false, message: "Failed to commit changes" },
-          500
+          500,
         )
       }
-    }
+    },
   )
   // #endregion
   // #region POST /repo/remove
@@ -460,7 +445,7 @@ export const githubRouter = createRouter()
       "json",
       z.object({
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const githubManager = c.get("manager")
@@ -478,7 +463,7 @@ export const githubRouter = createRouter()
         if (!sandbox.repositoryId) {
           return c.json(
             { success: false, message: "Repository not found" },
-            404
+            404,
           )
         }
         // Remove repository from GitHub
@@ -491,22 +476,22 @@ export const githubRouter = createRouter()
           .where(
             and(
               eq(sandboxSchema.id, projectId),
-              eq(sandboxSchema.userId, userId)
-            )
+              eq(sandboxSchema.userId, userId),
+            ),
           )
 
         return c.json(
           { success: true, message: "Repository removed successfully" },
-          200
+          200,
         )
       } catch (error) {
         console.error("Failed to remove repository:", error)
         return c.json(
           { success: false, message: "Failed to remove repository" },
-          500
+          500,
         )
       }
-    }
+    },
   )
   // #endregion
   // #region GET /repo/pull/check
@@ -516,7 +501,7 @@ export const githubRouter = createRouter()
       "query",
       z.object({
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const githubManager = c.get("manager")
@@ -537,7 +522,7 @@ export const githubRouter = createRouter()
         if (!sandbox.repositoryId) {
           return c.json(
             { success: false, message: "No repository linked to this project" },
-            404
+            404,
           )
         }
 
@@ -552,13 +537,13 @@ export const githubRouter = createRouter()
         const githubSyncManager = new GithubSyncManager(
           githubManager,
           project.fileManager,
-          project.container
+          project.container,
         )
 
         // Check if pull is needed
         const pullCheck = await githubSyncManager.checkIfPullNeeded(
           sandbox.repositoryId,
-          sandbox.lastCommit || undefined // pass local lastCommit
+          sandbox.lastCommit || undefined, // pass local lastCommit
         )
 
         return c.json(
@@ -567,7 +552,7 @@ export const githubRouter = createRouter()
             message: "Pull check completed",
             data: pullCheck,
           },
-          200
+          200,
         )
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error)
@@ -578,10 +563,10 @@ export const githubRouter = createRouter()
             message: "Failed to check pull status",
             data: message,
           },
-          500
+          500,
         )
       }
-    }
+    },
   )
   // #endregion
   // #region POST /repo/pull
@@ -591,7 +576,7 @@ export const githubRouter = createRouter()
       "json",
       z.object({
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const githubManager = c.get("manager")
@@ -612,7 +597,7 @@ export const githubRouter = createRouter()
         if (!sandbox.repositoryId) {
           return c.json(
             { success: false, message: "No repository linked to this project" },
-            404
+            404,
           )
         }
 
@@ -628,12 +613,12 @@ export const githubRouter = createRouter()
         const githubSyncManager = new GithubSyncManager(
           githubManager,
           project.fileManager,
-          project.container
+          project.container,
         )
 
         // Pull files from GitHub using SHA-based comparison
         const pullResult = await githubSyncManager.pullFromGitHub(
-          sandbox.repositoryId
+          sandbox.repositoryId,
         )
 
         // Note: Conflict resolutions are now handled by the separate /repo/resolve-conflicts endpoint
@@ -641,7 +626,7 @@ export const githubRouter = createRouter()
 
         // Get latest commit SHA from GitHub
         const latestCommit = await githubSyncManager.getLatestCommitSha(
-          sandbox.repositoryId
+          sandbox.repositoryId,
         )
         await db
           .update(sandboxSchema)
@@ -649,8 +634,8 @@ export const githubRouter = createRouter()
           .where(
             and(
               eq(sandboxSchema.id, projectId),
-              eq(sandboxSchema.userId, userId)
-            )
+              eq(sandboxSchema.userId, userId),
+            ),
           )
 
         return c.json(
@@ -659,7 +644,7 @@ export const githubRouter = createRouter()
             message: "Pull completed successfully",
             data: pullResult,
           },
-          200
+          200,
         )
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error)
@@ -670,10 +655,10 @@ export const githubRouter = createRouter()
             message: "Failed to pull from GitHub",
             data: message,
           },
-          500
+          500,
         )
       }
-    }
+    },
   )
   // #endregion
   // #region POST /repo/resolve-conflicts
@@ -692,11 +677,11 @@ export const githubRouter = createRouter()
                 resolution: z.enum(["local", "incoming"]),
                 localContent: z.string(),
                 incomingContent: z.string(),
-              })
+              }),
             ),
-          })
+          }),
         ),
-      })
+      }),
     ),
     async (c) => {
       const userId = c.get("user").id
@@ -717,7 +702,7 @@ export const githubRouter = createRouter()
         if (!sandbox.repositoryId) {
           return c.json(
             { success: false, message: "No repository linked to this project" },
-            404
+            404,
           )
         }
 
@@ -734,7 +719,7 @@ export const githubRouter = createRouter()
         const githubSyncManager = new GithubSyncManager(
           githubManager,
           project.fileManager,
-          project.container
+          project.container,
         )
 
         // Transform conflict resolutions to match FileManager format
@@ -755,12 +740,12 @@ export const githubRouter = createRouter()
 
         // Apply file-level conflict resolutions
         await githubSyncManager.applyFileLevelResolutions(
-          transformedResolutions
+          transformedResolutions,
         )
 
         // Get latest commit SHA from GitHub and update
         const latestCommit = await githubSyncManager.getLatestCommitSha(
-          sandbox.repositoryId
+          sandbox.repositoryId,
         )
         await db
           .update(sandboxSchema)
@@ -768,8 +753,8 @@ export const githubRouter = createRouter()
           .where(
             and(
               eq(sandboxSchema.id, projectId),
-              eq(sandboxSchema.userId, userId)
-            )
+              eq(sandboxSchema.userId, userId),
+            ),
           )
 
         return c.json({
@@ -785,7 +770,7 @@ export const githubRouter = createRouter()
             success: false,
             message: `Failed to resolve conflicts: ${errorMessage}`,
           },
-          500
+          500,
         )
       } finally {
         // Clean up project resources
@@ -793,7 +778,7 @@ export const githubRouter = createRouter()
           await project.disconnect()
         }
       }
-    }
+    },
   )
   // #endregion
   // #region GET /repo/changed-files
@@ -803,7 +788,7 @@ export const githubRouter = createRouter()
       "query",
       z.object({
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const githubManager = c.get("manager")
@@ -825,14 +810,14 @@ export const githubRouter = createRouter()
         if (!sandbox.repositoryId) {
           return c.json(
             { success: false, message: "No repository linked to this project" },
-            404
+            404,
           )
         }
 
         if (!sandbox.lastCommit) {
           return c.json(
             { success: false, message: "No previous commit found" },
-            404
+            404,
           )
         }
 
@@ -847,25 +832,25 @@ export const githubRouter = createRouter()
         const githubSyncManager = new GithubSyncManager(
           githubManager,
           project.fileManager,
-          project.container
+          project.container,
         )
 
         // Use the new efficient SHA-based comparison
         const changes = await githubSyncManager.getChangedFilesEfficiently(
           sandbox.repositoryId,
-          sandbox.lastCommit
+          sandbox.lastCommit,
         )
 
         // Filter out hidden files and apply .gitignore rules
         const filteredChanges = {
           modified: changes.modified.filter(
-            (file) => !file.path.includes("/.") && !file.path.startsWith(".")
+            (file) => !file.path.includes("/.") && !file.path.startsWith("."),
           ),
           created: changes.created.filter(
-            (file) => !file.path.includes("/.") && !file.path.startsWith(".")
+            (file) => !file.path.includes("/.") && !file.path.startsWith("."),
           ),
           deleted: changes.deleted.filter(
-            (file) => !file.path.includes("/.") && !file.path.startsWith(".")
+            (file) => !file.path.includes("/.") && !file.path.startsWith("."),
           ),
         }
 
@@ -890,13 +875,13 @@ export const githubRouter = createRouter()
             const filteredPaths = new Set(filteredFiles.map((f) => f.path))
 
             filteredChanges.modified = filteredChanges.modified.filter((f) =>
-              filteredPaths.has(f.path)
+              filteredPaths.has(f.path),
             )
             filteredChanges.created = filteredChanges.created.filter((f) =>
-              filteredPaths.has(f.path)
+              filteredPaths.has(f.path),
             )
             filteredChanges.deleted = filteredChanges.deleted.filter((f) =>
-              filteredPaths.has(f.path)
+              filteredPaths.has(f.path),
             )
           }
         } catch (error) {
@@ -909,7 +894,7 @@ export const githubRouter = createRouter()
             message: "Changed files retrieved successfully",
             data: filteredChanges,
           },
-          200
+          200,
         )
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error)
@@ -920,7 +905,7 @@ export const githubRouter = createRouter()
             message: "Failed to get changed files",
             data: message,
           },
-          500
+          500,
         )
       } finally {
         // Clean up project resources
@@ -928,7 +913,7 @@ export const githubRouter = createRouter()
           await project.disconnect()
         }
       }
-    }
+    },
   )
 // #endregion
 // #endregion
@@ -944,11 +929,11 @@ export const githubRouter = createRouter()
  */
 function filterIgnoredFiles(
   files: Array<{ path: string; content?: string }>,
-  gitignoreContent?: string
+  gitignoreContent?: string,
 ): Array<{ path: string; content?: string }> {
   // First, filter out hidden files (files that start with '.')
   const nonHiddenFiles = files.filter(
-    (file) => !file.path.includes("/.") && !file.path.startsWith(".")
+    (file) => !file.path.includes("/.") && !file.path.startsWith("."),
   )
 
   if (!gitignoreContent) {
@@ -985,7 +970,7 @@ function filterIgnoredFiles(
  */
 async function resolveRepoNameConflict(
   repoName: string,
-  isNameTaken: (name: string) => Promise<{ exists: boolean }>
+  isNameTaken: (name: string) => Promise<{ exists: boolean }>,
 ): Promise<string> {
   const { exists } = await isNameTaken(repoName)
   if (!exists) {

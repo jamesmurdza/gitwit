@@ -86,7 +86,7 @@ const UpdateErrorSchema = z.object({
         z.object({
           path: z.array(z.string()),
           message: z.string(),
-        })
+        }),
       ),
     ])
     .optional(),
@@ -100,7 +100,7 @@ interface FormState {
 }
 export async function updateUser(
   _prevState: FormState,
-  formData: FormData
+  formData: FormData,
 ): Promise<FormState> {
   let data = Object.fromEntries(formData)
   let links: UserLink[] = []

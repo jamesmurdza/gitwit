@@ -1,7 +1,7 @@
 import * as monaco from "monaco-editor"
 
 export function parseTSConfigToMonacoOptions(
-  tsconfig: Record<string, unknown>
+  tsconfig: Record<string, unknown>,
 ): monaco.languages.typescript.CompilerOptions {
   const compilerOptions: monaco.languages.typescript.CompilerOptions = {}
 
@@ -10,17 +10,22 @@ export function parseTSConfigToMonacoOptions(
   const str = (v: unknown): string | undefined =>
     typeof v === "string" ? v : undefined
   const strArr = (v: unknown): string[] | undefined =>
-    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined
+    Array.isArray(v)
+      ? v.filter((x): x is string => typeof x === "string")
+      : undefined
 
   // Map tsconfig options to Monaco CompilerOptions
   if (tsconfig.strict) compilerOptions.strict = bool(tsconfig.strict)
-  if (tsconfig.target) compilerOptions.target = mapScriptTarget(str(tsconfig.target) ?? "")
-  if (tsconfig.module) compilerOptions.module = mapModule(str(tsconfig.module) ?? "")
+  if (tsconfig.target)
+    compilerOptions.target = mapScriptTarget(str(tsconfig.target) ?? "")
+  if (tsconfig.module)
+    compilerOptions.module = mapModule(str(tsconfig.module) ?? "")
   if (tsconfig.lib) compilerOptions.lib = strArr(tsconfig.lib)
   if (tsconfig.allowJs) compilerOptions.allowJs = bool(tsconfig.allowJs)
   if (tsconfig.checkJs) compilerOptions.checkJs = bool(tsconfig.checkJs)
   if (tsconfig.jsx) compilerOptions.jsx = mapJSX(str(tsconfig.jsx))
-  if (tsconfig.declaration) compilerOptions.declaration = bool(tsconfig.declaration)
+  if (tsconfig.declaration)
+    compilerOptions.declaration = bool(tsconfig.declaration)
   if (tsconfig.declarationMap)
     compilerOptions.declarationMap = bool(tsconfig.declarationMap)
   if (tsconfig.sourceMap) compilerOptions.sourceMap = bool(tsconfig.sourceMap)
@@ -36,7 +41,7 @@ export function parseTSConfigToMonacoOptions(
 }
 
 function mapScriptTarget(
-  target: string
+  target: string,
 ): monaco.languages.typescript.ScriptTarget {
   const targetMap: { [key: string]: monaco.languages.typescript.ScriptTarget } =
     {
@@ -92,4 +97,3 @@ function mapJSX(jsx: string | undefined): monaco.languages.typescript.JsxEmit {
   }
   return jsxMap[jsx.toLowerCase()] || monaco.languages.typescript.JsxEmit.React
 }
-

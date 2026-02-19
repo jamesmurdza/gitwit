@@ -85,7 +85,7 @@ export function CodeBlockActions({
   }, [activeTab?.id, activeTab?.name])
   const isActiveForPath = useMemo(
     () => (path: string) => pathMatchesTab(path, activeTab),
-    [activeTab?.id, activeTab?.name]
+    [activeTab?.id, activeTab?.name],
   )
   const computedIsForCurrentFile = useMemo(() => {
     if (typeof isForCurrentFile === "boolean") return isForCurrentFile
@@ -96,7 +96,7 @@ export function CodeBlockActions({
 
   const normalizedIntendedFile = useMemo(
     () => (intendedFile ? normalizePath(intendedFile) : undefined),
-    [intendedFile]
+    [intendedFile],
   )
 
   const externalStatus =
@@ -173,7 +173,7 @@ export function CodeBlockActions({
       ? cn(
           "absolute top-2 right-10 shrink-0 flex items-center gap-1",
           "opacity-0 group-hover:opacity-100 transition-all",
-          className
+          className,
         )
       : cn("flex items-center gap-1", className)
 

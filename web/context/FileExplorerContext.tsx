@@ -57,7 +57,7 @@ export function useFileExplorer() {
   const ctx = useContext(FileExplorerContext)
   if (!ctx) {
     throw new Error(
-      "useFileExplorer must be used within a FileExplorerProvider"
+      "useFileExplorer must be used within a FileExplorerProvider",
     )
   }
   return ctx
@@ -85,7 +85,7 @@ interface ValidationResult {
  */
 export function validateName(
   name: string,
-  type: "file" | "folder"
+  type: "file" | "folder",
 ): ValidationResult {
   // Trim whitespace
   const trimmed = name.trim()
@@ -121,7 +121,7 @@ export function validateName(
  */
 function validateSegment(
   segment: string,
-  type: "file" | "folder"
+  type: "file" | "folder",
 ): ValidationResult {
   if (!segment) {
     return { isValid: false, error: "Name cannot be empty" }

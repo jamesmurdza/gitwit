@@ -248,7 +248,7 @@ export const sandboxLikes = pgTable(
   },
   (table: any) => ({
     pk: primaryKey({ columns: [table.sandboxId, table.userId] }),
-  })
+  }),
 )
 
 export const usersToSandboxes = pgTable("users_to_sandboxes", {
@@ -291,7 +291,7 @@ export const sandboxLikesRelations = relations(
       fields: [sandboxLikes.sandboxId],
       references: [sandbox.id],
     }),
-  })
+  }),
 )
 
 export const usersToSandboxesRelations = relations(
@@ -306,7 +306,7 @@ export const usersToSandboxesRelations = relations(
       fields: [usersToSandboxes.userId],
       references: [user.id],
     }),
-  })
+  }),
 )
 
 // #endregion

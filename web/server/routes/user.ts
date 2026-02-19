@@ -46,7 +46,7 @@ export const openUserRouter = createRouter().get(
     "query",
     z.object({
       username: z.string().optional(),
-    })
+    }),
   ),
   async (c) => {
     const { username } = c.req.valid("query")
@@ -77,14 +77,14 @@ export const openUserRouter = createRouter().get(
         (sb): SandboxWithLiked => ({
           ...(sb as unknown as SandboxWithLiked),
           liked: sb.likes.some((like) => like.userId === res.id),
-        })
+        }),
       ),
     }
     return c.json(
       { success: true, message: "User found", data: transformedUser },
-      200
+      200,
     )
-  }
+  },
 )
 export const userRouter = createRouter()
   // #region GET /
@@ -98,7 +98,7 @@ export const userRouter = createRouter()
           description: "Unique identifier for the user",
           example: "user_12345",
         }),
-      })
+      }),
     ),
     async (c) => {
       const userId = c.get("user").id
@@ -110,7 +110,9 @@ export const userRouter = createRouter()
           with: {
             sandbox: {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any -- drizzle orderBy union type lacks createdAt
-              orderBy: (sandbox: any, { desc }: any) => [desc(sandbox.createdAt)],
+              orderBy: (sandbox: any, { desc }: any) => [
+                desc(sandbox.createdAt),
+              ],
               with: {
                 likes: true,
               },
@@ -129,12 +131,12 @@ export const userRouter = createRouter()
             (sb): SandboxWithLiked => ({
               ...(sb as unknown as SandboxWithLiked),
               liked: sb.likes.some((like) => like.userId === userId),
-            })
+            }),
           ),
         }
         return c.json(
           { success: true, message: "User found ", data: transformedUser },
-          200
+          200,
         )
       }
       const res = await db.query.user.findFirst({
@@ -161,40 +163,36 @@ export const userRouter = createRouter()
           (sb): SandboxWithLiked => ({
             ...(sb as unknown as SandboxWithLiked),
             liked: sb.likes.some((like) => like.userId === (id ?? userId)),
-          })
+          }),
         ),
       }
       return c.json(
         { success: true, message: "User found ", data: transformedUser },
-        200
+        200,
       )
-    }
+    },
   )
   // #endregion
   // #region POST /
-  .post(
-    "/",
-    zValidator("json", userInsertSchema),
-    async (c) => {
-      const data = c.req.valid("json")
-      const res = (
-        await db
-          .insert(user)
-          .values({
-            ...data,
-            createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
-            tierExpiresAt: data.tierExpiresAt
-              ? new Date(data.tierExpiresAt)
-              : new Date(),
-            lastResetDate: data.lastResetDate
-              ? new Date(data.lastResetDate)
-              : new Date(),
-          })
-          .returning()
-      )[0]
-      return c.json({ res }, 200)
-    }
-  )
+  .post("/", zValidator("json", userInsertSchema), async (c) => {
+    const data = c.req.valid("json")
+    const res = (
+      await db
+        .insert(user)
+        .values({
+          ...data,
+          createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+          tierExpiresAt: data.tierExpiresAt
+            ? new Date(data.tierExpiresAt)
+            : new Date(),
+          lastResetDate: data.lastResetDate
+            ? new Date(data.lastResetDate)
+            : new Date(),
+        })
+        .returning()
+    )[0]
+    return c.json({ res }, 200)
+  })
   // #endregion
   // #region DELETE /
   .delete(
@@ -206,7 +204,7 @@ export const userRouter = createRouter()
           description: "Unique identifier for the user to be deleted",
           example: "user_12345",
         }),
-      })
+      }),
     ),
     async (c) => {
       const { id } = c.req.valid("query")
@@ -216,9 +214,9 @@ export const userRouter = createRouter()
           success: true,
           message: "User deleted successfully",
         },
-        200
+        200,
       )
-    }
+    },
   )
   // #endregion
   // #region PATCH /
@@ -231,7 +229,7 @@ export const userRouter = createRouter()
           description: "Unique identifier for the user to be updated",
           example: "user_12345",
         }),
-      })
+      }),
     ),
     async (c) => {
       const { id, username, ...updateData } = c.req.valid("json")
@@ -264,52 +262,48 @@ export const userRouter = createRouter()
       }
 
       return c.json({ res })
-    }
+    },
   )
   // #endregion
   // #region GET /api-keys
-  .get(
-    "/api-keys",
-    async (c) => {
-      // Check if encryption is available
-      const { isEncryptionAvailable } = await import(
-        "@gitwit/lib/utils/encryption"
-      )
-      if (!isEncryptionAvailable()) {
-        return c.json({
-          hasAnthropic: false,
-          hasOpenai: false,
-          hasOpenrouter: false,
-          hasAws: false,
-          encryptionAvailable: false,
-        })
-      }
-
-      const userId = c.get("user").id
-
-      const userRecord = await db.query.user.findFirst({
-        where: (user, { eq }) => eq(user.id, userId),
-      })
-
-      if (!userRecord) {
-        return c.json({ error: "User not found" }, 404)
-      }
-
-      const apiKeys = (userRecord.apiKeys || {}) as Record<string, string>
-
+  .get("/api-keys", async (c) => {
+    // Check if encryption is available
+    const { isEncryptionAvailable } =
+      await import("@gitwit/lib/utils/encryption")
+    if (!isEncryptionAvailable()) {
       return c.json({
-        hasAnthropic: !!apiKeys.anthropic,
-        anthropicModel: apiKeys.anthropicModel,
-        hasOpenai: !!apiKeys.openai,
-        openaiModel: apiKeys.openaiModel,
-        hasOpenrouter: !!apiKeys.openrouter,
-        openrouterModel: apiKeys.openrouterModel,
-        hasAws: !!(apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey),
-        awsModel: apiKeys.awsModel,
-        encryptionAvailable: true,
+        hasAnthropic: false,
+        hasOpenai: false,
+        hasOpenrouter: false,
+        hasAws: false,
+        encryptionAvailable: false,
       })
     }
-  )
+
+    const userId = c.get("user").id
+
+    const userRecord = await db.query.user.findFirst({
+      where: (user, { eq }) => eq(user.id, userId),
+    })
+
+    if (!userRecord) {
+      return c.json({ error: "User not found" }, 404)
+    }
+
+    const apiKeys = (userRecord.apiKeys || {}) as Record<string, string>
+
+    return c.json({
+      hasAnthropic: !!apiKeys.anthropic,
+      anthropicModel: apiKeys.anthropicModel,
+      hasOpenai: !!apiKeys.openai,
+      openaiModel: apiKeys.openaiModel,
+      hasOpenrouter: !!apiKeys.openrouter,
+      openrouterModel: apiKeys.openrouterModel,
+      hasAws: !!(apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey),
+      awsModel: apiKeys.awsModel,
+      encryptionAvailable: true,
+    })
+  })
   // #endregion
   // #region PUT /api-keys
   .put(
@@ -323,13 +317,12 @@ export const userRouter = createRouter()
         awsAccessKeyId: z.string().optional(),
         awsSecretAccessKey: z.string().optional(),
         awsRegion: z.string().optional(),
-      })
+      }),
     ),
     async (c) => {
       // Check if encryption is available
-      const { isEncryptionAvailable, encrypt } = await import(
-        "@gitwit/lib/utils/encryption"
-      )
+      const { isEncryptionAvailable, encrypt } =
+        await import("@gitwit/lib/utils/encryption")
       if (!isEncryptionAvailable()) {
         return c.json(
           {
@@ -337,7 +330,7 @@ export const userRouter = createRouter()
             message:
               "Custom API key feature is disabled. ENCRYPTION_KEY is not configured.",
           },
-          503
+          503,
         )
       }
 
@@ -390,7 +383,7 @@ export const userRouter = createRouter()
         success: true,
         message: "API keys updated successfully",
       })
-    }
+    },
   )
   // #endregion
   // #region DELETE /api-keys/:provider
@@ -400,13 +393,12 @@ export const userRouter = createRouter()
       "param",
       z.object({
         provider: z.enum(["anthropic", "openai", "openrouter", "aws"]),
-      })
+      }),
     ),
     async (c) => {
       // Check if encryption is available
-      const { isEncryptionAvailable } = await import(
-        "@gitwit/lib/utils/encryption"
-      )
+      const { isEncryptionAvailable } =
+        await import("@gitwit/lib/utils/encryption")
       if (!isEncryptionAvailable()) {
         return c.json(
           {
@@ -414,7 +406,7 @@ export const userRouter = createRouter()
             message:
               "Custom API key feature is disabled. ENCRYPTION_KEY is not configured.",
           },
-          503
+          503,
         )
       }
 
@@ -454,7 +446,7 @@ export const userRouter = createRouter()
         success: true,
         message: `${provider} API key deleted successfully`,
       })
-    }
+    },
   )
   // #endregion
   // #region GET /check-username
@@ -467,7 +459,7 @@ export const userRouter = createRouter()
           description: "Username to check for existence",
           example: "john_doe",
         }),
-      })
+      }),
     ),
     async (c) => {
       const { username } = c.req.valid("query")
@@ -475,7 +467,7 @@ export const userRouter = createRouter()
         where: (user, { eq }) => eq(user.username, username),
       })
       return c.json({ exists: !!exists }, 200)
-    }
+    },
   )
   // #endregion
   // #region POST /increment-generations
@@ -489,7 +481,7 @@ export const userRouter = createRouter()
             "ID of the user whose generations count will be incremented",
           example: "user_12345",
         }),
-      })
+      }),
     ),
     async (c) => {
       const { userId } = c.req.valid("json")
@@ -498,7 +490,7 @@ export const userRouter = createRouter()
         .set({ generations: sql`${user.generations} + 1` })
         .where(eq(user.id, userId))
       return c.json({ success: true, message: "AI generations increased" }, 200)
-    }
+    },
   )
   // #endregion
   // #region POST /update-tier
@@ -517,7 +509,7 @@ export const userRouter = createRouter()
         tierExpiresAt: z.coerce.date().meta({
           description: "Expiration date for the new tier",
         }),
-      })
+      }),
     ),
     async (c) => {
       const { userId, tier, tierExpiresAt } = c.req.valid("json")
@@ -530,7 +522,7 @@ export const userRouter = createRouter()
         })
         .where(eq(user.id, userId))
       return c.json({ success: true, message: "User tier updated" }, 200)
-    }
+    },
   )
   // #endregion
   // #region POST /check-reset
@@ -543,7 +535,7 @@ export const userRouter = createRouter()
           description: "ID of the user to check for reset eligibility",
           example: "user_12345",
         }),
-      })
+      }),
     ),
     async (c) => {
       const { userId } = c.req.valid("json")
@@ -576,157 +568,152 @@ export const userRouter = createRouter()
 
       return c.json(
         { success: false, message: "Already reset this month" },
-        400
+        400,
       )
-    }
+    },
   )
   // #endregion
   // #region GET /available-models
-  .get(
-    "/available-models",
-    async (c) => {
-      const userId = c.get("user").id
+  .get("/available-models", async (c) => {
+    const userId = c.get("user").id
 
-      const userRecord = await db.query.user.findFirst({
-        where: (user, { eq }) => eq(user.id, userId),
-      })
+    const userRecord = await db.query.user.findFirst({
+      where: (user, { eq }) => eq(user.id, userId),
+    })
 
-      if (!userRecord) {
-        return c.json({ error: "User not found" }, 404)
-      }
-
-      const apiKeys = (userRecord.apiKeys || {}) as Record<string, string>
-      const models: Array<{ id: string; name: string; provider: string }> = []
-      let defaultModel: string | undefined
-
-      // Import available models list
-      const { AVAILABLE_MODELS, DEFAULT_MODELS } = await import(
-        "@/lib/available-models"
-      )
-
-      // Helper function to check if a model ID already exists in the models array
-      const modelExists = (modelId: string) =>
-        models.some((m) => m.id === modelId)
-
-      // Priority order: OpenRouter > Anthropic > OpenAI > AWS > Default
-
-      // Add models for OpenAI and Anthropic (dropdown list)
-      if (apiKeys.openai) {
-        // Add predefined models
-        AVAILABLE_MODELS.openai.forEach((model) => {
-          models.push({ ...model, provider: "openai" })
-        })
-
-        // Add custom model if user specified one in settings and it's not already in the list
-        const customModel = apiKeys.openaiModel
-        if (customModel && !modelExists(customModel)) {
-          models.push({
-            id: customModel,
-            name: customModel,
-            provider: "openai",
-          })
-        }
-      }
-
-      if (apiKeys.anthropic) {
-        // Add predefined models
-        AVAILABLE_MODELS.anthropic.forEach((model) => {
-          models.push({ ...model, provider: "anthropic" })
-        })
-
-        // Add custom model if user specified one in settings and it's not already in the list
-        const customModel = apiKeys.anthropicModel
-        if (customModel && !modelExists(customModel)) {
-          models.push({
-            id: customModel,
-            name: customModel,
-            provider: "anthropic",
-          })
-        }
-      }
-
-      // For OpenRouter and AWS, show custom model or default
-      if (apiKeys.openrouter) {
-        const customModel = apiKeys.openrouterModel
-        if (customModel) {
-          models.push({
-            id: customModel,
-            name: customModel,
-            provider: "openrouter",
-          })
-        } else {
-          // Provide a default OpenRouter model if none specified
-          models.push({
-            id: DEFAULT_MODELS.openrouter.id,
-            name: DEFAULT_MODELS.openrouter.name,
-            provider: "openrouter",
-          })
-        }
-      }
-
-      if (apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey) {
-        const customModel = apiKeys.awsModel
-        if (customModel) {
-          models.push({
-            id: customModel,
-            name: customModel,
-            provider: "aws",
-          })
-        } else {
-          // Provide a default AWS Bedrock model if none specified
-          models.push({
-            id: DEFAULT_MODELS.aws.id,
-            name: DEFAULT_MODELS.aws.name,
-            provider: "aws",
-          })
-        }
-      }
-
-      // Determine default model based on last selected model
-      // This ensures the user's last selection is preserved
-      let selectedProvider: string | undefined
-
-      if (apiKeys.lastSelectedModel && apiKeys.lastSelectedProvider) {
-        defaultModel = apiKeys.lastSelectedModel
-        selectedProvider = apiKeys.lastSelectedProvider
-      } else {
-        // Fallback to priority order if no last selection
-        // Priority: OpenRouter > Anthropic > OpenAI > AWS
-        if (apiKeys.openrouter) {
-          defaultModel = apiKeys.openrouterModel || DEFAULT_MODELS.openrouter.id
-          selectedProvider = "openrouter"
-        } else if (apiKeys.anthropic) {
-          defaultModel =
-            apiKeys.anthropicModel ||
-            models.find((m) => m.provider === "anthropic")?.id
-          selectedProvider = "anthropic"
-        } else if (apiKeys.openai) {
-          defaultModel =
-            apiKeys.openaiModel ||
-            models.find((m) => m.provider === "openai")?.id
-          selectedProvider = "openai"
-        } else if (apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey) {
-          defaultModel = apiKeys.awsModel || DEFAULT_MODELS.aws.id
-          selectedProvider = "aws"
-        } else if (models.length > 0) {
-          // If models exist but no specific model selected, use first available
-          defaultModel = models[0].id
-          selectedProvider = models[0].provider
-        }
-      }
-
-      // If no API keys configured at all, show "Default"
-      if (models.length === 0) {
-        defaultModel = "Default"
-      }
-
-      return c.json({
-        models,
-        defaultModel,
-        selectedProvider,
-      })
+    if (!userRecord) {
+      return c.json({ error: "User not found" }, 404)
     }
-  )
+
+    const apiKeys = (userRecord.apiKeys || {}) as Record<string, string>
+    const models: Array<{ id: string; name: string; provider: string }> = []
+    let defaultModel: string | undefined
+
+    // Import available models list
+    const { AVAILABLE_MODELS, DEFAULT_MODELS } =
+      await import("@/lib/available-models")
+
+    // Helper function to check if a model ID already exists in the models array
+    const modelExists = (modelId: string) =>
+      models.some((m) => m.id === modelId)
+
+    // Priority order: OpenRouter > Anthropic > OpenAI > AWS > Default
+
+    // Add models for OpenAI and Anthropic (dropdown list)
+    if (apiKeys.openai) {
+      // Add predefined models
+      AVAILABLE_MODELS.openai.forEach((model) => {
+        models.push({ ...model, provider: "openai" })
+      })
+
+      // Add custom model if user specified one in settings and it's not already in the list
+      const customModel = apiKeys.openaiModel
+      if (customModel && !modelExists(customModel)) {
+        models.push({
+          id: customModel,
+          name: customModel,
+          provider: "openai",
+        })
+      }
+    }
+
+    if (apiKeys.anthropic) {
+      // Add predefined models
+      AVAILABLE_MODELS.anthropic.forEach((model) => {
+        models.push({ ...model, provider: "anthropic" })
+      })
+
+      // Add custom model if user specified one in settings and it's not already in the list
+      const customModel = apiKeys.anthropicModel
+      if (customModel && !modelExists(customModel)) {
+        models.push({
+          id: customModel,
+          name: customModel,
+          provider: "anthropic",
+        })
+      }
+    }
+
+    // For OpenRouter and AWS, show custom model or default
+    if (apiKeys.openrouter) {
+      const customModel = apiKeys.openrouterModel
+      if (customModel) {
+        models.push({
+          id: customModel,
+          name: customModel,
+          provider: "openrouter",
+        })
+      } else {
+        // Provide a default OpenRouter model if none specified
+        models.push({
+          id: DEFAULT_MODELS.openrouter.id,
+          name: DEFAULT_MODELS.openrouter.name,
+          provider: "openrouter",
+        })
+      }
+    }
+
+    if (apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey) {
+      const customModel = apiKeys.awsModel
+      if (customModel) {
+        models.push({
+          id: customModel,
+          name: customModel,
+          provider: "aws",
+        })
+      } else {
+        // Provide a default AWS Bedrock model if none specified
+        models.push({
+          id: DEFAULT_MODELS.aws.id,
+          name: DEFAULT_MODELS.aws.name,
+          provider: "aws",
+        })
+      }
+    }
+
+    // Determine default model based on last selected model
+    // This ensures the user's last selection is preserved
+    let selectedProvider: string | undefined
+
+    if (apiKeys.lastSelectedModel && apiKeys.lastSelectedProvider) {
+      defaultModel = apiKeys.lastSelectedModel
+      selectedProvider = apiKeys.lastSelectedProvider
+    } else {
+      // Fallback to priority order if no last selection
+      // Priority: OpenRouter > Anthropic > OpenAI > AWS
+      if (apiKeys.openrouter) {
+        defaultModel = apiKeys.openrouterModel || DEFAULT_MODELS.openrouter.id
+        selectedProvider = "openrouter"
+      } else if (apiKeys.anthropic) {
+        defaultModel =
+          apiKeys.anthropicModel ||
+          models.find((m) => m.provider === "anthropic")?.id
+        selectedProvider = "anthropic"
+      } else if (apiKeys.openai) {
+        defaultModel =
+          apiKeys.openaiModel || models.find((m) => m.provider === "openai")?.id
+        selectedProvider = "openai"
+      } else if (apiKeys.awsAccessKeyId && apiKeys.awsSecretAccessKey) {
+        defaultModel = apiKeys.awsModel || DEFAULT_MODELS.aws.id
+        selectedProvider = "aws"
+      } else if (models.length > 0) {
+        // If models exist but no specific model selected, use first available
+        defaultModel = models[0].id
+        selectedProvider = models[0].provider
+      }
+    }
+
+    // If no API keys configured at all, show "Default"
+    if (models.length === 0) {
+      defaultModel = "Default"
+    }
+
+    return c.json({
+      models,
+      defaultModel,
+      selectedProvider,
+    })
+  })
   // #endregion
   // #region PUT /selected-model
   .put(
@@ -736,7 +723,7 @@ export const userRouter = createRouter()
       z.object({
         provider: z.enum(["anthropic", "openai", "openrouter", "aws"]),
         modelId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const userId = c.get("user").id
@@ -775,6 +762,6 @@ export const userRouter = createRouter()
         success: true,
         message: "Selected model updated successfully",
       })
-    }
+    },
   )
 // #endregion

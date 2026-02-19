@@ -42,5 +42,5 @@ export type ApplyMergedFileArgs = FileMergeResult & {
 }
 
 export type GetCurrentFileContentFn = (
-  filePath: string
+  filePath: string,
 ) => Promise<string> | string

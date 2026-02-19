@@ -17,7 +17,7 @@ function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
 
 const debouncedSetItem = debounce(
   (name: string, value: string) => localStorage.setItem(name, value),
-  1000
+  1000,
 )
 
 const createAppStore = () =>
@@ -41,8 +41,8 @@ const createAppStore = () =>
         onRehydrateStorage: () => (state) => {
           state?.setHasHydrated(true)
         },
-      }
-    )
+      },
+    ),
   )
 
 export { createAppStore, type Slices }

@@ -18,7 +18,7 @@ type SocketHandler = (options: any) => Promise<any> | any
 export const createProjectHandlers = (
   project: Project,
   connection: ConnectionInfo,
-  context: ServerContext
+  context: ServerContext,
 ) => {
   const { dokkuClient, gitClient } = context
   const lockManager = new LockManager()
@@ -46,7 +46,7 @@ export const createProjectHandlers = (
   }) => {
     if (!dokkuClient) {
       throw new Error(
-        "Failed to retrieve app creation timestamp: No Dokku client"
+        "Failed to retrieve app creation timestamp: No Dokku client",
       )
     }
     return {
@@ -67,7 +67,7 @@ export const createProjectHandlers = (
     }
     if (!dokkuClient.isConnected) {
       console.log(
-        "Failed to check app existence: The Dokku client is not connected"
+        "Failed to check app existence: The Dokku client is not connected",
       )
       return { success: false }
     }
@@ -105,10 +105,10 @@ export const createProjectHandlers = (
           if (port) {
             connection.socket.emit(
               "previewURL",
-              "https://" + project.container?.getHost(port)
+              "https://" + project.container?.getHost(port),
             )
           }
-        }
+        },
       )
     })
   }

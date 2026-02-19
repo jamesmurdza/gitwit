@@ -14,7 +14,10 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { enableEditorShortcuts } from "../layout/utils/shortcuts"
 import { useFileTree } from "./useFile"
 import { loadAndApplyTSConfig } from "./lib/tsconfig-loader"
-import { useGenerateWidgetEffect, useSuggestionWidgetEffect } from "./useEditorWidgets"
+import {
+  useGenerateWidgetEffect,
+  useSuggestionWidgetEffect,
+} from "./useEditorWidgets"
 
 export interface UseEditorProps {
   fileId: string
@@ -40,14 +43,13 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
   const { terminalRef, gridRef } = useEditorContext()
   const { creatingTerminal, createNewTerminal } = useTerminal()
   const draft = useAppStore((s) => s.drafts[fileId ?? ""])
-  const { data: serverFileContent = "" } =
-    fileRouter.fileContent.useQuery({
-      enabled: !!fileId,
-      variables: { fileId, projectId },
-      select(data) {
-        return data.data
-      },
-    })
+  const { data: serverFileContent = "" } = fileRouter.fileContent.useQuery({
+    enabled: !!fileId,
+    variables: { fileId, projectId },
+    select(data) {
+      return data.data
+    },
+  })
   // Editor state - Locally managed
   const [editorRef, setEditorRef] = useState<
     monaco.editor.IStandaloneCodeEditor | undefined
@@ -290,8 +292,13 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
 
   // Widget effects (extracted into useEditorWidgets.ts)
   useGenerateWidgetEffect(
-    editorRef, generate, setGenerate, cursorLine,
-    generateRef, generateWidgetRef, setShowSuggestion,
+    editorRef,
+    generate,
+    setGenerate,
+    cursorLine,
+    generateRef,
+    generateWidgetRef,
+    setShowSuggestion,
   )
   useSuggestionWidgetEffect(editorRef, isSelected, suggestionRef)
 

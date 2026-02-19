@@ -49,7 +49,7 @@ export default function ProfileCard({
     const totalSandboxes = sandboxes.length
     const totalLikes = sandboxes.reduce(
       (sum, sandbox) => sum + sandbox.likeCount,
-      0
+      0,
     )
 
     return {
@@ -65,10 +65,16 @@ export default function ProfileCard({
         <div className="flex flex-col gap-2 items-center w-full max-w-full overflow-hidden">
           <Avatar name={name} avatarUrl={avatarUrl} className="size-36" />
           <div className="space-y-1 w-full max-w-full px-2">
-            <CardTitle className="text-2xl text-center break-words">{name}</CardTitle>
+            <CardTitle className="text-2xl text-center break-words">
+              {name}
+            </CardTitle>
             <CardDescription className="text-center break-words">{`@${username}`}</CardDescription>
           </div>
-          {bio && <p className="text-sm text-center break-words px-2 w-full max-w-full">{bio}</p>}
+          {bio && (
+            <p className="text-sm text-center break-words px-2 w-full max-w-full">
+              {bio}
+            </p>
+          )}
           {((Array.isArray(socialLinks) && socialLinks.length > 0) ||
             personalWebsite) && (
             <div className="flex gap-2 justify-center">

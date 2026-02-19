@@ -25,12 +25,12 @@ interface ChatSlice {
   updateMessage: (
     threadId: string,
     messageIndex: number,
-    content: string
+    content: string,
   ) => void
   updateMessageById: (
     threadId: string,
     messageId: string,
-    content: string
+    content: string,
   ) => void
   updateThreadTitle: (threadId: string, title: string) => void
 

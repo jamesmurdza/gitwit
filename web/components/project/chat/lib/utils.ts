@@ -31,7 +31,7 @@ const getAllFiles = (items: (TFile | TFolder)[]): TFile[] => {
     } else if (item.type === "folder") {
       // Check if folder should be ignored
       const isIgnoredFolder = ignoredFolders.some(
-        (folder: string) => folder === item.name
+        (folder: string) => folder === item.name,
       )
 
       if (!isIgnoredFolder && item.children && Array.isArray(item.children)) {
@@ -77,7 +77,7 @@ const processCodeContext = async ({
       fileRouter.fileContent.getOptions({
         fileId: tab.id,
         projectId: projectId,
-      })
+      }),
     )
     return `Code from ${tab.name}${lineInfo}:\n\`\`\`${language}\n${data.data}\n\`\`\``
   } catch (error) {
@@ -102,30 +102,30 @@ const getCombinedContext = async ({
   const contextMessages: string[] = []
 
   const codeContextTabs = contextTabs.filter(
-    (tab): tab is ContextTab & { type: "code" } => tab.type === "code"
+    (tab): tab is ContextTab & { type: "code" } => tab.type === "code",
   )
   const textContextTabs = contextTabs.filter(
-    (tab): tab is ContextTab & { type: "text" } => tab.type === "text"
+    (tab): tab is ContextTab & { type: "text" } => tab.type === "text",
   )
   const fileContextTabs = contextTabs.filter(
-    (tab): tab is ContextTab & { type: "file" } => tab.type === "file"
+    (tab): tab is ContextTab & { type: "file" } => tab.type === "file",
   )
   const imageContextTabs = contextTabs.filter(
-    (tab): tab is ContextTab & { type: "image" } => tab.type === "image"
+    (tab): tab is ContextTab & { type: "image" } => tab.type === "image",
   )
 
   if (codeContextTabs.length > 0) {
     const codeContexts = await Promise.all(
       codeContextTabs.map((tab) =>
-        processCodeContext({ tab, queryClient, projectId, drafts })
-      )
+        processCodeContext({ tab, queryClient, projectId, drafts }),
+      ),
     )
     contextMessages.push(...codeContexts)
   }
 
   textContextTabs.forEach((tab) => {
     contextMessages.push(
-      `Text snippet ${tab.name}:\n\`\`\`text\n${tab.content}\n\`\`\``
+      `Text snippet ${tab.name}:\n\`\`\`text\n${tab.content}\n\`\`\``,
     )
   })
 
@@ -135,7 +135,7 @@ const getCombinedContext = async ({
       .replace(/\n```$/, "")
     const fileExt = tab.name.split(".").pop() || "txt"
     contextMessages.push(
-      `File ${tab.name}:\n\`\`\`${fileExt}\n${cleanContent}\n\`\`\``
+      `File ${tab.name}:\n\`\`\`${fileExt}\n${cleanContent}\n\`\`\``,
     )
   })
 
@@ -164,7 +164,7 @@ const stringifyContent = (content: any, seen = new WeakSet()): string => {
   // Handle React elements
   if (React.isValidElement(content)) {
     return React.Children.toArray(
-      (content as React.ReactElement).props.children
+      (content as React.ReactElement).props.children,
     )
       .map((child) => stringifyContent(child, seen))
       .join("")
@@ -183,7 +183,7 @@ const stringifyContent = (content: any, seen = new WeakSet()): string => {
     seen.add(content)
     try {
       const pairs = Object.entries(content).map(
-        ([key, value]) => `${key}: ${stringifyContent(value, seen)}`
+        ([key, value]) => `${key}: ${stringifyContent(value, seen)}`,
       )
       return "{" + pairs.join(", ") + "}"
     } catch (error) {
@@ -205,7 +205,7 @@ const normalizePath = (p?: string | null): string =>
  */
 const pathMatchesTab = (
   path: string,
-  tab?: { id?: string; name?: string }
+  tab?: { id?: string; name?: string },
 ): boolean => {
   if (!tab?.id || !tab?.name) return false
   return (
@@ -232,25 +232,26 @@ export {
   normalizePath,
   pathMatchesTab,
   shouldTreatAsContext,
-  stringifyContent
+  stringifyContent,
 }
 
-
 export function findPanelByPath(
-  dockApi: { getPanel: (id: string) => { api: { setActive: () => void } } | undefined; panels: { id: string }[] } | null,
-  filePath: string
+  dockApi: {
+    getPanel: (id: string) => { api: { setActive: () => void } } | undefined
+    panels: { id: string }[]
+  } | null,
+  filePath: string,
 ): { api: { setActive: () => void } } | undefined {
   if (!dockApi?.panels?.length) return undefined
   const normalized = normalizePath(filePath)
   const exact = dockApi.getPanel(normalized)
   if (exact) return exact
-  
+
   const found = dockApi.panels.find((p) =>
     pathMatchesTab(normalized, {
       id: p.id,
       name: p.id.split("/").pop() || p.id,
-    })
+    }),
   )
   return found ? dockApi.getPanel(found.id) : undefined
 }
-

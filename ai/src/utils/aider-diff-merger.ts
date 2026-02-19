@@ -28,7 +28,7 @@ export interface AiderDiffBlock {
  */
 export function parseAiderDiff(
   snippet: string,
-  defaultFilePath?: string
+  defaultFilePath?: string,
 ): AiderDiffBlock[] {
   const blocks: AiderDiffBlock[] = []
   // Remove leading/trailing whitespace
@@ -210,7 +210,7 @@ function parseBlocks(blockContent: string): Omit<AiderDiffBlock, "filePath">[] {
     // Don't trim the entire block - preserve exact structure and indentation
     let searchText = blockContent.substring(
       searchStart + searchMarker.length,
-      separatorPos
+      separatorPos,
     )
     // Only remove leading/trailing newlines, preserve everything else
     searchText = searchText.replace(/^\n+|\n+$/g, "")
@@ -219,7 +219,7 @@ function parseBlocks(blockContent: string): Omit<AiderDiffBlock, "filePath">[] {
     // Don't trim the entire block - preserve exact structure and indentation
     let replaceText = blockContent.substring(
       separatorPos + separator.length,
-      replaceEnd
+      replaceEnd,
     )
     // Only remove leading/trailing newlines, preserve everything else
     replaceText = replaceText.replace(/^\n+|\n+$/g, "")
@@ -302,7 +302,7 @@ function findBlockInCode(code: string, searchLines: string[]): number | null {
 function preserveIndentation(
   originalLines: string[],
   replaceLines: string[],
-  searchLines: string[]
+  searchLines: string[],
 ): string[] {
   const result: string[] = []
 
@@ -352,7 +352,7 @@ function preserveIndentation(
 export function mergeAiderDiff(
   originalCode: string,
   diffSnippet: string,
-  filePath?: string
+  filePath?: string,
 ): string {
   const blocks = parseAiderDiff(diffSnippet, filePath)
 
@@ -394,7 +394,7 @@ export function mergeAiderDiff(
     const replacementLines = preserveIndentation(
       matchedOriginalLines,
       block.replaceLines,
-      block.searchLines
+      block.searchLines,
     )
     const replacement = replacementLines.join("\n")
 

@@ -36,7 +36,7 @@ export class Terminal {
     if (this.pty) {
       await this.container.pty.sendInput(
         this.pty.pid,
-        new TextEncoder().encode(data)
+        new TextEncoder().encode(data),
       )
     } else {
       console.log("Cannot send data because pty is not initialized.")

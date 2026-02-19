@@ -18,7 +18,7 @@ export default function createApp() {
       {
         message: `Route not found - ${c.req.path}`,
       },
-      404
+      404,
     )
   })
 
@@ -36,7 +36,7 @@ export default function createApp() {
 
         stack: env.NODE_ENV === "production" ? undefined : err.stack,
       },
-      statusCode
+      statusCode,
     )
   })
 

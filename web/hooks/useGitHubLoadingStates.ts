@@ -15,7 +15,7 @@ const MUTATION_KEYS = {
 type LoadingStates = Record<keyof typeof MUTATION_KEYS, boolean>
 
 const DEFAULT_STATES: LoadingStates = Object.fromEntries(
-  Object.keys(MUTATION_KEYS).map((key) => [key, false])
+  Object.keys(MUTATION_KEYS).map((key) => [key, false]),
 ) as LoadingStates
 
 export function useGitHubLoadingStates() {
@@ -35,16 +35,16 @@ export function useGitHubLoadingStates() {
             (m) =>
               m.options.mutationKey?.[0] === "github" &&
               m.options.mutationKey?.[1] === mutationKey &&
-              m.state.status === "pending"
+              m.state.status === "pending",
           ),
-        ])
+        ]),
       ) as LoadingStates
 
       // Only update if states actually changed
       const hasChanged = Object.keys(newStates).some(
         (key) =>
           newStates[key as keyof typeof newStates] !==
-          latestStatesRef.current[key as keyof typeof latestStatesRef.current]
+          latestStatesRef.current[key as keyof typeof latestStatesRef.current],
       )
 
       if (hasChanged) {

@@ -10,7 +10,10 @@ import {
   PrecomputeMergeArgs,
 } from "../chat/lib/types"
 import { normalizePath, pathMatchesTab } from "../chat/lib/utils"
-import { applyKeepToSession, applyRejectToSession } from "./lib/diff-session-utils"
+import {
+  applyKeepToSession,
+  applyRejectToSession,
+} from "./lib/diff-session-utils"
 import { resolveMergeResult } from "./lib/merge-resolver"
 
 interface UseAIFileActionsProps {
@@ -40,7 +43,12 @@ export function useAIFileActions({
 }: UseAIFileActionsProps) {
   const getDraft = useAppStore((s) => s.getDraft)
 
-  const pendingDiffsQueueRef = useRef<Map<string, { code: string; language?: string; options?: Record<string, unknown> }>>(new Map())
+  const pendingDiffsQueueRef = useRef<
+    Map<
+      string,
+      { code: string; language?: string; options?: Record<string, unknown> }
+    >
+  >(new Map())
   const pendingApplyReadyRef = useRef<
     Map<string, { mergedCode: string; originalCode: string }>
   >(new Map())

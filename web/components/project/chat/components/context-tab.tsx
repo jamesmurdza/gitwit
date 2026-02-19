@@ -26,7 +26,7 @@ const ContextTab = memo(
   (
     props: ContextTab & {
       removeContext?: (id: string) => void
-    }
+    },
   ) => {
     const lineRange =
       props.type === "code" && props.lineRange
@@ -56,7 +56,7 @@ const ContextTab = memo(
         )}
       </div>
     )
-  }
+  },
 )
 
 export { ContextTab }

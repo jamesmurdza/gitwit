@@ -4,12 +4,9 @@ import { inferFnData, router } from "react-query-kit"
 
 function parseGithubError(
   data: { message?: string; data?: string },
-  fallback: string
+  fallback: string,
 ): string {
-  if (
-    typeof data.message === "string" &&
-    typeof data.data === "string"
-  ) {
+  if (typeof data.message === "string" && typeof data.data === "string") {
     const match = data.data.match(/{.*}/)
     if (match) {
       try {
@@ -77,7 +74,10 @@ export const githubRouter = router("github", {
       if (!res.ok) {
         throw new Error("Failed to get GitHub auth URL")
       }
-      const data = (await res.json()) as { success: boolean; data: { auth_url: string } }
+      const data = (await res.json()) as {
+        success: boolean
+        data: { auth_url: string }
+      }
       return data
     },
   }),
@@ -151,7 +151,9 @@ export const githubRouter = router("github", {
   checkPullStatus: router.query({
     fetcher: async ({ projectId }: { projectId: string }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Hono can't type compound path segments
-      const res = await (apiClient.github.repo as Record<string, any>)["pull/check"].$get({
+      const res = await (apiClient.github.repo as Record<string, any>)[
+        "pull/check"
+      ].$get({
         query: { projectId },
       })
       if (!res.ok) {
@@ -171,7 +173,9 @@ export const githubRouter = router("github", {
   getChangedFiles: router.query({
     fetcher: async ({ projectId }: { projectId: string }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Hono can't type compound path segments
-      const res = await (apiClient.github.repo as Record<string, any>)["changed-files"].$get({
+      const res = await (apiClient.github.repo as Record<string, any>)[
+        "changed-files"
+      ].$get({
         query: { projectId },
       })
       if (!res.ok) {
@@ -193,16 +197,25 @@ export const githubRouter = router("github", {
         },
       })
       const data = (await res.json()) as ApiMsg & {
-        data?: {
-          success: boolean
-          conflicts: Array<{ path: string; localContent: string; incomingContent: string }>
-          newFiles: string[]
-          deletedFiles: string[]
-          updatedFiles: string[]
-        } | string
+        data?:
+          | {
+              success: boolean
+              conflicts: Array<{
+                path: string
+                localContent: string
+                incomingContent: string
+              }>
+              newFiles: string[]
+              deletedFiles: string[]
+              updatedFiles: string[]
+            }
+          | string
       }
       if (!res.ok) {
-        const errData = { message: data.message, data: typeof data.data === "string" ? data.data : undefined }
+        const errData = {
+          message: data.message,
+          data: typeof data.data === "string" ? data.data : undefined,
+        }
         throw new Error(parseGithubError(errData, "Failed to pull from GitHub"))
       }
       return data
@@ -350,7 +363,10 @@ export const fileRouter = router("file", {
       if (!res.ok) {
         throw new Error("Failed to fetch file tree")
       }
-      const data = (await res.json()) as { success: boolean; data: (TFile | TFolder)[] }
+      const data = (await res.json()) as {
+        success: boolean
+        data: (TFile | TFolder)[]
+      }
       return data
     },
   }),
@@ -491,7 +507,13 @@ export const aiApiRouter = router("ai", {
       }
     }) => {
       const res = await apiClient.ai["process-edit"].$post({
-        json: { messages: messages as Array<{ role: "user" | "assistant"; content: string }>, context },
+        json: {
+          messages: messages as Array<{
+            role: "user" | "assistant"
+            content: string
+          }>,
+          context,
+        },
       })
       if (!res.ok) {
         throw new Error("Failed to process edit")

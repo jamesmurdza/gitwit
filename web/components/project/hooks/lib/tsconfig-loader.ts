@@ -1,6 +1,4 @@
-import {
-  defaultCompilerOptions,
-} from "@/lib/monaco/config"
+import { defaultCompilerOptions } from "@/lib/monaco/config"
 import { parseTSConfigToMonacoOptions } from "@/lib/monaco/parse-tsconfig"
 import { TFile, TFolder } from "@/lib/types"
 import { deepMerge } from "@/lib/utils"

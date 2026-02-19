@@ -66,7 +66,7 @@ function useFileSelection(file: TFile) {
             name: p.id.split("/").pop() || p.id,
           }),
         ) ?? undefined
-        
+
       if (existingPanel) {
         existingPanel.api.setActive()
       } else {

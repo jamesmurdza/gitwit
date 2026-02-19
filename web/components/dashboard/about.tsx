@@ -26,13 +26,14 @@ export default function AboutModal({
             custom AI code autocompletion and real-time collaboration.
           </div> */}
           <div className="text-sm text-muted-foreground">
-            Get help and support through our Discord community or by creating issues on GitHub:
+            Get help and support through our Discord community or by creating
+            issues on GitHub:
           </div>
           <div className="space-y-2">
             <div className="text-sm">
-              <a 
-                href="https://discord.gitwit.dev/" 
-                target="_blank" 
+              <a
+                href="https://discord.gitwit.dev/"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
@@ -40,9 +41,9 @@ export default function AboutModal({
               </a>
             </div>
             <div className="text-sm">
-              <a 
-                href="https://github.com/jamesmurdza/gitwit/issues" 
-                target="_blank" 
+              <a
+                href="https://github.com/jamesmurdza/gitwit/issues"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >

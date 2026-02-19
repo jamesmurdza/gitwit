@@ -30,7 +30,7 @@ export default function SandboxesPanel({
           visibility: newVisibility,
         })
       },
-    []
+    [],
   )
 
   const onDelete = useMemo(
@@ -40,7 +40,7 @@ export default function SandboxesPanel({
       await deleteSandbox(sandbox.id)
       setDeletingId("")
     },
-    []
+    [],
   )
   if (!isOwnProfile) {
     return (

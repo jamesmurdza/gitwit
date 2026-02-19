@@ -158,11 +158,7 @@ Follow these steps to call the `qwen.qwen3-32b-v1:0` model through Amazon Bedroc
      "Statement": [
        {
          "Effect": "Allow",
-         "Action": [
-           "bedrock:*",
-           "kms:GenerateDataKey",
-           "kms:Decrypt"
-         ],
+         "Action": ["bedrock:*", "kms:GenerateDataKey", "kms:Decrypt"],
          "Resource": "*"
        }
      ]

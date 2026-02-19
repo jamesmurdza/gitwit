@@ -11,7 +11,7 @@ export function useDiffSessionManager(
   getUnresolvedSnapshot: (fileId: string) => DiffSession | null,
   restoreFromSnapshot: (session: DiffSession) => void,
   clearVisuals: () => void,
-  forceClearAllDecorations: () => void
+  forceClearAllDecorations: () => void,
 ) {
   const activeTab = useAppStore((s) => s.activeTab)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
@@ -79,7 +79,7 @@ export function useDiffSessionManager(
       forceClearAllDecorations,
       getDiffSession,
       restoreFromSnapshot,
-    ]
+    ],
   )
 
   return {

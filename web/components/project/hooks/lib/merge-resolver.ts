@@ -4,9 +4,7 @@ import { FileMergeResult } from "../../chat/lib/types"
 interface MergeStatusAccessor {
   getMergeStatus?: (
     filePath: string,
-  ) =>
-    | { status: string; result?: FileMergeResult; error?: string }
-    | undefined
+  ) => { status: string; result?: FileMergeResult; error?: string } | undefined
 }
 
 /**

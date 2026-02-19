@@ -30,7 +30,7 @@ export class DecorationManager {
           startPos.lineNumber,
           startPos.column,
           endLineForRange,
-          endColumnForRange
+          endColumnForRange,
         ),
         text: "",
       },
@@ -76,9 +76,7 @@ export class DecorationManager {
 
     const hasClass = (lineNumber: number) => {
       const decorations = this.model.getLineDecorations(lineNumber) || []
-      return decorations.some(
-        (d) => d.options.className === className
-      )
+      return decorations.some((d) => d.options.className === className)
     }
 
     if (!hasClass(seedLine)) {
@@ -125,7 +123,7 @@ export class DecorationManager {
    */
   getModificationPartner(
     range: LineRange,
-    type: "added" | "removed"
+    type: "added" | "removed",
   ): LineRange | null {
     if (type === "removed") {
       // Look for added block after removed block
@@ -166,7 +164,7 @@ export class DecorationManager {
               monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
           },
         },
-      ]
+      ],
     )
 
     return decorationId

@@ -41,7 +41,7 @@ export type MessageContextValue = {
 }
 
 const MessageContext = React.createContext<MessageContextValue | undefined>(
-  undefined
+  undefined,
 )
 const useMessage = () => {
   const context = React.useContext(MessageContext)
@@ -63,27 +63,27 @@ const Message = ({
 }: MessageProps) => {
   return (
     <MessageContext.Provider value={{ role, context, messageId, onOpenFile }}>
-    <div
-      className={cn(
-        "flex gap-3",
-        role === "user" ? "justify-end" : "justify-start",
-        className
-      )}
-      {...props}
-    >
-      {role === "assistant" && onApplyCode && onRejectCode ? (
-        <CodeApplyProvider
-          onApplyCode={onApplyCode}
-          onRejectCode={onRejectCode}
-          messageId={messageId}
-        >
-          {children}
-        </CodeApplyProvider>
-      ) : (
-        children
-      )}
-    </div>
-  </MessageContext.Provider>
+      <div
+        className={cn(
+          "flex gap-3",
+          role === "user" ? "justify-end" : "justify-start",
+          className,
+        )}
+        {...props}
+      >
+        {role === "assistant" && onApplyCode && onRejectCode ? (
+          <CodeApplyProvider
+            onApplyCode={onApplyCode}
+            onRejectCode={onRejectCode}
+            messageId={messageId}
+          >
+            {children}
+          </CodeApplyProvider>
+        ) : (
+          children
+        )}
+      </div>
+    </MessageContext.Provider>
   )
 }
 
@@ -95,11 +95,7 @@ export type MessageAvatarProps = {
   className?: string
 }
 
-const MessageAvatar = ({
-  src,
-  alt,
-  className,
-}: MessageAvatarProps) => {
+const MessageAvatar = ({ src, alt, className }: MessageAvatarProps) => {
   return (
     <Avatar
       avatarUrl={src}
@@ -132,7 +128,7 @@ const MessageContent = ({
       isAssistant
         ? "bg-background text-foreground"
         : "bg-secondary text-secondary-foreground",
-      className
+      className,
     )
     return isAssistant ? (
       <Markdown className={classNames} onOpenFile={onOpenFile} {...props}>
@@ -159,7 +155,7 @@ const MessageContent = ({
     <div
       className={cn(
         "flex flex-col gap-0.5 max-w-full sm:max-w-full group pb-1",
-        role === "assistant" ? "items-start" : "items-end"
+        role === "assistant" ? "items-start" : "items-end",
       )}
     >
       {hasContext && (
@@ -173,7 +169,7 @@ const MessageContent = ({
 
       <MessageActions
         className={cn(
-          "opacity-0 transition-opacity duration-150 group-hover:opacity-100 flex-row-reverse"
+          "opacity-0 transition-opacity duration-150 group-hover:opacity-100 flex-row-reverse",
         )}
       >
         {isAssistant ? (
@@ -257,8 +253,9 @@ const MessageActions = ({
   </div>
 )
 
-export interface MessageActionProps
-  extends React.ComponentProps<typeof Button> {
+export interface MessageActionProps extends React.ComponentProps<
+  typeof Button
+> {
   label: React.ReactNode
 }
 
@@ -288,4 +285,3 @@ const MessageAction = ({
 }
 
 export { Message, MessageAction, MessageActions, MessageAvatar, MessageContent }
-

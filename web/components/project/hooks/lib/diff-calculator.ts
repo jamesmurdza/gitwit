@@ -14,7 +14,7 @@ import * as monaco from "monaco-editor"
 export function calculateDiff(
   originalCode: string,
   mergedCode: string,
-  config: DiffConfig = { ignoreWhitespace: false }
+  config: DiffConfig = { ignoreWhitespace: false },
 ): DiffResult {
   const combinedLines: string[] = []
   const decorations: monaco.editor.IModelDeltaDecoration[] = []
@@ -33,7 +33,7 @@ export function calculateDiff(
   const diffResult = diff.diffLines(
     normalizedOriginal,
     normalizedMerged,
-    config
+    config,
   )
 
   diffResult.forEach((part: diff.Change) => {
@@ -80,7 +80,7 @@ export function calculateDiff(
  */
 function processRemovedLines(
   value: string,
-  startLineNumber: number
+  startLineNumber: number,
 ): {
   lines: string[]
   decorations: monaco.editor.IModelDeltaDecoration[]
@@ -122,7 +122,7 @@ function processRemovedLines(
  */
 function processAddedLines(
   value: string,
-  startLineNumber: number
+  startLineNumber: number,
 ): {
   lines: string[]
   decorations: monaco.editor.IModelDeltaDecoration[]

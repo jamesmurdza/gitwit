@@ -149,7 +149,10 @@ export function debounce<T extends (...args: any[]) => void>(
 }
 
 // Deep merge utility function
-export const deepMerge = (target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> => {
+export const deepMerge = (
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+): Record<string, unknown> => {
   const output: Record<string, unknown> = { ...target }
   if (isObject(target) && isObject(source)) {
     Object.keys(source).forEach((key) => {
@@ -157,7 +160,10 @@ export const deepMerge = (target: Record<string, unknown>, source: Record<string
         if (!(key in target)) {
           Object.assign(output, { [key]: source[key] })
         } else {
-          output[key] = deepMerge(target[key] as Record<string, unknown>, source[key] as Record<string, unknown>)
+          output[key] = deepMerge(
+            target[key] as Record<string, unknown>,
+            source[key] as Record<string, unknown>,
+          )
         }
       } else {
         Object.assign(output, { [key]: source[key] })

@@ -132,7 +132,7 @@ describe("GET /api/project/like", () => {
 
   test("Should return like status", async () => {
     const response = await apiClient.get(
-      `/project/like?sandboxId=${createdSandboxId}&userId=${env.CLERK_TEST_USER_ID}`
+      `/project/like?sandboxId=${createdSandboxId}&userId=${env.CLERK_TEST_USER_ID}`,
     )
     const body = response.data
 
@@ -186,7 +186,7 @@ describe("POST /api/project (limit enforcement)", () => {
 
   afterAll(async () => {
     await Promise.all(
-      sandboxIds.map((id) => apiClient.delete(`/project?id=${id}`))
+      sandboxIds.map((id) => apiClient.delete(`/project?id=${id}`)),
     )
   })
 })

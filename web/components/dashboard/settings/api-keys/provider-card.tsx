@@ -112,7 +112,7 @@ export default function ProviderCard({
     if (provider === "aws") {
       if (!awsAccessKeyId || !awsSecretAccessKey) {
         toast.error(
-          "Please provide both AWS Access Key ID and Secret Access Key"
+          "Please provide both AWS Access Key ID and Secret Access Key",
         )
         return
       }

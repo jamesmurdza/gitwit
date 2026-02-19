@@ -10,7 +10,7 @@ async function withProject<T>(
   projectId: string,
   c: Context,
   action: string,
-  handler: (project: Project) => Promise<T>
+  handler: (project: Project) => Promise<T>,
 ): Promise<T | Response> {
   const project = new Project(projectId)
   await project.initialize()
@@ -22,7 +22,7 @@ async function withProject<T>(
       error instanceof Error ? error.message : "Unknown error"
     return c.json(
       { success: false, message: `Failed to ${action}: ${errorMessage}` },
-      500
+      500,
     )
   } finally {
     await project.disconnect()
@@ -38,7 +38,7 @@ export const fileRouter = createRouter()
       z.object({
         fileId: z.string(),
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { fileId, projectId } = c.req.valid("query")
@@ -61,7 +61,7 @@ export const fileRouter = createRouter()
           throw error
         }
       })
-    }
+    },
   )
 
   // Save file content
@@ -73,7 +73,7 @@ export const fileRouter = createRouter()
         fileId: z.string(),
         content: z.string(),
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { fileId, content, projectId } = c.req.valid("json")
@@ -82,9 +82,12 @@ export const fileRouter = createRouter()
           throw new Error("File manager not available")
         }
         await project.fileManager.saveFile(fileId, content)
-        return c.json({ success: true, message: "File saved successfully" }, 200)
+        return c.json(
+          { success: true, message: "File saved successfully" },
+          200,
+        )
       })
-    }
+    },
   )
 
   // Create a new file
@@ -95,7 +98,7 @@ export const fileRouter = createRouter()
       z.object({
         name: z.string(),
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { name, projectId } = c.req.valid("json")
@@ -111,10 +114,10 @@ export const fileRouter = createRouter()
               ? "File created successfully"
               : "Failed to create file",
           },
-          200
+          200,
         )
       })
-    }
+    },
   )
 
   // Delete a file
@@ -125,7 +128,7 @@ export const fileRouter = createRouter()
       z.object({
         fileId: z.string(),
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { fileId, projectId } = c.req.valid("query")
@@ -133,10 +136,10 @@ export const fileRouter = createRouter()
         const result = await project.fileManager?.deleteFile(fileId)
         return c.json(
           { success: true, message: "File deleted successfully", data: result },
-          200
+          200,
         )
       })
-    }
+    },
   )
 
   // Move a file
@@ -148,7 +151,7 @@ export const fileRouter = createRouter()
         fileId: z.string(),
         folderId: z.string(),
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { fileId, folderId, projectId } = c.req.valid("json")
@@ -156,10 +159,10 @@ export const fileRouter = createRouter()
         const result = await project.fileManager?.moveFile(fileId, folderId)
         return c.json(
           { success: true, message: "File moved successfully", data: result },
-          200
+          200,
         )
       })
-    }
+    },
   )
 
   // Rename a file
@@ -171,15 +174,18 @@ export const fileRouter = createRouter()
         fileId: z.string(),
         newName: z.string(),
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { fileId, newName, projectId } = c.req.valid("json")
       return withProject(projectId, c, "rename file", async (project) => {
         await project.fileManager?.renameFile(fileId, newName)
-        return c.json({ success: true, message: "File renamed successfully" }, 200)
+        return c.json(
+          { success: true, message: "File renamed successfully" },
+          200,
+        )
       })
-    }
+    },
   )
 
   // Create a folder
@@ -190,15 +196,18 @@ export const fileRouter = createRouter()
       z.object({
         name: z.string(),
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { name, projectId } = c.req.valid("json")
       return withProject(projectId, c, "create folder", async (project) => {
         await project.fileManager?.createFolder(name)
-        return c.json({ success: true, message: "Folder created successfully" }, 200)
+        return c.json(
+          { success: true, message: "Folder created successfully" },
+          200,
+        )
       })
-    }
+    },
   )
 
   // Delete a folder
@@ -209,18 +218,22 @@ export const fileRouter = createRouter()
       z.object({
         folderId: z.string(),
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { folderId, projectId } = c.req.valid("query")
       return withProject(projectId, c, "delete folder", async (project) => {
         const result = await project.fileManager?.deleteFolder(folderId)
         return c.json(
-          { success: true, message: "Folder deleted successfully", data: result },
-          200
+          {
+            success: true,
+            message: "Folder deleted successfully",
+            data: result,
+          },
+          200,
         )
       })
-    }
+    },
   )
 
   // Get folder contents
@@ -231,7 +244,7 @@ export const fileRouter = createRouter()
       z.object({
         folderId: z.string(),
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { folderId, projectId } = c.req.valid("query")
@@ -242,7 +255,7 @@ export const fileRouter = createRouter()
         }
         return c.json(folder, 200)
       })
-    }
+    },
   )
 
   // Download files as archive
@@ -252,7 +265,7 @@ export const fileRouter = createRouter()
       "query",
       z.object({
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { projectId } = c.req.valid("query")
@@ -263,7 +276,7 @@ export const fileRouter = createRouter()
         const archive = await project.fileManager.getFilesForDownload()
         return c.json({ archive })
       })
-    }
+    },
   )
 
   // Get file tree
@@ -273,7 +286,7 @@ export const fileRouter = createRouter()
       "query",
       z.object({
         projectId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { projectId } = c.req.valid("query")
@@ -281,7 +294,7 @@ export const fileRouter = createRouter()
         const fileTree = await project.fileManager?.getFileTree()
         return c.json({ success: true, data: fileTree }, 200)
       })
-    }
+    },
   )
 
   // Handle heartbeat
@@ -292,7 +305,7 @@ export const fileRouter = createRouter()
       z.object({
         projectId: z.string(),
         isOwner: z.boolean(),
-      })
+      }),
     ),
     async (c) => {
       const { projectId, isOwner } = c.req.valid("json")
@@ -307,5 +320,5 @@ export const fileRouter = createRouter()
         }
         return c.json({ success: true }, 200)
       })
-    }
+    },
   )

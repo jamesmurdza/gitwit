@@ -52,7 +52,7 @@ export default function UserButton({ userData }: { userData: User }) {
     TIER_INFO[userData.tier as keyof typeof TIER_INFO] || TIER_INFO.FREE
   const TierIcon = tierInfo.icon
   const usagePercentage = Math.floor(
-    ((userData.generations || 0) * 100) / tierInfo.limit
+    ((userData.generations || 0) * 100) / tierInfo.limit,
   )
 
   const handleUpgrade = async () => {
@@ -126,8 +126,8 @@ export default function UserButton({ userData }: { userData: User }) {
                   usagePercentage > 90
                     ? "bg-red-500"
                     : usagePercentage > 75
-                    ? "bg-yellow-500"
-                    : tierInfo.color.replace("text-", "bg-")
+                      ? "bg-yellow-500"
+                      : tierInfo.color.replace("text-", "bg-")
                 }`}
                 style={{
                   width: `${Math.min(usagePercentage, 100)}%`,

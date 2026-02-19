@@ -25,7 +25,7 @@ export class WidgetManager {
   constructor(
     private editorRef: monaco.editor.IStandaloneCodeEditor,
     private model: monaco.editor.ITextModel,
-    onWidgetsChanged?: (count: number) => void
+    onWidgetsChanged?: (count: number) => void,
   ) {
     this.decorationManager = new DecorationManager(model)
     this.onWidgetsChanged = onWidgetsChanged
@@ -94,11 +94,11 @@ export class WidgetManager {
     for (let lineNumber = 1; lineNumber <= maxLines; lineNumber++) {
       const isRemoved = this.decorationManager.lineHasClass(
         lineNumber,
-        "removed-line-decoration"
+        "removed-line-decoration",
       )
       const isAdded = this.decorationManager.lineHasClass(
         lineNumber,
-        "added-line-decoration"
+        "added-line-decoration",
       )
 
       if (!isRemoved && !isAdded) continue
@@ -143,7 +143,7 @@ export class WidgetManager {
    */
   private createWidgetForBlock(
     type: "added" | "removed",
-    anchorLine: number
+    anchorLine: number,
   ): {
     widget: monaco.editor.IContentWidget
     anchorDecorationId: string
@@ -155,7 +155,7 @@ export class WidgetManager {
     const { acceptHandler, rejectHandler } = this.createActionHandlers(
       type,
       anchorLine,
-      anchorDecorationId
+      anchorDecorationId,
     )
 
     const acceptButton = createDiffButton({
@@ -179,7 +179,7 @@ export class WidgetManager {
     const widget = createContentWidget(
       `diff-block-actions-${anchorLine}-${type}`,
       container,
-      () => this.calculateWidgetPosition(anchorDecorationId, anchorLine, type)
+      () => this.calculateWidgetPosition(anchorDecorationId, anchorLine, type),
     )
 
     this.editorRef.addContentWidget(widget)
@@ -198,14 +198,14 @@ export class WidgetManager {
   private createActionHandlers(
     type: "added" | "removed",
     anchorLine: number,
-    anchorDecorationId: string
+    anchorDecorationId: string,
   ) {
     const acceptHandler = () => {
       const safeAnchor = Math.min(anchorLine, this.model.getLineCount())
       const liveRange = this.decorationManager.getLiveRange(type, safeAnchor)
       const livePartner = this.decorationManager.getModificationPartner(
         liveRange,
-        type
+        type,
       )
 
       if (type === "removed") {
@@ -227,7 +227,7 @@ export class WidgetManager {
       const liveRange = this.decorationManager.getLiveRange(type, safeAnchor)
       const livePartner = this.decorationManager.getModificationPartner(
         liveRange,
-        type
+        type,
       )
 
       this.removeWidget(anchorDecorationId)
@@ -260,7 +260,7 @@ export class WidgetManager {
   private calculateWidgetPosition(
     anchorDecorationId: string,
     seedLine: number,
-    type: "added" | "removed"
+    type: "added" | "removed",
   ): monaco.editor.IContentWidgetPosition {
     const anchorRange = this.model.getDecorationRange(anchorDecorationId)
     const anchorLine = anchorRange
@@ -290,7 +290,7 @@ export class WidgetManager {
         widget.getId() ===
         `diff-block-actions-${anchorDecorationId
           .split("-")
-          .pop()}-${anchorDecorationId}`
+          .pop()}-${anchorDecorationId}`,
     )
 
     if (widgetIndex >= 0) {
@@ -337,13 +337,13 @@ export class WidgetManager {
         (decoration) =>
           decoration.options.className?.includes("removed-line-decoration") ||
           decoration.options.className?.includes("added-line-decoration") ||
-          decoration.options.className?.includes("diff-anchor-decoration")
+          decoration.options.className?.includes("diff-anchor-decoration"),
       )
 
       if (diffDecorations.length > 0) {
         this.model.deltaDecorations(
           diffDecorations.map((d) => d.id),
-          []
+          [],
         )
       }
 
@@ -373,11 +373,11 @@ export class WidgetManager {
     for (let lineNumber = 1; lineNumber <= maxLines; lineNumber++) {
       const isRemoved = this.decorationManager.lineHasClass(
         lineNumber,
-        "removed-line-decoration"
+        "removed-line-decoration",
       )
       const isAdded = this.decorationManager.lineHasClass(
         lineNumber,
-        "added-line-decoration"
+        "added-line-decoration",
       )
 
       if (!isRemoved && !isAdded) continue
@@ -422,14 +422,14 @@ export class WidgetManager {
     for (const block of blocks.reverse()) {
       const liveRange = this.decorationManager.getLiveRange(
         block.type,
-        Math.min(block.end, this.model.getLineCount())
+        Math.min(block.end, this.model.getLineCount()),
       )
 
       let livePartner = undefined
       if (block.type === "removed") {
         livePartner = this.decorationManager.getModificationPartner(
           liveRange,
-          block.type
+          block.type,
         )
       }
 
@@ -458,11 +458,11 @@ export class WidgetManager {
     for (const block of blocks.reverse()) {
       const liveRange = this.decorationManager.getLiveRange(
         block.type,
-        Math.min(block.end, this.model.getLineCount())
+        Math.min(block.end, this.model.getLineCount()),
       )
       const livePartner = this.decorationManager.getModificationPartner(
         liveRange,
-        block.type
+        block.type,
       )
 
       if (block.type === "added") {
