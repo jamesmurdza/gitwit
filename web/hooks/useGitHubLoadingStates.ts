@@ -1,18 +1,26 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
+const MUTATION_KEYS = {
+  isGettingAuthUrl: "gethAuthUrl",
+  isLoggingIn: "login",
+  isSyncingToGithub: "createCommit",
+  isCreatingRepo: "createRepo",
+  isDeletingRepo: "removeRepo",
+  isPulling: "pullFromGithub",
+  isResolvingConflicts: "resolveConflicts",
+  isLoggingOut: "logout",
+} as const
+
+type LoadingStates = Record<keyof typeof MUTATION_KEYS, boolean>
+
+const DEFAULT_STATES: LoadingStates = Object.fromEntries(
+  Object.keys(MUTATION_KEYS).map((key) => [key, false])
+) as LoadingStates
+
 export function useGitHubLoadingStates() {
   const queryClient = useQueryClient()
-  const [loadingStates, setLoadingStates] = useState({
-    isGettingAuthUrl: false,
-    isLoggingIn: false,
-    isSyncingToGithub: false,
-    isCreatingRepo: false,
-    isDeletingRepo: false,
-    isPulling: false,
-    isResolvingConflicts: false,
-    isLoggingOut: false,
-  })
+  const [loadingStates, setLoadingStates] = useState(DEFAULT_STATES)
 
   const latestStatesRef = useRef(loadingStates)
 
@@ -20,56 +28,17 @@ export function useGitHubLoadingStates() {
     const updateLoadingStates = () => {
       const mutations = queryClient.getMutationCache().getAll()
 
-      const newStates = {
-        isGettingAuthUrl: mutations.some(
-          (m) =>
-            m.options.mutationKey?.[0] === "github" &&
-            m.options.mutationKey?.[1] === "gethAuthUrl" &&
-            m.state.status === "pending"
-        ),
-        isLoggingIn: mutations.some(
-          (m) =>
-            m.options.mutationKey?.[0] === "github" &&
-            m.options.mutationKey?.[1] === "login" &&
-            m.state.status === "pending"
-        ),
-        isSyncingToGithub: mutations.some(
-          (m) =>
-            m.options.mutationKey?.[0] === "github" &&
-            m.options.mutationKey?.[1] === "createCommit" &&
-            m.state.status === "pending"
-        ),
-        isCreatingRepo: mutations.some(
-          (m) =>
-            m.options.mutationKey?.[0] === "github" &&
-            m.options.mutationKey?.[1] === "createRepo" &&
-            m.state.status === "pending"
-        ),
-        isDeletingRepo: mutations.some(
-          (m) =>
-            m.options.mutationKey?.[0] === "github" &&
-            m.options.mutationKey?.[1] === "removeRepo" &&
-            m.state.status === "pending"
-        ),
-        isPulling: mutations.some(
-          (m) =>
-            m.options.mutationKey?.[0] === "github" &&
-            m.options.mutationKey?.[1] === "pullFromGithub" &&
-            m.state.status === "pending"
-        ),
-        isResolvingConflicts: mutations.some(
-          (m) =>
-            m.options.mutationKey?.[0] === "github" &&
-            m.options.mutationKey?.[1] === "resolveConflicts" &&
-            m.state.status === "pending"
-        ),
-        isLoggingOut: mutations.some(
-          (m) =>
-            m.options.mutationKey?.[0] === "github" &&
-            m.options.mutationKey?.[1] === "logout" &&
-            m.state.status === "pending"
-        ),
-      }
+      const newStates = Object.fromEntries(
+        Object.entries(MUTATION_KEYS).map(([stateKey, mutationKey]) => [
+          stateKey,
+          mutations.some(
+            (m) =>
+              m.options.mutationKey?.[0] === "github" &&
+              m.options.mutationKey?.[1] === mutationKey &&
+              m.state.status === "pending"
+          ),
+        ])
+      ) as LoadingStates
 
       // Only update if states actually changed
       const hasChanged = Object.keys(newStates).some(
