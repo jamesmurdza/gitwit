@@ -14,6 +14,7 @@
   ],
   "scripts": {
     "build": "turbo build",
+    "build:web": "turbo build --filter=@gitwit/web",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "test": "turbo test",
