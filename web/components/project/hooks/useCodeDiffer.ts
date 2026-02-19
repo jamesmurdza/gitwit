@@ -101,88 +101,83 @@ export function useCodeDiffer({
     [onDiffChange, onDiffResolved],
   )
 
+  // Shared: replace widget manager, cleaning up the old one.
+  // Returns the new manager. Does NOT build widgets (caller controls timing).
+  const replaceWidgetManager = useCallback(
+    (
+      editor: monaco.editor.IStandaloneCodeEditor,
+      model: monaco.editor.ITextModel,
+      checkAndResolve: (count: number) => void,
+    ) => {
+      if (widgetManagerRef.current) {
+        suppressZeroNotifyRef.current = true
+        widgetManagerRef.current.cleanupAllWidgets()
+        suppressZeroNotifyRef.current = false
+      }
+      widgetManagerRef.current = new WidgetManager(editor, model, (count) => {
+        lastWidgetCountRef.current = count
+        checkAndResolve(count)
+      })
+      return widgetManagerRef.current
+    },
+    [],
+  )
+
+  // Shared: build widgets and run initial check
+  const buildAndCheck = useCallback(
+    (checkAndResolve: (count: number) => void) => {
+      if (!widgetManagerRef.current) return
+      suppressZeroNotifyRef.current = true
+      widgetManagerRef.current.buildAllWidgetsFromDecorations()
+      suppressZeroNotifyRef.current = false
+      checkAndResolve(widgetManagerRef.current.hasActiveWidgets() ? 1 : 0)
+    },
+    [],
+  )
+
   /**
    * Applies a diff view to the Monaco editor with interactive accept/reject buttons
-   *
-   * @param mergedCode - The new code content to compare against
-   * @param originalCode - The original code content
-   * @returns Monaco decorations collection for the diff view, or null if editor is not available
    */
   const handleApplyCode = useCallback(
     (
       mergedCode: string,
       originalCode: string,
     ): monaco.editor.IEditorDecorationsCollection | null => {
-      // Use the ref to get the latest editorRef value
       const currentEditorRef = editorRefRef.current
       if (!currentEditorRef) return null
       const model = currentEditorRef.getModel()
-      if (!model)
-        return null
+      if (!model) return null
 
-        // Store original content on model for potential restoration
       ;(model as any).originalContent = originalCode
       ;(model as any).mergedContent = mergedCode
 
-      const originalModelEOL = model.getEOL()
       const eolSequence =
-        originalModelEOL === "\r\n"
+        model.getEOL() === "\r\n"
           ? monaco.editor.EndOfLineSequence.CRLF
           : monaco.editor.EndOfLineSequence.LF
 
-      // Calculate diff using the modular diff calculator
       const diffResult = calculateDiff(originalCode, mergedCode, {
         ignoreWhitespace: false,
       })
 
-      // Apply the combined diff view to the editor
       model.setValue(diffResult.combinedLines.join("\n"))
-      // Reapply original EOL style so the last line does not appear changed on CRLF files
       model.setEOL(eolSequence)
 
-      // Create and return decorations collection
       const newDecorations = currentEditorRef.createDecorationsCollection(
         diffResult.decorations,
       )
-
       ;(model as any).granularBlocks = diffResult.granularBlocks
+      ;(model as any).diffDecorationsCollection = newDecorations
 
       const checkAndResolve = createCheckAndResolve(model, true)
+      replaceWidgetManager(currentEditorRef, model, checkAndResolve)
 
-      // Always create a new widget manager for each diff application
-      // This ensures it's bound to the current model
-      if (widgetManagerRef.current) {
-        suppressZeroNotifyRef.current = true
-        widgetManagerRef.current.cleanupAllWidgets()
-        suppressZeroNotifyRef.current = false
-      }
-      widgetManagerRef.current = new WidgetManager(
-        currentEditorRef,
-        model,
-        (count) => {
-          lastWidgetCountRef.current = count
-          checkAndResolve(count)
-        },
-      )
-
-      // Store decorations collection reference to prevent garbage collection
-      ;(model as any).diffDecorationsCollection = newDecorations
       currentEditorRef.layout()
-      requestAnimationFrame(() => {
-        if (!widgetManagerRef.current) return
-
-        suppressZeroNotifyRef.current = true
-        widgetManagerRef.current.buildAllWidgetsFromDecorations()
-        suppressZeroNotifyRef.current = false
-
-        // Manually check once after build is done
-        const hasWidgets = widgetManagerRef.current.hasActiveWidgets()
-        checkAndResolve(hasWidgets ? 1 : 0)
-      })
+      requestAnimationFrame(() => buildAndCheck(checkAndResolve))
 
       return newDecorations
     },
-    [createCheckAndResolve], // editorRef is accessed via ref, so no dependency needed
+    [createCheckAndResolve, replaceWidgetManager, buildAndCheck],
   )
 
   /**
@@ -282,7 +277,7 @@ export function useCodeDiffer({
       if (!currentEditorRef) return
       const model = currentEditorRef.getModel()
       if (!model) return
-      // Set combined text and EOL exactly as before
+
       model.setValue(session.combinedText)
       model.setEOL(
         session.eol === "CRLF"
@@ -293,57 +288,30 @@ export function useCodeDiffer({
       ;(model as any).mergedContent = session.mergedCode
 
       // Recreate diff decorations only for unresolved blocks
-      const decorations: monaco.editor.IModelDeltaDecoration[] = []
-      for (const block of session.unresolvedBlocks) {
-        for (let line = block.start; line <= block.end; line++) {
-          decorations.push({
-            range: new monaco.Range(line, 1, line, 1),
-            options: {
-              isWholeLine: true,
-              className:
-                block.type === "added"
-                  ? "added-line-decoration"
-                  : "removed-line-decoration",
-              glyphMarginClassName:
-                block.type === "added"
-                  ? "added-line-glyph"
-                  : "removed-line-glyph",
-              linesDecorationsClassName:
-                block.type === "added"
-                  ? "added-line-number"
-                  : "removed-line-number",
-            },
-          })
-        }
-      }
+      const decorations: monaco.editor.IModelDeltaDecoration[] =
+        session.unresolvedBlocks.flatMap((block) => {
+          const cls = block.type === "added" ? "added" : "removed"
+          return Array.from(
+            { length: block.end - block.start + 1 },
+            (_, i) => ({
+              range: new monaco.Range(block.start + i, 1, block.start + i, 1),
+              options: {
+                isWholeLine: true,
+                className: `${cls}-line-decoration`,
+                glyphMarginClassName: `${cls}-line-glyph`,
+                linesDecorationsClassName: `${cls}-line-number`,
+              },
+            }),
+          )
+        })
 
       currentEditorRef.createDecorationsCollection(decorations)
 
       const checkAndResolve = createCheckAndResolve(model, false)
-
-      // Rebuild widgets for current decorations
-      if (widgetManagerRef.current) {
-        suppressZeroNotifyRef.current = true
-        widgetManagerRef.current.cleanupAllWidgets()
-        suppressZeroNotifyRef.current = false
-      }
-      widgetManagerRef.current = new WidgetManager(
-        currentEditorRef,
-        model,
-        (count) => {
-          lastWidgetCountRef.current = count
-          checkAndResolve(count)
-        },
-      )
-
-      suppressZeroNotifyRef.current = true
-      widgetManagerRef.current.buildAllWidgetsFromDecorations()
-      suppressZeroNotifyRef.current = false
-
-      // Manually check once after build is done
-      checkAndResolve(widgetManagerRef.current.hasActiveWidgets() ? 1 : 0)
+      replaceWidgetManager(currentEditorRef, model, checkAndResolve)
+      buildAndCheck(checkAndResolve)
     },
-    [], // editorRef is accessed via ref
+    [createCheckAndResolve, replaceWidgetManager, buildAndCheck],
   )
 
   const clearVisuals = useCallback(() => {
