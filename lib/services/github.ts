@@ -58,7 +58,7 @@ export class GitHubManager {
   get octokit(): Octokit {
     if (!this._octokit) {
       throw new Error(
-        "GitHubManager.init() must be called before using octokit."
+        "GitHubManager.init() must be called before using octokit.",
       )
     }
     return this._octokit
@@ -67,7 +67,7 @@ export class GitHubManager {
   get username(): string {
     if (!this._username) {
       throw new Error(
-        "GitHubManager.init() must be called before using octokit."
+        "GitHubManager.init() must be called before using octokit.",
       )
     }
     return this._username
@@ -144,7 +144,7 @@ export class GitHubManager {
    *          If not found, returns { exists: false }
    */
   async repoExistsByID(
-    repoId: string
+    repoId: string,
   ): Promise<
     { exists: boolean; repoId: string; repoName: string } | { exists: false }
   > {
@@ -185,7 +185,7 @@ export class GitHubManager {
   async createCommit(
     repoID: string,
     files: Array<{ id: string; data: string }>,
-    message: string
+    message: string,
   ) {
     const username = this.username
     // First get repo name from ID
@@ -202,7 +202,7 @@ export class GitHubManager {
         owner: username,
         repo: repoName,
         ref: "heads/main",
-      }
+      },
     )
     const ref = refResponse?.data
 
@@ -216,7 +216,7 @@ export class GitHubManager {
         owner: username,
         repo: repoName,
         commit_sha: ref.object.sha,
-      }
+      },
     )
     if (!baseTreeResponse) {
       throw new Error("Failed to fetch base tree for commit.")
@@ -232,8 +232,8 @@ export class GitHubManager {
       const batch = files.slice(i, i + batchSize)
       console.log(
         `Processing batch ${i / batchSize + 1} of ${Math.ceil(
-          files.length / batchSize
-        )}`
+          files.length / batchSize,
+        )}`,
       )
 
       // Process each file in the batch sequentially
@@ -246,7 +246,7 @@ export class GitHubManager {
               repo: repoName,
               content: file.data,
               encoding: "utf-8",
-            }
+            },
           )
           if (!blobResponse) {
             throw new Error(`Failed to create blob for file: ${file.id}`)
@@ -276,7 +276,7 @@ export class GitHubManager {
         owner: username,
         repo: repoName,
         tree: blobs as any,
-      }
+      },
     )
     if (!treeResponse) {
       throw new Error("Failed to create tree for commit.")
@@ -292,7 +292,7 @@ export class GitHubManager {
         message,
         tree: tree.sha,
         parents: [ref.object.sha],
-      }
+      },
     )
     if (!newCommitResponse) {
       throw new Error("Failed to create new commit.")

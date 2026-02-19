@@ -49,7 +49,7 @@ describe("GET /api/github/user", () => {
     })
     response = await apiClient.get(
       `/github/user?userId=${env.CLERK_TEST_USER_ID}`,
-      {}
+      {},
     )
     body = response.data
   })

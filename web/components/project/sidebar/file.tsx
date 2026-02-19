@@ -6,7 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
-import { useContainer } from "@/context/container-context"
+import { useEditor } from "@/context/editor-context"
 import { getParentPath, useFileExplorer } from "@/context/FileExplorerContext"
 import { fileRouter } from "@/lib/api"
 import { TFile } from "@/lib/types"
@@ -37,7 +37,7 @@ const noopNull = () => null
 function useFileSelection(file: TFile) {
   const { id: projectId } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
-  const { dockRef } = useContainer()
+  const { dockRef } = useEditor()
   const diffFunctions = useAppStore((s) => s.diffFunctions)
 
   const { handleSetActiveTab } = useDiffSessionManager(
@@ -66,7 +66,7 @@ function useFileSelection(file: TFile) {
             name: p.id.split("/").pop() || p.id,
           }),
         ) ?? undefined
-        
+
       if (existingPanel) {
         existingPanel.api.setActive()
       } else {

@@ -1,4 +1,4 @@
-import { useContainer } from "@/context/container-context"
+import { useEditor } from "@/context/editor-context"
 import { useSocket } from "@/context/SocketContext"
 import { useTerminal } from "@/context/TerminalContext"
 import {
@@ -33,7 +33,7 @@ interface DockProps {}
 
 export function Dock(_props: DockProps) {
   const { resolvedTheme } = useTheme()
-  const { gridRef, dockRef, terminalRef } = useContainer()
+  const { gridRef, dockRef, terminalRef } = useEditor()
   const { isReady: isSocketReady } = useSocket()
   const { creatingTerminal, createNewTerminal } = useTerminal()
   const chatHandlers = useChatPanelHandlers()
@@ -98,7 +98,7 @@ export function Dock(_props: DockProps) {
     terminal: TerminalPanel,
   }
   const gridComponents: PanelCollection<IGridviewPanelProps> = {
-    dock: (props: IGridviewPanelProps) => {
+    dock: (_props: IGridviewPanelProps) => {
       const { resolvedTheme } = useTheme()
 
       return (
@@ -117,7 +117,7 @@ export function Dock(_props: DockProps) {
       )
     },
 
-    terminal: (props: IGridviewPanelProps) => {
+    terminal: (_props: IGridviewPanelProps) => {
       const { resolvedTheme } = useTheme()
 
       return (

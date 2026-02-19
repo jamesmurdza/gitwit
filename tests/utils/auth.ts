@@ -60,7 +60,7 @@ export class ClerkAuth {
             Authorization: `Bearer ${this.secretKey}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       )
       return response.data
     } catch (error) {
@@ -68,7 +68,7 @@ export class ClerkAuth {
       throw new Error(
         `Failed to create session: ${
           axiosError.response?.data || axiosError.message
-        }`
+        }`,
       )
     }
   }
@@ -91,7 +91,7 @@ export class ClerkAuth {
             Authorization: `Bearer ${this.secretKey}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       )
 
       return response.data.jwt
@@ -100,7 +100,7 @@ export class ClerkAuth {
       throw new Error(
         `Failed to generate session token: ${
           axiosError.response?.data || axiosError.message
-        }`
+        }`,
       )
     }
   }

@@ -84,12 +84,8 @@
           "name": "sandbox_user_id_user_id_fk",
           "tableFrom": "sandbox",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -99,9 +95,7 @@
         "sandbox_id_unique": {
           "name": "sandbox_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -138,12 +132,8 @@
           "name": "sandbox_likes_user_id_user_id_fk",
           "tableFrom": "sandbox_likes",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -151,12 +141,8 @@
           "name": "sandbox_likes_sandbox_id_sandbox_id_fk",
           "tableFrom": "sandbox_likes",
           "tableTo": "sandbox",
-          "columnsFrom": [
-            "sandbox_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sandbox_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -164,10 +150,7 @@
       "compositePrimaryKeys": {
         "sandbox_likes_sandbox_id_user_id_pk": {
           "name": "sandbox_likes_sandbox_id_user_id_pk",
-          "columns": [
-            "sandbox_id",
-            "user_id"
-          ]
+          "columns": ["sandbox_id", "user_id"]
         }
       },
       "uniqueConstraints": {},
@@ -284,16 +267,12 @@
         "user_id_unique": {
           "name": "user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "user_username_unique": {
           "name": "user_username_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "username"
-          ]
+          "columns": ["username"]
         }
       },
       "policies": {},
@@ -329,12 +308,8 @@
           "name": "users_to_sandboxes_userId_user_id_fk",
           "tableFrom": "users_to_sandboxes",
           "tableTo": "user",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -342,12 +317,8 @@
           "name": "users_to_sandboxes_sandboxId_sandbox_id_fk",
           "tableFrom": "users_to_sandboxes",
           "tableTo": "sandbox",
-          "columnsFrom": [
-            "sandboxId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sandboxId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

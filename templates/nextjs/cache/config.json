@@ -1,5 +1,5 @@
 {
-	"telemetry": {
-		"enabled": false
-	}
+  "telemetry": {
+    "enabled": false
+  }
 }

@@ -14,7 +14,7 @@ import { toast } from "sonner"
  * Shows a plus button specifically for the terminal group to add new terminal tabs.
  */
 export function TerminalRightHeaderActions(props: IDockviewHeaderActionsProps) {
-  const { group, containerApi, panels } = props
+  const { group, containerApi } = props
   const { isReady: isSocketReady } = useSocket()
 
   const { createNewTerminal } = useTerminal()

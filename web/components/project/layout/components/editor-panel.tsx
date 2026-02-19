@@ -1,4 +1,4 @@
-import { useEditorHandlers } from "@/context/editor-handlers-context"
+import { useEditor as useEditorContext } from "@/context/editor-context"
 import { useProjectContext } from "@/context/project-context"
 import { fileRouter } from "@/lib/api"
 import { defaultEditorOptions } from "@/lib/monaco/config"
@@ -26,7 +26,7 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>) {
   const {
     project: { id: projectId },
   } = useProjectContext()
-  const { registerHandlers, unregisterHandlers } = useEditorHandlers()
+  const { registerHandlers, unregisterHandlers } = useEditorContext()
   const { markFileActionStatus, latestAssistantId, messages } = useChat()
 
   const onDiffResolved = useCallback(
@@ -101,9 +101,7 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>) {
     forceClearAllDecorations,
   } = useCodeDiffer({
     editorRef: editor.editorRef || null,
-    onDiffChange: (session) => {
-      // Save session to global store if needed, or local
-    },
+    onDiffChange: () => {},
     onDiffResolved,
   })
 

@@ -25,7 +25,7 @@ const sidebarItems = [
     icon: Github,
   },
 ]
-export function SideBarPanel(props: IGridviewPanelProps<FilesPanelParams>) {
+export function SideBarPanel(_props: IGridviewPanelProps<FilesPanelParams>) {
   const {
     user: { id: userId },
   } = useProjectContext()

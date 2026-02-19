@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { useContainer } from "@/context/container-context"
+import { useEditor } from "@/context/editor-context"
 import { useTerminal } from "@/context/TerminalContext"
 import { Sandbox } from "@/lib/types"
 import { templateConfigs } from "@gitwit/templates"
@@ -19,7 +19,7 @@ export default function RunButtonModal({
   setIsRunning: (running: boolean) => void
   sandboxData: Sandbox
 }) {
-  const { gridRef, dockRef, terminalRef } = useContainer()
+  const { gridRef, dockRef, terminalRef } = useEditor()
   const { resolvedTheme } = useTheme()
   const {
     createNewTerminal,

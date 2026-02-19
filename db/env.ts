@@ -1,5 +1,3 @@
-import "zod-openapi/extend" // For extending the Zod schema with OpenAPI properties
-
 export const env = {
   // Server-side environment variables
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID as string,

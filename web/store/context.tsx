@@ -5,35 +5,33 @@ import { useStore } from "zustand"
 
 import { type Slices, createAppStore } from "@/store"
 
-export type CounterStoreApi = ReturnType<typeof createAppStore>
+export type AppStoreApi = ReturnType<typeof createAppStore>
 
-export const CounterStoreContext = createContext<CounterStoreApi | undefined>(
-  undefined
-)
+const AppStoreContext = createContext<AppStoreApi | undefined>(undefined)
 
 export interface AppStoreProviderProps {
   children: ReactNode
 }
 
 export const AppStoreProvider = ({ children }: AppStoreProviderProps) => {
-  const storeRef = useRef<CounterStoreApi | null>(null)
+  const storeRef = useRef<AppStoreApi | null>(null)
   if (storeRef.current === null) {
     storeRef.current = createAppStore()
   }
 
   return (
-    <CounterStoreContext.Provider value={storeRef.current}>
+    <AppStoreContext.Provider value={storeRef.current}>
       {children}
-    </CounterStoreContext.Provider>
+    </AppStoreContext.Provider>
   )
 }
 
 export const useAppStore = <T,>(selector: (store: Slices) => T): T => {
-  const counterStoreContext = useContext(CounterStoreContext)
+  const storeContext = useContext(AppStoreContext)
 
-  if (!counterStoreContext) {
+  if (!storeContext) {
     throw new Error(`useAppStore must be used within AppStoreProvider`)
   }
 
-  return useStore(counterStoreContext, selector)
+  return useStore(storeContext, selector)
 }

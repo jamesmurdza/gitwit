@@ -86,7 +86,7 @@ const UpdateErrorSchema = z.object({
         z.object({
           path: z.array(z.string()),
           message: z.string(),
-        })
+        }),
       ),
     ])
     .optional(),
@@ -94,13 +94,13 @@ const UpdateErrorSchema = z.object({
 
 interface FormState {
   message: string
-  error?: any
+  error?: unknown
   newRoute?: string
   fields?: Record<string, unknown>
 }
 export async function updateUser(
-  prevState: any,
-  formData: FormData
+  _prevState: FormState,
+  formData: FormData,
 ): Promise<FormState> {
   let data = Object.fromEntries(formData)
   let links: UserLink[] = []
@@ -161,7 +161,7 @@ export async function updateUser(
     if (error instanceof z.ZodError) {
       return {
         message: "Invalid data",
-        error: error.errors,
+        error: error.issues,
         fields: data,
       }
     }

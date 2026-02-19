@@ -1,35 +1,47 @@
 import * as monaco from "monaco-editor"
 
 export function parseTSConfigToMonacoOptions(
-  tsconfig: any
+  tsconfig: Record<string, unknown>,
 ): monaco.languages.typescript.CompilerOptions {
   const compilerOptions: monaco.languages.typescript.CompilerOptions = {}
 
+  const bool = (v: unknown): boolean | undefined =>
+    typeof v === "boolean" ? v : undefined
+  const str = (v: unknown): string | undefined =>
+    typeof v === "string" ? v : undefined
+  const strArr = (v: unknown): string[] | undefined =>
+    Array.isArray(v)
+      ? v.filter((x): x is string => typeof x === "string")
+      : undefined
+
   // Map tsconfig options to Monaco CompilerOptions
-  if (tsconfig.strict) compilerOptions.strict = tsconfig.strict
-  if (tsconfig.target) compilerOptions.target = mapScriptTarget(tsconfig.target)
-  if (tsconfig.module) compilerOptions.module = mapModule(tsconfig.module)
-  if (tsconfig.lib) compilerOptions.lib = tsconfig.lib
-  if (tsconfig.allowJs) compilerOptions.allowJs = tsconfig.allowJs
-  if (tsconfig.checkJs) compilerOptions.checkJs = tsconfig.checkJs
-  if (tsconfig.jsx) compilerOptions.jsx = mapJSX(tsconfig.jsx)
-  if (tsconfig.declaration) compilerOptions.declaration = tsconfig.declaration
+  if (tsconfig.strict) compilerOptions.strict = bool(tsconfig.strict)
+  if (tsconfig.target)
+    compilerOptions.target = mapScriptTarget(str(tsconfig.target) ?? "")
+  if (tsconfig.module)
+    compilerOptions.module = mapModule(str(tsconfig.module) ?? "")
+  if (tsconfig.lib) compilerOptions.lib = strArr(tsconfig.lib)
+  if (tsconfig.allowJs) compilerOptions.allowJs = bool(tsconfig.allowJs)
+  if (tsconfig.checkJs) compilerOptions.checkJs = bool(tsconfig.checkJs)
+  if (tsconfig.jsx) compilerOptions.jsx = mapJSX(str(tsconfig.jsx))
+  if (tsconfig.declaration)
+    compilerOptions.declaration = bool(tsconfig.declaration)
   if (tsconfig.declarationMap)
-    compilerOptions.declarationMap = tsconfig.declarationMap
-  if (tsconfig.sourceMap) compilerOptions.sourceMap = tsconfig.sourceMap
-  if (tsconfig.outFile) compilerOptions.outFile = tsconfig.outFile
-  if (tsconfig.outDir) compilerOptions.outDir = tsconfig.outDir
+    compilerOptions.declarationMap = bool(tsconfig.declarationMap)
+  if (tsconfig.sourceMap) compilerOptions.sourceMap = bool(tsconfig.sourceMap)
+  if (tsconfig.outFile) compilerOptions.outFile = str(tsconfig.outFile)
+  if (tsconfig.outDir) compilerOptions.outDir = str(tsconfig.outDir)
   if (tsconfig.removeComments)
-    compilerOptions.removeComments = tsconfig.removeComments
-  if (tsconfig.noEmit) compilerOptions.noEmit = tsconfig.noEmit
+    compilerOptions.removeComments = bool(tsconfig.removeComments)
+  if (tsconfig.noEmit) compilerOptions.noEmit = bool(tsconfig.noEmit)
   if (tsconfig.noEmitOnError)
-    compilerOptions.noEmitOnError = tsconfig.noEmitOnError
+    compilerOptions.noEmitOnError = bool(tsconfig.noEmitOnError)
 
   return compilerOptions
 }
 
 function mapScriptTarget(
-  target: string
+  target: string,
 ): monaco.languages.typescript.ScriptTarget {
   const targetMap: { [key: string]: monaco.languages.typescript.ScriptTarget } =
     {
@@ -85,18 +97,3 @@ function mapJSX(jsx: string | undefined): monaco.languages.typescript.JsxEmit {
   }
   return jsxMap[jsx.toLowerCase()] || monaco.languages.typescript.JsxEmit.React
 }
-
-// Example usage:
-const tsconfigJSON = {
-  compilerOptions: {
-    strict: true,
-    target: "ES2020",
-    module: "ESNext",
-    lib: ["DOM", "ES2020"],
-    jsx: "react",
-    sourceMap: true,
-    outDir: "./dist",
-  },
-}
-
-const monacoOptions = parseTSConfigToMonacoOptions(tsconfigJSON.compilerOptions)

@@ -53,10 +53,10 @@ export const socketAuth = async (socket: Socket, next: Function) => {
 
       // Check if the user owns the project or has shared access
       const project = (dbUserJSON.sandbox as any[])?.find(
-        (s: any) => s.id === projectId
+        (s: any) => s.id === projectId,
       )
       const sharedProjects = (dbUserJSON.usersToSandboxes as any[])?.find(
-        (uts: any) => uts.sandboxId === projectId
+        (uts: any) => uts.sandboxId === projectId,
       )
 
       // If user doesn't own or have shared access to the project, deny access

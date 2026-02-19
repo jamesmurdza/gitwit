@@ -4,6 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { normalizePath } from "../chat/lib/utils"
 import { DecorationManager } from "./lib/decoration-manager"
 import { calculateDiff } from "./lib/diff-calculator"
+import {
+  getEditorCleanup,
+  getModelMeta,
+  setModelMeta,
+} from "./lib/model-metadata"
 import { WidgetManager } from "./lib/widget-manager"
 
 export interface UseCodeDifferProps {
@@ -67,75 +72,15 @@ export function useCodeDiffer({
     ((fileId: string) => DiffSession | null) | null
   >(null)
 
-  /**
-   * Applies a diff view to the Monaco editor with interactive accept/reject buttons
-   *
-   * @param mergedCode - The new code content to compare against
-   * @param originalCode - The original code content
-   * @returns Monaco decorations collection for the diff view, or null if editor is not available
-   */
-  const handleApplyCode = useCallback(
-    (
-      mergedCode: string,
-      originalCode: string,
-    ): monaco.editor.IEditorDecorationsCollection | null => {
-      // Use the ref to get the latest editorRef value
-      const currentEditorRef = editorRefRef.current
-      if (!currentEditorRef) return null
-      const model = currentEditorRef.getModel()
-      if (!model)
-        return null
-
-        // Store original content on model for potential restoration
-      ;(model as any).originalContent = originalCode
-      ;(model as any).mergedContent = mergedCode
-
-      const originalModelEOL = model.getEOL()
-      const eolSequence =
-        originalModelEOL === "\r\n"
-          ? monaco.editor.EndOfLineSequence.CRLF
-          : monaco.editor.EndOfLineSequence.LF
-
-      // Calculate diff using the modular diff calculator
-      const diffResult = calculateDiff(originalCode, mergedCode, {
-        ignoreWhitespace: false,
-      })
-
-      // Apply the combined diff view to the editor
-      model.setValue(diffResult.combinedLines.join("\n"))
-      // Reapply original EOL style so the last line does not appear changed on CRLF files
-      model.setEOL(eolSequence)
-
-      // Create and return decorations collection
-      const newDecorations = currentEditorRef.createDecorationsCollection(
-        diffResult.decorations,
-      )
-
-      ;(model as any).granularBlocks = diffResult.granularBlocks
-
-      // Verify decorations are readable immediately
-      let readableDecorations = 0
-      for (let i = 1; i <= Math.min(model.getLineCount(), 20); i++) {
-        const lineDecs = model.getLineDecorations(i) || []
-        if (
-          lineDecs.some(
-            (d) =>
-              (d.options as any)?.className === "added-line-decoration" ||
-              (d.options as any)?.className === "removed-line-decoration",
-          )
-        ) {
-          readableDecorations++
-        }
-      }
-      const checkAndResolve = (count: number) => {
-        // Update state for UI
+  // Shared helper: creates a checkAndResolve callback for a given model.
+  // When `resolveStatus` is true, also detects applied/rejected and calls onDiffResolved.
+  const createCheckAndResolve = useCallback(
+    (model: monaco.editor.ITextModel, resolveStatus: boolean) => {
+      return (count: number) => {
         setActiveWidgetsState(count > 0)
 
-        if (suppressZeroNotifyRef.current) {
-          return
-        }
+        if (suppressZeroNotifyRef.current) return
 
-        // Notify about diff changes
         if (onDiffChange && getUnresolvedSnapshotRef.current) {
           const fileId = normalizePath(model.uri.fsPath)
           const session = getUnresolvedSnapshotRef.current(fileId)
@@ -144,57 +89,102 @@ export function useCodeDiffer({
 
         if (count === 0) {
           try {
-            // Use fsPath to ensure we get backslashes on Windows if applicable, or consistent path logic
-            // Normalize immediately to ensure consistent use across the app
             const fileId = normalizePath(model.uri.fsPath)
-            // Detect if applied or rejected (simplistic check: if content == merged, it's applied)
-            const currentContent = model.getValue()
-            const original = (model as any).originalContent || ""
-            const status = currentContent !== original ? "applied" : "rejected"
-
-            ;(window as any).__clearDiffSession?.(fileId)
-
-            if (onDiffResolved) {
+            if (resolveStatus && onDiffResolved) {
+              const currentContent = model.getValue()
+              const original = getModelMeta(model).originalContent || ""
+              const status =
+                currentContent !== original ? "applied" : "rejected"
               onDiffResolved(fileId, status)
             }
           } catch {}
         }
       }
+    },
+    [onDiffChange, onDiffResolved],
+  )
 
-      // Always create a new widget manager for each diff application
-      // This ensures it's bound to the current model
+  // Shared: replace widget manager, cleaning up the old one.
+  // Returns the new manager. Does NOT build widgets (caller controls timing).
+  const replaceWidgetManager = useCallback(
+    (
+      editor: monaco.editor.IStandaloneCodeEditor,
+      model: monaco.editor.ITextModel,
+      checkAndResolve: (count: number) => void,
+    ) => {
       if (widgetManagerRef.current) {
         suppressZeroNotifyRef.current = true
         widgetManagerRef.current.cleanupAllWidgets()
         suppressZeroNotifyRef.current = false
       }
-      widgetManagerRef.current = new WidgetManager(
-        currentEditorRef,
-        model,
-        (count) => {
-          lastWidgetCountRef.current = count
-          checkAndResolve(count)
-        },
-      )
-
-      // Store decorations collection reference to prevent garbage collection
-      ;(model as any).diffDecorationsCollection = newDecorations
-      currentEditorRef.layout()
-      requestAnimationFrame(() => {
-        if (!widgetManagerRef.current) return
-
-        suppressZeroNotifyRef.current = true
-        widgetManagerRef.current.buildAllWidgetsFromDecorations()
-        suppressZeroNotifyRef.current = false
-
-        // Manually check once after build is done
-        const hasWidgets = widgetManagerRef.current.hasActiveWidgets()
-        checkAndResolve(hasWidgets ? 1 : 0)
+      widgetManagerRef.current = new WidgetManager(editor, model, (count) => {
+        lastWidgetCountRef.current = count
+        checkAndResolve(count)
       })
+      return widgetManagerRef.current
+    },
+    [],
+  )
+
+  // Shared: build widgets and run initial check
+  const buildAndCheck = useCallback(
+    (checkAndResolve: (count: number) => void) => {
+      if (!widgetManagerRef.current) return
+      suppressZeroNotifyRef.current = true
+      widgetManagerRef.current.buildAllWidgetsFromDecorations()
+      suppressZeroNotifyRef.current = false
+      checkAndResolve(widgetManagerRef.current.hasActiveWidgets() ? 1 : 0)
+    },
+    [],
+  )
+
+  /**
+   * Applies a diff view to the Monaco editor with interactive accept/reject buttons
+   */
+  const handleApplyCode = useCallback(
+    (
+      mergedCode: string,
+      originalCode: string,
+    ): monaco.editor.IEditorDecorationsCollection | null => {
+      const currentEditorRef = editorRefRef.current
+      if (!currentEditorRef) return null
+      const model = currentEditorRef.getModel()
+      if (!model) return null
+
+      setModelMeta(model, {
+        originalContent: originalCode,
+        mergedContent: mergedCode,
+      })
+
+      const eolSequence =
+        model.getEOL() === "\r\n"
+          ? monaco.editor.EndOfLineSequence.CRLF
+          : monaco.editor.EndOfLineSequence.LF
+
+      const diffResult = calculateDiff(originalCode, mergedCode, {
+        ignoreWhitespace: false,
+      })
+
+      model.setValue(diffResult.combinedLines.join("\n"))
+      model.setEOL(eolSequence)
+
+      const newDecorations = currentEditorRef.createDecorationsCollection(
+        diffResult.decorations,
+      )
+      setModelMeta(model, {
+        granularBlocks: diffResult.granularBlocks,
+        diffDecorationsCollection: newDecorations,
+      })
+
+      const checkAndResolve = createCheckAndResolve(model, true)
+      replaceWidgetManager(currentEditorRef, model, checkAndResolve)
+
+      currentEditorRef.layout()
+      requestAnimationFrame(() => buildAndCheck(checkAndResolve))
 
       return newDecorations
     },
-    [onDiffResolved], // editorRef is accessed via ref, so no dependency needed
+    [createCheckAndResolve, replaceWidgetManager, buildAndCheck],
   )
 
   /**
@@ -210,9 +200,7 @@ export function useCodeDiffer({
         }
 
         const currentEditorRef = editorRefRef.current
-        const cleanup = (currentEditorRef as any)?.cleanupDiffWidgets as
-          | (() => void)
-          | undefined
+        const cleanup = getEditorCleanup(currentEditorRef)
         if (cleanup) cleanup()
       } catch (error) {
         console.warn("Failed to cleanup diff widgets:", error)
@@ -269,8 +257,9 @@ export function useCodeDiffer({
 
       const eolStr = model.getEOL()
       const eol: "LF" | "CRLF" = eolStr === "\r\n" ? "CRLF" : "LF"
-      const originalCode = (model as any).originalContent ?? ""
-      const mergedCode = (model as any).mergedContent ?? ""
+      const meta = getModelMeta(model)
+      const originalCode = meta.originalContent ?? ""
+      const mergedCode = meta.mergedContent ?? ""
       const combinedText = model.getValue()
 
       return {
@@ -294,89 +283,43 @@ export function useCodeDiffer({
       if (!currentEditorRef) return
       const model = currentEditorRef.getModel()
       if (!model) return
-      // Set combined text and EOL exactly as before
+
       model.setValue(session.combinedText)
       model.setEOL(
         session.eol === "CRLF"
           ? monaco.editor.EndOfLineSequence.CRLF
           : monaco.editor.EndOfLineSequence.LF,
       )
-      ;(model as any).originalContent = session.originalCode
-      ;(model as any).mergedContent = session.mergedCode
+      setModelMeta(model, {
+        originalContent: session.originalCode,
+        mergedContent: session.mergedCode,
+      })
 
       // Recreate diff decorations only for unresolved blocks
-      const decorations: monaco.editor.IModelDeltaDecoration[] = []
-      for (const block of session.unresolvedBlocks) {
-        for (let line = block.start; line <= block.end; line++) {
-          decorations.push({
-            range: new monaco.Range(line, 1, line, 1),
-            options: {
-              isWholeLine: true,
-              className:
-                block.type === "added"
-                  ? "added-line-decoration"
-                  : "removed-line-decoration",
-              glyphMarginClassName:
-                block.type === "added"
-                  ? "added-line-glyph"
-                  : "removed-line-glyph",
-              linesDecorationsClassName:
-                block.type === "added"
-                  ? "added-line-number"
-                  : "removed-line-number",
-            },
-          })
-        }
-      }
+      const decorations: monaco.editor.IModelDeltaDecoration[] =
+        session.unresolvedBlocks.flatMap((block) => {
+          const cls = block.type === "added" ? "added" : "removed"
+          return Array.from(
+            { length: block.end - block.start + 1 },
+            (_, i) => ({
+              range: new monaco.Range(block.start + i, 1, block.start + i, 1),
+              options: {
+                isWholeLine: true,
+                className: `${cls}-line-decoration`,
+                glyphMarginClassName: `${cls}-line-glyph`,
+                linesDecorationsClassName: `${cls}-line-number`,
+              },
+            }),
+          )
+        })
 
       currentEditorRef.createDecorationsCollection(decorations)
 
-      const checkAndResolve = (count: number) => {
-        // Update state for UI
-        setActiveWidgetsState(count > 0)
-
-        if (suppressZeroNotifyRef.current) {
-          return
-        }
-
-        // Notify about diff changes
-        if (onDiffChange && getUnresolvedSnapshotRef.current) {
-          const fileId = normalizePath(model.uri.fsPath)
-          const session = getUnresolvedSnapshotRef.current(fileId)
-          onDiffChange(session)
-        }
-
-        if (count === 0) {
-          try {
-            const fileId = normalizePath(model.uri.fsPath)
-            ;(window as any).__clearDiffSession?.(fileId)
-          } catch {}
-        }
-      }
-
-      // Rebuild widgets for current decorations
-      if (widgetManagerRef.current) {
-        suppressZeroNotifyRef.current = true
-        widgetManagerRef.current.cleanupAllWidgets()
-        suppressZeroNotifyRef.current = false
-      }
-      widgetManagerRef.current = new WidgetManager(
-        currentEditorRef,
-        model,
-        (count) => {
-          lastWidgetCountRef.current = count
-          checkAndResolve(count)
-        },
-      )
-
-      suppressZeroNotifyRef.current = true
-      widgetManagerRef.current.buildAllWidgetsFromDecorations()
-      suppressZeroNotifyRef.current = false
-
-      // Manually check once after build is done
-      checkAndResolve(widgetManagerRef.current.hasActiveWidgets() ? 1 : 0)
+      const checkAndResolve = createCheckAndResolve(model, false)
+      replaceWidgetManager(currentEditorRef, model, checkAndResolve)
+      buildAndCheck(checkAndResolve)
     },
-    [], // editorRef is accessed via ref
+    [createCheckAndResolve, replaceWidgetManager, buildAndCheck],
   )
 
   const clearVisuals = useCallback(() => {

@@ -38,7 +38,7 @@ export const defaultEditorOptions: monaco.editor.IStandaloneEditorConstructionOp
  * Pre-mount editor keybinding configuration
  */
 export const configureEditorKeybindings = (
-  monaco: typeof import("monaco-editor")
+  monaco: typeof import("monaco-editor"),
 ) => {
   monaco.editor.addKeybindingRules([
     {

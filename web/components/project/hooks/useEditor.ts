@@ -3,11 +3,8 @@ import {
   configureEditorKeybindings,
   defaultCompilerOptions,
 } from "@/lib/monaco/config"
-import { parseTSConfigToMonacoOptions } from "@/lib/monaco/parse-tsconfig"
-import { TFile, TFolder } from "@/lib/types"
-import { debounce, deepMerge } from "@/lib/utils"
-// Removed global store dependency
-import { useContainer } from "@/context/container-context"
+import { debounce } from "@/lib/utils"
+import { useEditor as useEditorContext } from "@/context/editor-context"
 import { useTerminal } from "@/context/TerminalContext"
 import { fileRouter } from "@/lib/api"
 import { useAppStore } from "@/store/context"
@@ -16,6 +13,11 @@ import * as monaco from "monaco-editor"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { enableEditorShortcuts } from "../layout/utils/shortcuts"
 import { useFileTree } from "./useFile"
+import { loadAndApplyTSConfig } from "./lib/tsconfig-loader"
+import {
+  useGenerateWidgetEffect,
+  useSuggestionWidgetEffect,
+} from "./useEditorWidgets"
 
 export interface UseEditorProps {
   fileId: string
@@ -38,17 +40,16 @@ export interface DecorationsState {
 
 export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
   const { saveFile, fileTree: files = [] } = useFileTree()
-  const { terminalRef, gridRef } = useContainer()
+  const { terminalRef, gridRef } = useEditorContext()
   const { creatingTerminal, createNewTerminal } = useTerminal()
   const draft = useAppStore((s) => s.drafts[fileId ?? ""])
-  const { data: serverFileContent = "", isLoading } =
-    fileRouter.fileContent.useQuery({
-      enabled: !!fileId,
-      variables: { fileId, projectId },
-      select(data) {
-        return data.data
-      },
-    })
+  const { data: serverFileContent = "" } = fileRouter.fileContent.useQuery({
+    enabled: !!fileId,
+    variables: { fileId, projectId },
+    select(data) {
+      return data.data
+    },
+  })
   // Editor state - Locally managed
   const [editorRef, setEditorRef] = useState<
     monaco.editor.IStandaloneCodeEditor | undefined
@@ -93,8 +94,9 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
   // Helper function to fetch file content
   const fetchFileContent = useCallback(
     (fileId: string): Promise<string> => {
+      if (!socket) return Promise.resolve("")
       return new Promise((resolve) => {
-        socket?.emit("getFile", { fileId }, (content: string) => {
+        socket.emit("getFile", { fileId }, (content: string) => {
           resolve(content)
         })
       })
@@ -105,56 +107,14 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
   // Load and merge TSConfig
   const loadTSConfig = useCallback(
     async (
-      files: (TFolder | TFile)[],
+      files: Parameters<typeof loadAndApplyTSConfig>[0],
       editor: monaco.editor.IStandaloneCodeEditor,
-      monaco: typeof import("monaco-editor"),
+      monacoInstance: typeof monaco,
     ) => {
-      const tsconfigFiles = files.filter((file) =>
-        file.name.endsWith("tsconfig.json"),
-      )
-      let mergedConfig: any = { compilerOptions: {} }
+      await loadAndApplyTSConfig(files, monacoInstance, fetchFileContent)
 
-      for (const file of tsconfigFiles) {
-        const content = await fetchFileContent(file.id)
-
-        try {
-          let tsConfig = JSON.parse(content)
-
-          // Handle references
-          if (tsConfig.references) {
-            for (const ref of tsConfig.references) {
-              const path = ref.path.replace("./", "")
-              const refContent = await fetchFileContent(path)
-              const referenceTsConfig = JSON.parse(refContent)
-
-              // Merge configurations
-              mergedConfig = deepMerge(mergedConfig, referenceTsConfig)
-            }
-          }
-
-          // Merge current file's config
-          mergedConfig = deepMerge(mergedConfig, tsConfig)
-        } catch (error) {
-          console.error("Error parsing TSConfig:", error)
-        }
-      }
-
-      // Apply merged compiler options
-      if (mergedConfig.compilerOptions) {
-        const updatedOptions = parseTSConfigToMonacoOptions({
-          ...defaultCompilerOptions,
-          ...mergedConfig.compilerOptions,
-        })
-        monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
-          updatedOptions,
-        )
-        monaco.languages.typescript.javascriptDefaults.setCompilerOptions(
-          updatedOptions,
-        )
-      }
-
-      // Store the last copied range in the editor to be used in the AIChat component
-      editor.onDidChangeCursorSelection((e) => {
+      // Track cursor selection for AIChat context
+      editor.onDidChangeCursorSelection(() => {
         const selection = editor.getSelection()
         if (!selection) return
         lastCopiedRangeRef.current = {
@@ -240,10 +200,7 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
         defaultCompilerOptions,
       )
 
-      // Load TSConfig
-      await loadTSConfig(files, editor, monaco)
-
-      // Set up editor event handlers
+      // Set up editor event handlers (register before loadTSConfig which may be async)
       editor.onDidChangeCursorPosition((e) => {
         setIsSelected(false)
         const selection = editor.getSelection()
@@ -279,7 +236,7 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
         })
       })
 
-      editor.onDidBlurEditorText((e) => {
+      editor.onDidBlurEditorText(() => {
         setDecorations((prev) => {
           return {
             ...prev,
@@ -296,6 +253,9 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
           "editorTextFocus && !suggestWidgetVisible && !renameInputVisible && !inSnippetMode && !quickFixWidgetVisible",
         run: (editor) => handleAiEdit(editor),
       })
+
+      // Load TSConfig async (non-blocking — cursor handlers already registered above)
+      await loadTSConfig(files, editor, monaco)
     },
     [files, loadTSConfig, cursorLine, handleAiEdit, debouncedSetIsSelected],
   )
@@ -330,125 +290,17 @@ export const useEditor = ({ projectId, fileId }: UseEditorProps) => {
     creatingTerminal,
   ])
 
-  // Generate widget effect
-  useEffect(() => {
-    if (generate.show) {
-      setShowSuggestion(false)
-
-      // Only create view zone if it doesn't already exist
-      if (!generate.id) {
-        editorRef?.changeViewZones(function (changeAccessor) {
-          if (!generateRef.current) return
-          const id = changeAccessor.addZone({
-            afterLineNumber: cursorLine,
-            heightInLines: 3,
-            domNode: generateRef.current,
-          })
-          setGenerate((prev) => {
-            return { ...prev, id, line: cursorLine }
-          })
-        })
-      }
-
-      if (!generateWidgetRef.current) return
-      const widgetElement = generateWidgetRef.current
-
-      const contentWidget = {
-        getDomNode: () => {
-          return widgetElement
-        },
-        getId: () => {
-          return "generate.widget"
-        },
-        getPosition: () => {
-          return {
-            position: {
-              lineNumber: generate.line || cursorLine,
-              column: 1,
-            },
-            preference: generate.pref,
-          }
-        },
-      }
-
-      // Get width from the editor's DOM container (works with Dockview)
-      const editorDomNode = editorRef?.getDomNode()
-      const width = editorDomNode?.clientWidth ?? 400
-
-      setGenerate((prev) => {
-        return {
-          ...prev,
-          widget: contentWidget,
-          width,
-        }
-      })
-      editorRef?.addContentWidget(contentWidget)
-
-      if (generateRef.current && generateWidgetRef.current) {
-        editorRef?.applyFontInfo(generateRef.current)
-        editorRef?.applyFontInfo(generateWidgetRef.current)
-      }
-    } else {
-      editorRef?.changeViewZones(function (changeAccessor) {
-        changeAccessor.removeZone(generate.id)
-        setGenerate((prev) => {
-          return { ...prev, id: "" }
-        })
-      })
-
-      if (!generate.widget) return
-      editorRef?.removeContentWidget(generate.widget)
-      setGenerate((prev) => {
-        return {
-          ...prev,
-          widget: undefined,
-        }
-      })
-    }
-  }, [
-    generate.show,
-    generate.id,
-    generate.line,
-    generate.pref,
-    cursorLine,
+  // Widget effects (extracted into useEditorWidgets.ts)
+  useGenerateWidgetEffect(
     editorRef,
-  ])
-
-  // Suggestion widget effect
-  useEffect(() => {
-    if (!suggestionRef.current || !editorRef) return
-    const widgetElement = suggestionRef.current
-    const suggestionWidget: monaco.editor.IContentWidget = {
-      getDomNode: () => {
-        return widgetElement
-      },
-      getId: () => {
-        return "suggestion.widget"
-      },
-      getPosition: () => {
-        const selection = editorRef?.getSelection()
-        const column = Math.max(3, selection?.positionColumn ?? 1)
-        let lineNumber = selection?.positionLineNumber ?? 1
-        let pref = monaco.editor.ContentWidgetPositionPreference.ABOVE
-        if (lineNumber <= 3) {
-          pref = monaco.editor.ContentWidgetPositionPreference.BELOW
-        }
-        return {
-          preference: [pref],
-          position: {
-            lineNumber,
-            column,
-          },
-        }
-      },
-    }
-    if (isSelected) {
-      editorRef?.addContentWidget(suggestionWidget)
-      editorRef?.applyFontInfo(suggestionRef.current)
-    } else {
-      editorRef?.removeContentWidget(suggestionWidget)
-    }
-  }, [isSelected, editorRef])
+    generate,
+    setGenerate,
+    cursorLine,
+    generateRef,
+    generateWidgetRef,
+    setShowSuggestion,
+  )
+  useSuggestionWidgetEffect(editorRef, isSelected, suggestionRef)
 
   // Decorations effect for generate widget tips
   useEffect(() => {

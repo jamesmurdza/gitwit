@@ -37,27 +37,9 @@ export interface ChatPanelParams {
 }
 
 export function ChatPanel(props: IGridviewPanelProps<ChatPanelParams>) {
-  const {
-    onApplyCode,
-    onRejectCode,
-    precomputeMergeForFile,
-    applyPrecomputedMerge,
-    restoreOriginalFile,
-    getCurrentFileContent,
-    onOpenFile,
-  } = props.params
-
   return (
     <div className="h-full bg-background">
-      <AIChat
-        onApplyCode={onApplyCode}
-        onRejectCode={onRejectCode}
-        precomputeMergeForFile={precomputeMergeForFile}
-        applyPrecomputedMerge={applyPrecomputedMerge}
-        restoreOriginalFile={restoreOriginalFile}
-        getCurrentFileContent={getCurrentFileContent}
-        onOpenFile={onOpenFile}
-      />
+      <AIChat {...props.params} />
     </div>
   )
 }

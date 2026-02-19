@@ -1,6 +1,6 @@
 "use client"
 
-import { processEdit } from "@/app/actions/ai"
+import { apiClient } from "@/server/client"
 import { useProjectContext } from "@/context/project-context"
 import { useRouter } from "@bprogress/next/app"
 import { Editor } from "@monaco-editor/react"
@@ -130,16 +130,22 @@ function GenerateInput({
       const selectedCode = data.code
       const instruction = regenerate ? currentPrompt : input
 
-      const result = await processEdit(
-        [{ role: "user", content: instruction }],
-        {
-          templateType: "code",
-          activeFileContent: selectedCode,
-          fileName: data.fileName,
-          projectId: projectId,
-          projectName: projectName,
+      const res = await apiClient.ai["process-edit"].$post({
+        json: {
+          messages: [{ role: "user" as const, content: instruction }],
+          context: {
+            templateType: "code",
+            activeFileContent: selectedCode,
+            fileName: data.fileName,
+            projectId: projectId,
+            projectName: projectName,
+          },
         },
-      )
+      })
+      if (!res.ok) {
+        throw new Error("Failed to generate code")
+      }
+      const result = await res.json()
 
       // Clean up any potential markdown or explanation text
       const cleanedResult = result.content

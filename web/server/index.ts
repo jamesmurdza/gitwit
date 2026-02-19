@@ -1,5 +1,6 @@
 import createApp from "@/lib/api/create-app"
 import { clerkAuth } from "./middlewares/clerkAuth"
+import { aiRouter } from "./routes/ai"
 import { fileRouter } from "./routes/file"
 import { githubRouter } from "./routes/github"
 import { projectRouter } from "./routes/project"
@@ -12,6 +13,7 @@ const app = createApp()
   .route("/project", projectRouter)
   .route("/file", fileRouter)
   .route("/github", githubRouter)
+  .route("/ai", aiRouter)
 
 export type AppType = typeof app
 

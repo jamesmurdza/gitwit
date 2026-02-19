@@ -1,4 +1,4 @@
-import { TTab } from "@/lib/types"
+import { DiffSession, TTab } from "@/lib/types"
 import { useAppStore } from "@/store/context"
 import { useCallback, useEffect, useRef } from "react"
 
@@ -8,17 +8,15 @@ import { useCallback, useEffect, useRef } from "react"
  */
 export function useDiffSessionManager(
   hasActiveWidgets: () => boolean,
-  getUnresolvedSnapshot: (fileId: string) => any,
-  restoreFromSnapshot: (session: any) => void,
+  getUnresolvedSnapshot: (fileId: string) => DiffSession | null,
+  restoreFromSnapshot: (session: DiffSession) => void,
   clearVisuals: () => void,
-  forceClearAllDecorations: () => void
+  forceClearAllDecorations: () => void,
 ) {
   const activeTab = useAppStore((s) => s.activeTab)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const saveDiffSession = useAppStore((s) => s.saveDiffSession)
   const getDiffSession = useAppStore((s) => s.getDiffSession)
-  const clearDiffSession = useAppStore((s) => s.clearDiffSession)
-
   const previousActiveTabRef = useRef<string | undefined>(activeTab?.id)
 
   // Sync the ref with the current activeTab from store
@@ -81,7 +79,7 @@ export function useDiffSessionManager(
       forceClearAllDecorations,
       getDiffSession,
       restoreFromSnapshot,
-    ]
+    ],
   )
 
   return {

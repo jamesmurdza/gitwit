@@ -1,5 +1,4 @@
 import { createRouter } from "@/lib/api/create-app"
-import jsonContent from "@/lib/api/utils"
 import { db } from "@gitwit/db"
 import {
   sandbox,
@@ -11,31 +10,18 @@ import {
   usersToSandboxes,
 } from "@gitwit/db/schema"
 import { and, eq, sql } from "drizzle-orm"
-import { describeRoute } from "hono-openapi"
-import { validator as zValidator } from "hono-openapi/zod"
+import { zValidator } from "@hono/zod-validator"
 import z from "zod"
 
 export const projectRouter = createRouter()
   // #region GET /
   .get(
     "/",
-    describeRoute({
-      tags: ["Project"],
-      description: "Get sandbox data",
-      responses: {
-        200: jsonContent(
-          z.object({
-            id: z.string(),
-          }),
-          "Sandbox data response"
-        ),
-      },
-    }),
     zValidator(
       "query",
       z.object({
         id: z.string().optional(),
-      })
+      }),
     ),
     async (c) => {
       const { id } = c.req.valid("query")
@@ -55,34 +41,27 @@ export const projectRouter = createRouter()
             ...res,
             usersToSandboxes: res.usersToSandboxes as UsersToSandboxes[],
           },
-          200
+          200,
         )
       } else {
         const res = await db.select().from(sandbox).where(
           // check for authed user
-          eq(sandbox.userId, userId)
+          eq(sandbox.userId, userId),
         )
         return c.json(res ?? {}, 200)
       }
-    }
+    },
   )
   // #endregion
 
   // #region DELETE /
   .delete(
     "/",
-    describeRoute({
-      tags: ["Project"],
-      description: "Delete a sandbox",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox deletion response"),
-      },
-    }),
     zValidator(
       "query",
       z.object({
         id: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { id } = c.req.valid("query")
@@ -93,27 +72,20 @@ export const projectRouter = createRouter()
       await db.delete(sandbox).where(eq(sandbox.id, id))
       return c.json(
         { success: true, message: "Sandbox Deleted successfully" },
-        200
+        200,
       )
-    }
+    },
   )
   // #endregion
 
   // #region POST /
   .post(
     "/",
-    describeRoute({
-      tags: ["Project"],
-      description: "Create or update a sandbox",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox creation/update response"),
-      },
-    }),
     zValidator(
       "json",
       sandboxInsertSchema.omit({
         userId: true,
-      })
+      }),
     ),
     async (c) => {
       const data = c.req.valid("json")
@@ -131,7 +103,7 @@ export const projectRouter = createRouter()
             success: false,
             message: "You reached the maximum # of sandboxes.",
           },
-          400
+          400,
         )
       }
 
@@ -157,30 +129,23 @@ export const projectRouter = createRouter()
             sandbox: sb,
           },
         },
-        200
+        200,
       )
-    }
+    },
   )
   // #endregion
 
   // #region PATCH /
   .patch(
     "/",
-    describeRoute({
-      tags: ["Project"],
-      description: "Update a sandbox",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox update response"),
-      },
-    }),
     zValidator(
       "json",
       sandboxUpdateSchema.extend({
-        id: z.string().openapi({
+        id: z.string().meta({
           description: "Unique identifier for the sandbox to be updated",
           example: "sandbox_12345",
         }),
-      })
+      }),
     ),
     async (c) => {
       const data = c.req.valid("json")
@@ -207,68 +172,50 @@ export const projectRouter = createRouter()
             sandbox: sb,
           },
         },
-        200
+        200,
       )
-    }
+    },
   )
   // #endregion
 
   // #region GET /share
-  .get(
-    "/share",
-    describeRoute({
-      tags: ["Project"],
-      description: "Get shared sandbox data",
-      responses: {
-        200: jsonContent(z.object({}), "Shared sandbox data response"),
+  .get("/share", async (c) => {
+    const { id } = c.get("user")
+
+    const shared = await db
+      .select({
+        id: sandbox.id,
+        name: sandbox.name,
+        type: sandbox.type,
+        sharedOn: usersToSandboxes.sharedOn,
+        author: user.name,
+        authorAvatarUrl: user.avatarUrl,
+      })
+      .from(usersToSandboxes)
+      .innerJoin(sandbox, eq(usersToSandboxes.sandboxId, sandbox.id))
+      .innerJoin(user, eq(sandbox.userId, user.id))
+      .where(eq(usersToSandboxes.userId, id))
+
+    return c.json(
+      {
+        success: true,
+        message: "Shared sandboxes retrieved successfully",
+        data: shared,
       },
-    }),
-
-    async (c) => {
-      const { id } = c.get("user")
-
-      const shared = await db
-        .select({
-          id: sandbox.id,
-          name: sandbox.name,
-          type: sandbox.type,
-          sharedOn: usersToSandboxes.sharedOn,
-          author: user.name,
-          authorAvatarUrl: user.avatarUrl,
-        })
-        .from(usersToSandboxes)
-        .innerJoin(sandbox, eq(usersToSandboxes.sandboxId, sandbox.id))
-        .innerJoin(user, eq(sandbox.userId, user.id))
-        .where(eq(usersToSandboxes.userId, id))
-
-      return c.json(
-        {
-          success: true,
-          message: "Shared sandboxes retrieved successfully",
-          data: shared,
-        },
-        200
-      )
-    }
-  )
+      200,
+    )
+  })
   // #endregion
 
   // #region POST /share
   .post(
     "/share",
-    describeRoute({
-      tags: ["Project"],
-      description: "Share a sandbox with a user",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox sharing response"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
         sandboxId: z.string(),
         email: z.string().email(),
-      })
+      }),
     ),
     async (c) => {
       const { sandboxId, email } = c.req.valid("json")
@@ -284,27 +231,27 @@ export const projectRouter = createRouter()
       if (!user) {
         return c.json(
           { success: false, message: "No user associated with email." },
-          400
+          400,
         )
       }
 
       if (
         Array.isArray(user.sandbox) &&
-        user.sandbox.find((sb: any) => sb.id === sandboxId)
+        user.sandbox.find((sb) => sb.id === sandboxId)
       ) {
         return c.json(
           { success: false, message: "Cannot share with yourself!" },
-          400
+          400,
         )
       }
 
       if (
         Array.isArray(user.usersToSandboxes) &&
-        user.usersToSandboxes.find((uts: any) => uts.sandboxId === sandboxId)
+        user.usersToSandboxes.find((uts) => uts.sandboxId === sandboxId)
       ) {
         return c.json(
           { success: false, message: "User already has access." },
-          400
+          400,
         )
       }
 
@@ -317,28 +264,21 @@ export const projectRouter = createRouter()
           success: true,
           message: "Sandbox shared successfully",
         },
-        200
+        200,
       )
-    }
+    },
   )
   // #endregion
 
   // #region DELETE /share
   .delete(
     "/share",
-    describeRoute({
-      tags: ["Project"],
-      description: "Remove sharing access from a user",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox sharing removal response"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
         sandboxId: z.string(),
         userId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { sandboxId, userId } = c.req.valid("json")
@@ -348,34 +288,27 @@ export const projectRouter = createRouter()
         .where(
           and(
             eq(usersToSandboxes.userId, userId),
-            eq(usersToSandboxes.sandboxId, sandboxId)
-          )
+            eq(usersToSandboxes.sandboxId, sandboxId),
+          ),
         )
 
       return c.json(
         { success: true, message: "Sharing access removed successfully" },
-        200
+        200,
       )
-    }
+    },
   )
   // #endregion
 
   // #region POST /like
   .post(
     "/like",
-    describeRoute({
-      tags: ["Project"],
-      description: "Like a sandbox",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox like response"),
-      },
-    }),
     zValidator(
       "json",
       z.object({
         userId: z.string(),
         sandboxId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { userId, sandboxId } = c.req.valid("json")
@@ -392,8 +325,8 @@ export const projectRouter = createRouter()
           .where(
             and(
               eq(sandboxLikes.sandboxId, sandboxId),
-              eq(sandboxLikes.userId, userId)
-            )
+              eq(sandboxLikes.userId, userId),
+            ),
           )
 
         await db
@@ -411,7 +344,7 @@ export const projectRouter = createRouter()
               liked: false,
             },
           },
-          200
+          200,
         )
       } else {
         // Like
@@ -434,29 +367,22 @@ export const projectRouter = createRouter()
             message: "Like successful",
             data: { liked: true },
           },
-          200
+          200,
         )
       }
-    }
+    },
   )
   // #endregion
 
   // #region GET /like
   .get(
     "/like",
-    describeRoute({
-      tags: ["Project"],
-      description: "Check if a sandbox is liked by a user",
-      responses: {
-        200: jsonContent(z.object({}), "Sandbox like check response"),
-      },
-    }),
     zValidator(
       "query",
       z.object({
         sandboxId: z.string(),
         userId: z.string(),
-      })
+      }),
     ),
     async (c) => {
       const { sandboxId, userId } = c.req.valid("query")
@@ -472,9 +398,9 @@ export const projectRouter = createRouter()
           message: "Like check successful",
           data: { liked: !!like },
         },
-        200
+        200,
       )
-    }
+    },
   )
 
 // #endregion

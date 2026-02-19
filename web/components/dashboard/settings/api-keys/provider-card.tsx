@@ -14,6 +14,74 @@ import { Check, ExternalLink, Eye, EyeOff, Key, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
+function PasswordInput({
+  id,
+  placeholder,
+  value,
+  onChange,
+  showKey,
+  onToggleShow,
+}: {
+  id: string
+  placeholder: string
+  value: string
+  onChange: (value: string) => void
+  showKey: boolean
+  onToggleShow: () => void
+}) {
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        type={showKey ? "text" : "password"}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="pr-10"
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="smIcon"
+        className="absolute right-2 top-1/2 -translate-y-1/2"
+        onClick={onToggleShow}
+      >
+        {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+      </Button>
+    </div>
+  )
+}
+
+function ModelIdField({
+  provider,
+  modelPlaceholder,
+  modelId,
+  onModelIdChange,
+}: {
+  provider: string
+  modelPlaceholder: string
+  modelId: string
+  onModelIdChange: (value: string) => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={`${provider}-model`} className="text-sm">
+        Model ID <span className="text-muted-foreground">(Optional)</span>
+      </Label>
+      <Input
+        id={`${provider}-model`}
+        type="text"
+        placeholder={modelPlaceholder}
+        value={modelId}
+        onChange={(e) => onModelIdChange(e.target.value)}
+      />
+      <p className="text-xs text-muted-foreground">
+        Leave empty to use default model
+      </p>
+    </div>
+  )
+}
+
 export interface ProviderCardProps {
   provider: Provider
   config: ProviderConfig
@@ -44,7 +112,7 @@ export default function ProviderCard({
     if (provider === "aws") {
       if (!awsAccessKeyId || !awsSecretAccessKey) {
         toast.error(
-          "Please provide both AWS Access Key ID and Secret Access Key"
+          "Please provide both AWS Access Key ID and Secret Access Key",
         )
         return
       }
@@ -188,29 +256,14 @@ export default function ProviderCard({
                   <Label htmlFor={`${provider}-secret-key`}>
                     AWS Secret Access Key
                   </Label>
-                  <div className="relative">
-                    <Input
-                      id={`${provider}-secret-key`}
-                      type={showKey ? "text" : "password"}
-                      placeholder="..."
-                      value={awsSecretAccessKey}
-                      onChange={(e) => setAwsSecretAccessKey(e.target.value)}
-                      className="pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="smIcon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2"
-                      onClick={() => setShowKey(!showKey)}
-                    >
-                      {showKey ? (
-                        <EyeOff className="size-4" />
-                      ) : (
-                        <Eye className="size-4" />
-                      )}
-                    </Button>
-                  </div>
+                  <PasswordInput
+                    id={`${provider}-secret-key`}
+                    placeholder="..."
+                    value={awsSecretAccessKey}
+                    onChange={setAwsSecretAccessKey}
+                    showKey={showKey}
+                    onToggleShow={() => setShowKey(!showKey)}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor={`${provider}-region`}>AWS Region</Label>
@@ -222,69 +275,26 @@ export default function ProviderCard({
                     onChange={(e) => setAwsRegion(e.target.value)}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor={`${provider}-model`} className="text-sm">
-                    Model ID{" "}
-                    <span className="text-muted-foreground">(Optional)</span>
-                  </Label>
-                  <Input
-                    id={`${provider}-model`}
-                    type="text"
-                    placeholder={config.modelPlaceholder}
-                    value={modelId}
-                    onChange={(e) => setModelId(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Leave empty to use default model
-                  </p>
-                </div>
               </>
             ) : (
-              <>
-                <div className="space-y-1.5">
-                  <Label htmlFor={`${provider}-key`}>API Key</Label>
-                  <div className="relative">
-                    <Input
-                      id={`${provider}-key`}
-                      type={showKey ? "text" : "password"}
-                      placeholder={config.placeholder}
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      className="pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="smIcon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2"
-                      onClick={() => setShowKey(!showKey)}
-                    >
-                      {showKey ? (
-                        <EyeOff className="size-4" />
-                      ) : (
-                        <Eye className="size-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor={`${provider}-model`} className="text-sm">
-                    Model ID{" "}
-                    <span className="text-muted-foreground">(Optional)</span>
-                  </Label>
-                  <Input
-                    id={`${provider}-model`}
-                    type="text"
-                    placeholder={config.modelPlaceholder}
-                    value={modelId}
-                    onChange={(e) => setModelId(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Leave empty to use default model
-                  </p>
-                </div>
-              </>
+              <div className="space-y-1.5">
+                <Label htmlFor={`${provider}-key`}>API Key</Label>
+                <PasswordInput
+                  id={`${provider}-key`}
+                  placeholder={config.placeholder}
+                  value={apiKey}
+                  onChange={setApiKey}
+                  showKey={showKey}
+                  onToggleShow={() => setShowKey(!showKey)}
+                />
+              </div>
             )}
+            <ModelIdField
+              provider={provider}
+              modelPlaceholder={config.modelPlaceholder}
+              modelId={modelId}
+              onModelIdChange={setModelId}
+            />
             <div className="flex gap-2 pt-1">
               <Button onClick={handleSave} disabled={isSaving} size="sm">
                 {isSaving ? "Saving..." : "Save"}

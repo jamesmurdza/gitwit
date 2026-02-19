@@ -6,7 +6,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useContainer } from "@/context/container-context"
+import { useEditor } from "@/context/editor-context"
 import { cn } from "@/lib/utils"
 import { Slot } from "@radix-ui/react-slot"
 import { type VariantProps } from "class-variance-authority"
@@ -45,6 +45,15 @@ const useChatContainerContext = () => {
   }
   return context
 }
+
+function withViewTransition(fn: () => void) {
+  if (document.startViewTransition) {
+    document.startViewTransition(fn)
+  } else {
+    fn()
+  }
+}
+
 export type ChatContainerRootProps = {
   children: React.ReactNode
   className?: string
@@ -58,11 +67,7 @@ function ChatContainerRoot({
 }: ChatContainerRootProps) {
   const [maximized, setMaximized] = useState(false)
   const toggleMaximized = useCallback(() => {
-    if (document.startViewTransition) {
-      document.startViewTransition(() => setMaximized((prev) => !prev))
-    } else {
-      setMaximized((prev) => !prev)
-    }
+    withViewTransition(() => setMaximized((prev) => !prev))
   }, [])
 
   useEffect(() => {
@@ -77,11 +82,7 @@ function ChatContainerRoot({
           "input, textarea, [contenteditable]",
         )
       ) {
-        if (document.startViewTransition) {
-          document.startViewTransition(() => setMaximized(false))
-        } else {
-          setMaximized(false)
-        }
+        withViewTransition(() => setMaximized(false))
       }
     }
     window.addEventListener("keydown", handleKeyDown)
@@ -348,7 +349,7 @@ function ScrollButton({
 }
 
 export function ChatContainerCollapse() {
-  const { gridRef } = useContainer()
+  const { gridRef } = useEditor()
   function toggleAIChat() {
     const panel = gridRef.current?.getPanel("chat")
     panel?.api.setVisible(!panel.api.isVisible)

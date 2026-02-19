@@ -17,8 +17,8 @@ export default function DashboardSettings({ userData }: { userData: User }) {
     subtab === "api-keys"
       ? "api-keys"
       : subtab === "billing"
-      ? "billing"
-      : "profile"
+        ? "billing"
+        : "profile"
 
   const handleTabChange = (value: string) => {
     const url =

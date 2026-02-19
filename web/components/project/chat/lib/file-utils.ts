@@ -46,7 +46,7 @@ export function extractFilesFromMarkdown(markdown: string): {
       markdown,
       codeBlockFileMap,
       codeBlockIndex,
-      previousCodeBlockEnd
+      previousCodeBlockEnd,
     )
     if (filePath) {
       const normalized = normalizePath(filePath)
@@ -87,7 +87,7 @@ export function extractFilesFromMessages(messages: Message[]): {
   const latestAssistant = [...messages]
     .reverse()
     .find(
-      (message) => message.role === "assistant" && !!message.content?.trim()
+      (message) => message.role === "assistant" && !!message.content?.trim(),
     )
 
   if (!latestAssistant?.content) return { files: [], sourceKey: null }
@@ -99,7 +99,7 @@ export function extractFilesFromMessages(messages: Message[]): {
       name: getDisplayName(path),
       code,
       additions: HARDCODED_ADDITIONS,
-    })
+    }),
   )
 
   return { files, sourceKey: latestAssistant.id || latestAssistant.content }

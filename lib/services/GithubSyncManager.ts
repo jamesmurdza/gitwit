@@ -16,7 +16,7 @@ export class GithubSyncManager {
   constructor(
     githubManager: GitHubManager,
     fileManager: FileManager,
-    container: Container
+    container: Container,
   ) {
     this.githubManager = githubManager
     this.fileManager = fileManager
@@ -47,7 +47,7 @@ export class GithubSyncManager {
         owner: this.githubManager.username,
         repo: repoInfo.repoName,
         ref: "heads/main",
-      }
+      },
     )
     const ref = refResponse?.data
     if (!ref || !ref.object?.sha) {
@@ -64,7 +64,7 @@ export class GithubSyncManager {
    */
   async checkIfPullNeeded(
     repoId: string,
-    localSha?: string
+    localSha?: string,
   ): Promise<{
     needsPull: boolean
     latestCommit?: {
@@ -85,7 +85,7 @@ export class GithubSyncManager {
           owner: this.githubManager.username,
           repo: repoInfo.repoName,
           ref: "heads/main",
-        }
+        },
       )
       const ref = refResponse?.data
       if (!ref || !ref.object?.sha) {
@@ -98,7 +98,7 @@ export class GithubSyncManager {
           owner: this.githubManager.username,
           repo: repoInfo.repoName,
           commit_sha: ref.object.sha,
-        }
+        },
       )
       const commit = commitResponse?.data
       if (!commit) {
@@ -127,7 +127,7 @@ export class GithubSyncManager {
    */
   async pullFromGitHub(
     repoId: string,
-    commitSha?: string
+    commitSha?: string,
   ): Promise<{
     success: boolean
     conflicts: Array<{
@@ -162,7 +162,7 @@ export class GithubSyncManager {
           // Skip directories
           try {
             const content = await this.fileManager.safeReadFile(
-              path.posix.join(this.dirName, filePath)
+              path.posix.join(this.dirName, filePath),
             )
             if (content != undefined) {
               currentFilesWithSHA.push({
@@ -181,15 +181,15 @@ export class GithubSyncManager {
       const remoteFiles = (await this.getFilesFromCommit(
         repoId,
         commitSha,
-        true
+        true,
       )) as Array<{ path: string; sha: string }>
 
       // Create maps for efficient lookup
       const currentFileMap = new Map(
-        currentFilesWithSHA.map((file) => [file.path, file])
+        currentFilesWithSHA.map((file) => [file.path, file]),
       )
       const remoteFileMap = new Map(
-        remoteFiles.map((file) => [file.path, file])
+        remoteFiles.map((file) => [file.path, file]),
       )
 
       // Find files to delete (exist locally but not in remote)
@@ -220,13 +220,13 @@ export class GithubSyncManager {
                   repoInfo as { exists: true; repoId: string; repoName: string }
                 ).repoName,
                 file_sha: remoteFile.sha,
-              }
+              },
             )
 
             const blob = blobResponse?.data
             if (blob && blob.content !== undefined) {
               const content = Buffer.from(blob.content, "base64").toString(
-                "utf-8"
+                "utf-8",
               )
 
               // Create the new file
@@ -237,7 +237,7 @@ export class GithubSyncManager {
           } catch (error) {
             console.error(
               `Failed to fetch remote content for ${filePath}:`,
-              error
+              error,
             )
           }
         } else if (currentFile.sha !== remoteFile.sha) {
@@ -256,14 +256,14 @@ export class GithubSyncManager {
                   repoInfo as { exists: true; repoId: string; repoName: string }
                 ).repoName,
                 file_sha: remoteFile.sha,
-              }
+              },
             )
 
             const blob = blobResponse?.data
             if (blob && blob.content !== undefined) {
               const remoteContent = Buffer.from(
                 blob.content,
-                "base64"
+                "base64",
               ).toString("utf-8")
 
               // Add to conflicts - don't update file yet, wait for user resolution
@@ -276,7 +276,7 @@ export class GithubSyncManager {
           } catch (error) {
             console.error(
               `Failed to fetch remote content for ${filePath}:`,
-              error
+              error,
             )
           }
         }
@@ -318,7 +318,7 @@ export class GithubSyncManager {
       resolution: "local" | "incoming"
       localContent: string
       incomingContent: string
-    }>
+    }>,
   ): Promise<void> {
     for (const res of resolutions) {
       const filePath = path.posix.join(this.dirName, res.path)
@@ -341,7 +341,7 @@ export class GithubSyncManager {
       githubContent: string
       resolution: "local" | "github" | "merged"
       mergedContent?: string
-    }>
+    }>,
   ): Promise<void> {
     for (const conflict of conflicts) {
       const filePath = path.posix.join(this.dirName, conflict.path)
@@ -378,7 +378,7 @@ export class GithubSyncManager {
   async getFilesFromCommit(
     repoId: string,
     commitSha?: string,
-    shaOnly: boolean = false
+    shaOnly: boolean = false,
   ): Promise<
     | Array<{ path: string; sha: string }>
     | Array<{ path: string; content: string }>
@@ -401,7 +401,7 @@ export class GithubSyncManager {
               repoInfo as { exists: true; repoId: string; repoName: string }
             ).repoName,
             commit_sha: commitSha,
-          }
+          },
         )
 
         const commit = commitResponse?.data
@@ -419,7 +419,7 @@ export class GithubSyncManager {
               repoInfo as { exists: true; repoId: string; repoName: string }
             ).repoName,
             ref: "heads/main",
-          }
+          },
         )
 
         const ref = refResponse?.data
@@ -437,7 +437,7 @@ export class GithubSyncManager {
           repo: (repoInfo as { exists: true; repoId: string; repoName: string })
             .repoName,
           tree_sha: treeSha,
-        }
+        },
       )
 
       const tree = treeResponse?.data
@@ -472,7 +472,7 @@ export class GithubSyncManager {
                     owner: this.githubManager.username,
                     repo: repoInfo.repoName,
                     file_sha: file.sha,
-                  }
+                  },
                 )
 
                 const blob = blobResponse?.data
@@ -480,7 +480,7 @@ export class GithubSyncManager {
                 if (blob && blob.content !== undefined) {
                   // Decode base64 content
                   const content = Buffer.from(blob.content, "base64").toString(
-                    "utf-8"
+                    "utf-8",
                   )
                   fileContents.push({
                     path: file.path,
@@ -490,7 +490,7 @@ export class GithubSyncManager {
               } catch (error) {
                 console.error(`Failed to fetch file ${file.path}:`, error)
               }
-            })
+            }),
           )
 
           // Add delay between batches to respect rate limits
@@ -531,7 +531,7 @@ export class GithubSyncManager {
    */
   async getChangedFilesEfficiently(
     repoId: string,
-    commitSha?: string
+    commitSha?: string,
   ): Promise<{
     modified: Array<{
       path: string
@@ -555,7 +555,7 @@ export class GithubSyncManager {
           // Skip directories
           try {
             const content = await this.fileManager.safeReadFile(
-              path.posix.join(this.dirName, filePath)
+              path.posix.join(this.dirName, filePath),
             )
             if (content != undefined) {
               currentFilesWithSHA.push({
@@ -574,17 +574,17 @@ export class GithubSyncManager {
       const remoteFiles = (await this.getFilesFromCommit(
         repoId,
         commitSha,
-        true
+        true,
       )) as Array<{ path: string; sha: string }>
 
       const currentFileMap = new Map(
-        currentFilesWithSHA.map((file) => [file.path, file])
+        currentFilesWithSHA.map((file) => [file.path, file]),
       )
       const remoteFileMap = new Map(
         remoteFiles.map((file) => [
           file.path,
           { path: file.path, sha: file.sha },
-        ])
+        ]),
       )
 
       const modified: Array<{
@@ -618,14 +618,14 @@ export class GithubSyncManager {
                   repoInfo as { exists: true; repoId: string; repoName: string }
                 ).repoName,
                 file_sha: remoteFile.sha,
-              }
+              },
             )
 
             const blob = blobResponse?.data
             if (blob && blob.content !== undefined) {
               const remoteContent = Buffer.from(
                 blob.content,
-                "base64"
+                "base64",
               ).toString("utf-8")
               modified.push({
                 path,

@@ -1,75 +1,49 @@
-import { AIRequest } from "../types"
+import type { PromptContext } from "../types"
 import { formatFileTree } from "./file-tree-formatter"
 
 /**
- * Prompt builder class that generates context-aware system prompts for AI interactions
- * Supports different modes (chat, edit, generate) and project templates
- *
- * @example
- * ```typescript
- * const builder = new PromptBuilder()
- * const prompt = builder.build({
- *   mode: "chat",
- *   context: { templateType: "nextjs", userId: "user123" },
- *   messages: []
- * })
- * ```
+ * Build a system prompt based on mode and context.
  */
-export class PromptBuilder {
-  /**
-   * Builds a system prompt based on the AI request mode and context
-   *
-   * @param request - AI request object containing mode and context information
-   * @returns Generated system prompt string tailored to the request
-   */
-  build(request: AIRequest): string {
-    const { mode } = request
-
-    switch (mode) {
-      case "edit":
-        return this.buildEditPrompt(request)
-      case "chat":
-      default:
-        return this.buildChatPrompt(request)
-    }
+export function buildPrompt(ctx: PromptContext): string {
+  switch (ctx.mode) {
+    case "edit":
+      return buildEditPrompt(ctx)
+    case "chat":
+    default:
+      return buildChatPrompt(ctx)
   }
+}
 
-  /**
-   * Builds a chat-oriented system prompt with project context and conventions
-   * Includes template-specific information when available
-   *
-   * @param request - AI request object with chat context
-   * @returns System prompt optimized for conversational AI interactions
-   */
-  private buildChatPrompt(request: AIRequest): string {
-    const { context } = request
-    const templateConfig =
-      context.templateType && context.templateConfigs
-        ? context.templateConfigs[context.templateType]
-        : null
+function buildChatPrompt(ctx: PromptContext): string {
+  const templateConfig =
+    ctx.templateType && ctx.templateConfigs
+      ? (ctx.templateConfigs[ctx.templateType] as
+          | { conventions?: string[] }
+          | undefined)
+      : null
 
-    let prompt = `You are an intelligent programming assistant for a ${
-      context.templateType || "web"
-    } project.`
+  let prompt = `You are an intelligent programming assistant for a ${
+    ctx.templateType || "web"
+  } project.`
 
-    if (templateConfig) {
-      prompt += `
+  if (templateConfig) {
+    prompt += `
 File Tree:
-${formatFileTree(context.fileTree || [])}
+${formatFileTree(ctx.fileTree || [])}
 
 Conventions:
-${templateConfig.conventions.join("\n")}
+${templateConfig.conventions?.join("\n") ?? ""}
 `
-    }
+  }
 
-    if (context.activeFileContent) {
-      prompt += `\n\nActive File Content:\n${context.activeFileContent}`
-    }
-    if (context.contextContent) {
-      prompt += `\n\nAdditional Context(selected files):\n${context.contextContent}`
-    }
+  if (ctx.activeFileContent) {
+    prompt += `\n\nActive File Content:\n${ctx.activeFileContent}`
+  }
+  if (ctx.contextContent) {
+    prompt += `\n\nAdditional Context(selected files):\n${ctx.contextContent}`
+  }
 
-    prompt += `
+  prompt += `
 
 🚨 CRITICAL INSTRUCTION: When providing code changes, show ONLY the modified sections, not the entire file. Use the **aider diff** format with search/replace blocks inside code blocks.
 
@@ -178,20 +152,11 @@ export function capitalize(str: string): string {
 >>>>>>> REPLACE
 \`\`\``
 
-    return prompt
-  }
+  return prompt
+}
 
-  /**
-   * Builds an edit-focused system prompt for code modification tasks
-   * Emphasizes minimal context and precise code changes
-   *
-   * @param request - AI request object with edit context
-   * @returns System prompt optimized for code editing operations
-   */
-  private buildEditPrompt(request: AIRequest): string {
-    const { context } = request
-
-    return `You are a code editor AI. Your task is to generate ONLY the code needed for the edit.
+function buildEditPrompt(ctx: PromptContext): string {
+  return `You are a code editor AI. Your task is to generate ONLY the code needed for the edit.
 
 Rules:
 - Return ONLY code, no explanations
@@ -200,11 +165,6 @@ Rules:
 - Preserve the exact formatting and style of the existing code
 - If multiple edits are needed, show them in order of appearance
 
-Current file: ${context.fileName || "unknown"}
-${
-  context.activeFileContent
-    ? `\nFile content:\n${context.activeFileContent}`
-    : ""
-}`
-  }
+Current file: ${ctx.fileName || "unknown"}
+${ctx.activeFileContent ? `\nFile content:\n${ctx.activeFileContent}` : ""}`
 }

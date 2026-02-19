@@ -1,6 +1,6 @@
-import { logFileDetected, mergeCode } from "@/app/actions/ai"
+import { apiClient } from "@/server/client"
 import { fileRouter } from "@/lib/api"
-import { TTab } from "@/lib/types"
+import { DiffSession, TTab } from "@/lib/types"
 import { useAppStore } from "@/store/context"
 import * as monaco from "monaco-editor"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -10,6 +10,11 @@ import {
   PrecomputeMergeArgs,
 } from "../chat/lib/types"
 import { normalizePath, pathMatchesTab } from "../chat/lib/utils"
+import {
+  applyKeepToSession,
+  applyRejectToSession,
+} from "./lib/diff-session-utils"
+import { resolveMergeResult } from "./lib/merge-resolver"
 
 interface UseAIFileActionsProps {
   projectId: string
@@ -38,7 +43,12 @@ export function useAIFileActions({
 }: UseAIFileActionsProps) {
   const getDraft = useAppStore((s) => s.getDraft)
 
-  const pendingDiffsQueueRef = useRef<Map<string, any>>(new Map())
+  const pendingDiffsQueueRef = useRef<
+    Map<
+      string,
+      { code: string; language?: string; options?: Record<string, unknown> }
+    >
+  >(new Map())
   const pendingApplyReadyRef = useRef<
     Map<string, { mergedCode: string; originalCode: string }>
   >(new Map())
@@ -152,18 +162,21 @@ export function useAIFileActions({
     }: PrecomputeMergeArgs): Promise<FileMergeResult> => {
       const normalizedPath = normalizePath(filePath)
 
-      // Log when file is detected from AI response
-      await logFileDetected(normalizedPath)
-
       const originalCode = await getCurrentFileContent(normalizedPath)
 
       try {
-        const mergedCode = await mergeCode(
-          code,
-          originalCode,
-          normalizedPath.split("/").pop() || normalizedPath,
-          projectId,
-        )
+        const res = await apiClient.ai["merge-code"].$post({
+          json: {
+            partialCode: code,
+            originalCode,
+            fileName: normalizedPath.split("/").pop() || normalizedPath,
+            projectId,
+          },
+        })
+        if (!res.ok) {
+          throw new Error("Merge request failed")
+        }
+        const { mergedCode } = await res.json()
         return { mergedCode, originalCode }
       } catch (error) {
         console.error("Auto-merge failed:", error)
@@ -249,50 +262,16 @@ export function useAIFileActions({
       // Use target path if provided, otherwise use target tab
       const targetPath = normalizedTargetPath || normalizePath(targetTab.id)
       try {
-        const normalizedPath = targetPath
-        let mergeResult: FileMergeResult | null = null
+        const mergeResult = await resolveMergeResult(
+          targetPath,
+          code,
+          targetTab.name,
+          projectId,
+          getCurrentFileContent,
+          options,
+        )
 
-        // 1. Check Precomputed Status
-        const mergeStatus = options?.getMergeStatus?.(normalizedPath)
-        // 2. If ready, verify content matches
-        if (mergeStatus?.status === "ready" && mergeStatus.result) {
-          const currentContent = await getCurrentFileContent(normalizedPath)
-          if (currentContent === mergeStatus.result.originalCode) {
-            mergeResult = mergeStatus.result
-          }
-        }
-        // 3. If pending, wait (poll)
-        else if (mergeStatus?.status === "pending" && options?.getMergeStatus) {
-          // Simple polling logic
-          let waited = 0
-          while (waited < 10000) {
-            await new Promise((r) => setTimeout(r, 100))
-            waited += 100
-            const updated = options.getMergeStatus(normalizedPath)
-            if (updated?.status === "ready" && updated.result) {
-              const current = await getCurrentFileContent(normalizedPath)
-              if (current === updated.result.originalCode) {
-                mergeResult = updated.result
-                break
-              }
-            }
-            if (updated?.status === "error") break
-          }
-        }
-
-        // 4. If still no result, calculate fresh
-        if (!mergeResult) {
-          const originalCode = await getCurrentFileContent(targetTab.id)
-          const mergedCode = await mergeCode(
-            code,
-            originalCode,
-            targetTab.name,
-            projectId,
-          )
-          mergeResult = { mergedCode, originalCode }
-        }
-
-        // 5. Apply to Editor
+        // Apply to Editor
         if (mergeResult) {
           const applied = handleApplyCodeWithDecorations(
             mergeResult.mergedCode,
@@ -456,85 +435,28 @@ export function useAIFileActions({
     updateFileDraft,
   ])
 
-  // --- Helper: Diff Session Logic ---
-  const applyKeepToSession = (session: {
-    combinedText: string
-    unresolvedBlocks: {
-      type: "added" | "removed"
-      start: number
-      end: number
-    }[]
-  }) => {
-    const lines = session.combinedText.split("\n")
-    const rangesToRemove: { start: number; end: number }[] = []
-
-    session.unresolvedBlocks.forEach((block) => {
-      if (block.type === "removed") {
-        rangesToRemove.push({ start: block.start, end: block.end })
-      }
-    })
-
-    rangesToRemove.sort((a, b) => b.start - a.start)
-
-    rangesToRemove.forEach((range) => {
-      // 1-based index to 0-based
-      lines.splice(range.start - 1, range.end - range.start + 1)
-    })
-
-    return lines.join("\n")
-  }
-
-  const applyRejectToSession = (session: {
-    combinedText: string
-    unresolvedBlocks: {
-      type: "added" | "removed"
-      start: number
-      end: number
-    }[]
-  }) => {
-    const lines = session.combinedText.split("\n")
-    const rangesToRemove: { start: number; end: number }[] = []
-
-    // For "Reject" (Reject Remaining):
-    // - Remove lines from "added" blocks (reject addition)
-    // - Keep lines from "removed" blocks (reject deletion -> keep original)
-    session.unresolvedBlocks.forEach((block) => {
-      if (block.type === "added") {
-        rangesToRemove.push({ start: block.start, end: block.end })
-      }
-    })
-
-    // Sort ranges descending to remove successfully
-    rangesToRemove.sort((a, b) => b.start - a.start)
-
-    rangesToRemove.forEach((range) => {
-      // 1-based index to 0-based
-      lines.splice(range.start - 1, range.end - range.start + 1)
-    })
-
-    return lines.join("\n")
-  }
-
   const getDiffSession = useAppStore((s) => s.getDiffSession)
   const clearDiffSession = useAppStore((s) => s.clearDiffSession)
 
-  const applyPrecomputedMerge = useCallback(
-    ({ filePath, mergedCode }: ApplyMergedFileArgs) => {
+  // Shared: resolve diff session and apply content update
+  const resolveAndEnqueue = useCallback(
+    (
+      filePath: string,
+      fallbackCode: string,
+      sessionTransform: (session: DiffSession) => string,
+      errorLabel: string,
+    ) => {
       const normalizedPath = normalizePath(filePath)
       const session = getDiffSession(normalizedPath)
 
-      let contentToApply = mergedCode
-
-      // If we have a diff session with unresolved blocks, applying "Keep" means
-      // we should apply the logic to the *session state*, not the raw merged code.
+      let contentToApply = fallbackCode
       if (session && session.unresolvedBlocks.length > 0) {
         try {
-          contentToApply = applyKeepToSession(session)
-          // Clear session after applying because we are fully resolving it
+          contentToApply = sessionTransform(session)
           clearDiffSession(normalizedPath)
         } catch (error) {
-          console.error("Failed to apply session keep logic:", error)
-}
+          console.error(`Failed to apply session ${errorLabel} logic:`, error)
+        }
       }
 
       return enqueueFileContentUpdate(filePath, contentToApply)
@@ -542,28 +464,16 @@ export function useAIFileActions({
     [enqueueFileContentUpdate, getDiffSession, clearDiffSession],
   )
 
+  const applyPrecomputedMerge = useCallback(
+    ({ filePath, mergedCode }: ApplyMergedFileArgs) =>
+      resolveAndEnqueue(filePath, mergedCode, applyKeepToSession, "keep"),
+    [resolveAndEnqueue],
+  )
+
   const restoreOriginalFile = useCallback(
-    ({ filePath, originalCode }: ApplyMergedFileArgs) => {
-      const normalizedPath = normalizePath(filePath)
-      const session = getDiffSession(normalizedPath)
-
-      let contentToApply = originalCode
-
-      // If we have a diff session, applying "Reject" means we should reject
-      // the remaining changes in the session, preserving what was already accepted/rejected/original.
-      if (session && session.unresolvedBlocks.length > 0) {
-        try {
-          contentToApply = applyRejectToSession(session)
-          // Clear session after resolving
-          clearDiffSession(normalizedPath)
-        } catch (error) {
-          console.error("Failed to apply session reject logic:", error)
-        }
-      }
-
-      return enqueueFileContentUpdate(filePath, contentToApply)
-    },
-    [enqueueFileContentUpdate, getDiffSession, clearDiffSession],
+    ({ filePath, originalCode }: ApplyMergedFileArgs) =>
+      resolveAndEnqueue(filePath, originalCode, applyRejectToSession, "reject"),
+    [resolveAndEnqueue],
   )
 
   return {

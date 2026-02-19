@@ -161,7 +161,7 @@ export function generateUsername(): string {
 }
 
 export async function generateUniqueUsername(
-  checkExists: (username: string) => Promise<boolean>
+  checkExists: (username: string) => Promise<boolean>,
 ): Promise<string> {
   const MAX_ATTEMPTS = 10
   let attempts = 0

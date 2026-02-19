@@ -57,11 +57,7 @@ import React, {
 import { toast } from "sonner"
 import { getIconForFile } from "vscode-icons-js"
 import { Button } from "../../../ui/button"
-import {
-  ALLOWED_FILE_TYPES,
-  ALLOWED_IMAGE_TYPES,
-  TEXT_LIKE_MIMES,
-} from "../lib/constants"
+import { ALLOWED_FILE_TYPES, ALLOWED_IMAGE_TYPES } from "../lib/constants"
 import { ContextTab } from "../lib/types"
 import { getAllFiles, shouldTreatAsContext } from "../lib/utils"
 import { useChat } from "../providers/chat-provider"
@@ -133,10 +129,7 @@ function ChatInput({
       if (item.type.startsWith("image/")) {
         e.preventDefault()
         const file = item.getAsFile()
-        if (
-          file &&
-          ALLOWED_IMAGE_TYPES.includes(file.type)
-        ) {
+        if (file && ALLOWED_IMAGE_TYPES.includes(file.type)) {
           const reader = new FileReader()
           reader.onload = () => {
             addContextTab({
@@ -155,7 +148,7 @@ function ChatInput({
         if (
           file &&
           ALLOWED_FILE_TYPES.some((type) =>
-            file.type.includes(type.replace("*", ""))
+            file.type.includes(type.replace("*", "")),
           )
         ) {
           e.preventDefault()
@@ -168,11 +161,7 @@ function ChatInput({
               content: reader.result as string,
             })
           }
-          if (TEXT_LIKE_MIMES.has(file.type)) {
-            reader.readAsDataURL(file)
-          } else {
-            reader.readAsDataURL(file)
-          }
+          reader.readAsDataURL(file)
         }
       } else if (item.type === "text/plain") {
         // Get text synchronously to check if it should be treated as context
@@ -205,7 +194,7 @@ function ChatInput({
       <form
         className={cn(
           "border-input bg-background cursor-text border rounded p-2 shadow-xs",
-          className
+          className,
         )}
         style={{ viewTransitionName: "chat-input" }}
         onSubmit={(e) => {
@@ -267,7 +256,7 @@ function ChatInputTextarea({
         "w-full resize-none rounded-none border-none px-2 py-3 shadow-none outline-none ring-0",
         "field-sizing-content max-h-[6lh] bg-transparent dark:bg-transparent",
         "focus-visible:ring-0",
-        className
+        className,
       )}
       rows={1}
       disabled={disabled}
@@ -304,8 +293,9 @@ function ChatInputActions({
   )
 }
 
-export interface ChatInputActionProps
-  extends React.ComponentProps<typeof Button> {
+export interface ChatInputActionProps extends React.ComponentProps<
+  typeof Button
+> {
   className?: string
   tooltip?: React.ReactNode
   children: React.ReactNode
@@ -494,7 +484,7 @@ function ChatInputModelSelect() {
                     <Check
                       className={cn(
                         "ml-auto",
-                        value === model.value ? "opacity-100" : "opacity-0"
+                        value === model.value ? "opacity-100" : "opacity-0",
                       )}
                     />
                   </CommandItem>
@@ -521,11 +511,10 @@ function ChatInputContextMenu() {
   const [contextOpenMenu, setContextOpenMenu] = useState(false)
   const codeContextTabs = React.useMemo(
     () => contextTabs.filter((tab) => tab.type === "code"),
-    [contextTabs]
+    [contextTabs],
   )
   const files = React.useMemo(() => getAllFiles(fileTree), [fileTree])
-  const isAllowedFileType = (type: string) =>
-    ALLOWED_FILE_TYPES.includes(type)
+  const isAllowedFileType = (type: string) => ALLOWED_FILE_TYPES.includes(type)
   const isAllowedImageType = (type: string) =>
     ALLOWED_IMAGE_TYPES.includes(type)
   const toggleCodeContextTab = React.useCallback(
@@ -538,22 +527,28 @@ function ChatInputContextMenu() {
         }
       }
     },
-    [codeContextTabs, addContextTab, removeContextTab]
+    [codeContextTabs, addContextTab, removeContextTab],
   )
-  const handleFileUpload: React.MouseEventHandler<HTMLDivElement> = (event) => {
-    event.preventDefault()
-    const fileInput = document.createElement("input")
-    fileInput.type = "file"
-    fileInput.accept = ALLOWED_FILE_TYPES.join(",")
-    fileInput.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        const fileType = file.type
-        if (!fileType || !isAllowedFileType(fileType)) {
-          toast.error("Unsupported file type. Select a valid document or code file.")
+  const createUploadHandler =
+    (
+      acceptTypes: string[],
+      contextType: "file" | "image",
+      validate: (type: string) => boolean,
+      errorMessage: string,
+    ): React.MouseEventHandler<HTMLDivElement> =>
+    (event) => {
+      event.preventDefault()
+      const fileInput = document.createElement("input")
+      fileInput.type = "file"
+      fileInput.accept = acceptTypes.join(",")
+      fileInput.onchange = (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0]
+        if (!file) return
+        if (!file.type || !validate(file.type)) {
+          toast.error(errorMessage)
           return
         }
-        if (isAllowedImageType(fileType)) {
+        if (contextType === "file" && isAllowedImageType(file.type)) {
           toast.error("Use the Images option to upload image files.")
           return
         }
@@ -561,55 +556,28 @@ function ChatInputContextMenu() {
         reader.onload = () => {
           addContextTab({
             id: nanoid(),
-            type: "file",
+            type: contextType,
             name: file.name,
             content: reader.result as string,
           })
           setContextOpenMenu(false)
         }
-        if (TEXT_LIKE_MIMES.has(file.type)) {
-          reader.readAsDataURL(file)
-        } else {
-          reader.readAsDataURL(file)
-        }
+        reader.readAsDataURL(file)
       }
+      fileInput.click()
     }
-    fileInput.click()
-  }
-  const handleImageUpload: React.MouseEventHandler<HTMLDivElement> = (
-    event
-  ) => {
-    event.preventDefault()
-    const fileInput = document.createElement("input")
-    fileInput.type = "file"
-    fileInput.accept = ALLOWED_IMAGE_TYPES.join(",")
-    fileInput.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        const fileType = file.type
-        if (!fileType || !isAllowedImageType(fileType)) {
-          toast.error("Only image files are supported in the Images section.")
-          return
-        }
-        const reader = new FileReader()
-        reader.onload = () => {
-          addContextTab({
-            id: nanoid(),
-            type: "image",
-            name: file.name,
-            content: reader.result as string,
-          })
-          setContextOpenMenu(false)
-        }
-        if (TEXT_LIKE_MIMES.has(file.type)) {
-          reader.readAsDataURL(file)
-        } else {
-          reader.readAsDataURL(file)
-        }
-      }
-    }
-    fileInput.click()
-  }
+  const handleFileUpload = createUploadHandler(
+    ALLOWED_FILE_TYPES,
+    "file",
+    isAllowedFileType,
+    "Unsupported file type. Select a valid document or code file.",
+  )
+  const handleImageUpload = createUploadHandler(
+    ALLOWED_IMAGE_TYPES,
+    "image",
+    isAllowedImageType,
+    "Only image files are supported in the Images section.",
+  )
   return (
     <DropdownMenu open={contextOpenMenu} onOpenChange={setContextOpenMenu}>
       <DropdownMenuTrigger asChild>
@@ -655,7 +623,7 @@ function ChatInputContextMenu() {
                     {files.map((file) => {
                       const imgSrc = `/icons/${getIconForFile(file.name)}`
                       const isSelected = codeContextTabs.some(
-                        (tab) => tab.name === file.name
+                        (tab) => tab.name === file.name,
                       )
                       return (
                         <CommandItem
@@ -701,5 +669,5 @@ export {
   ChatInputContextMenu,
   ChatInputModelSelect,
   ChatInputSubmit,
-  ChatInputTextarea
+  ChatInputTextarea,
 }

@@ -112,7 +112,7 @@ interface HandleTerminalDropResult {
 export function handleTerminalDrop(
   config: HandleTerminalDropConfig,
 ): HandleTerminalDropResult {
-  const { event, sourceContainerRef, targetContainerRef } = config
+  const { event, sourceContainerRef } = config
   const data = event.getData()
 
   // Validate panel data exists
@@ -208,8 +208,8 @@ export function loadDefaultGridviewLayout({ grid }: { grid: GridviewApi }) {
     id: "chat",
     component: "chat",
     location: [2],
-    minimumWidth: 220,
-    size: 300,
+    minimumWidth: 350,
+    size: 420,
     snap: true,
   })
   panel.api.setVisible(false)

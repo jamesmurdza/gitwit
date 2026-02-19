@@ -119,7 +119,7 @@ export default function ApiKeysSettings() {
               onUpdate={loadApiKeysStatus}
             />
           )
-        }
+        },
       )}
     </Accordion>
   )

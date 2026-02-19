@@ -1,5 +1,5 @@
 "use client"
-import { GenerateState } from "@/components/project/hooks/useMonacoEditor"
+import { GenerateState } from "@/components/project/hooks/useEditor"
 import { TTab } from "@/lib/types"
 import * as monaco from "monaco-editor"
 import { useGenerateWidget } from "../hooks/useGenerateWidget"

@@ -9,7 +9,7 @@ export interface CodeApplyContextType {
 }
 
 const CodeApplyContext = createContext<CodeApplyContextType | undefined>(
-  undefined
+  undefined,
 )
 
 export function CodeApplyProvider({

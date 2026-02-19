@@ -1,4 +1,8 @@
-export * from "./client"
-export * from "./providers"
-export * from "./types"
-export * from "./utils"
+export { createModel, resolveProviderConfig } from "./providers"
+export {
+  type AIProviderType,
+  type AIProviderConfig,
+  type FileTree,
+  type PromptContext,
+} from "./types"
+export { buildPrompt, formatFileTree, mergeAiderDiff } from "./utils"

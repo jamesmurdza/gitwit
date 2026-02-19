@@ -6,6 +6,7 @@ import {
   Instagram,
   Link,
   Linkedin,
+  type LucideIcon,
   MessageCircle,
   Twitch,
   Twitter,
@@ -13,10 +14,7 @@ import {
 } from "lucide-react"
 import { KnownPlatform } from "../types"
 
-export const socialIcons: Record<
-  KnownPlatform | "website",
-  React.ComponentType<any>
-> = {
+export const socialIcons: Record<KnownPlatform | "website", LucideIcon> = {
   github: Github,
   twitter: Twitter,
   instagram: Instagram,

@@ -23,7 +23,6 @@ export interface CodeBlockActionsProps {
 
 export function CodeBlockActions({
   code,
-  language,
   onApply,
   onReject,
   className,
@@ -39,7 +38,7 @@ export function CodeBlockActions({
   const tabs = useAppStore((s) => s.tabs)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const { onApplyCode, onRejectCode, messageId } = useCodeApply()
-  const { fileActionStatuses, mergeStatuses } = useChat()
+  const { fileActionStatuses } = useChat()
 
   const applyHandler = onApply ?? onApplyCode
   const rejectHandler = onReject ?? onRejectCode
@@ -86,7 +85,7 @@ export function CodeBlockActions({
   }, [activeTab?.id, activeTab?.name])
   const isActiveForPath = useMemo(
     () => (path: string) => pathMatchesTab(path, activeTab),
-    [activeTab?.id, activeTab?.name]
+    [activeTab?.id, activeTab?.name],
   )
   const computedIsForCurrentFile = useMemo(() => {
     if (typeof isForCurrentFile === "boolean") return isForCurrentFile
@@ -97,19 +96,13 @@ export function CodeBlockActions({
 
   const normalizedIntendedFile = useMemo(
     () => (intendedFile ? normalizePath(intendedFile) : undefined),
-    [intendedFile]
+    [intendedFile],
   )
 
   const externalStatus =
     messageId && normalizedIntendedFile
       ? fileActionStatuses[messageId]?.[normalizedIntendedFile]
       : undefined
-
-  // Check if merge is in progress for this file
-  const mergeStatus = normalizedIntendedFile
-    ? mergeStatuses[normalizedIntendedFile]
-    : undefined
-  const isMergePending = mergeStatus?.status === "pending"
 
   useEffect(() => {
     if (externalStatus === "applied") {
@@ -180,7 +173,7 @@ export function CodeBlockActions({
       ? cn(
           "absolute top-2 right-10 shrink-0 flex items-center gap-1",
           "opacity-0 group-hover:opacity-100 transition-all",
-          className
+          className,
         )
       : cn("flex items-center gap-1", className)
 

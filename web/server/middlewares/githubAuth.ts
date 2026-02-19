@@ -17,7 +17,7 @@ export const githubAuth = createMiddleware<GithubAppBindings>(
     if (!dbUser?.githubToken) {
       return c.json(
         { success: false, message: "GitHub authentication required" },
-        403
+        403,
       )
     }
     try {
@@ -28,8 +28,8 @@ export const githubAuth = createMiddleware<GithubAppBindings>(
     } catch (error) {
       return c.json(
         { success: false, message: "GitHub authentication failed" },
-        403
+        403,
       )
     }
-  }
+  },
 )

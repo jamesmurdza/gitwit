@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@bprogress/next": "^3.2.12",
@@ -18,11 +18,8 @@
     "@gitwit/db": "*",
     "@gitwit/lib": "*",
     "@gitwit/templates": "*",
-    "@hono/zod-validator": "^0.4.3",
+    "@hono/zod-validator": "^0.7.6",
     "@hookform/resolvers": "^3.9.1",
-    "@liveblocks/client": "^2.24.2",
-    "@liveblocks/react": "^2.24.2",
-    "@liveblocks/yjs": "^2.24.2",
     "@monaco-editor/react": "^4.6.0",
     "@paralleldrive/cuid2": "^2.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -42,7 +39,6 @@
     "@radix-ui/react-tabs": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.6",
     "@react-three/fiber": "^9.1.2",
-    "@scalar/hono-api-reference": "^0.9.1",
     "@streamdown/code": "^1.0.1",
     "@t3-oss/env-nextjs": "^0.13.6",
     "@tanstack/react-query": "^5.71.10",
@@ -61,14 +57,13 @@
     "dockview": "^4.13.1",
     "dockview-react": "^4.13.1",
     "dotenv": "^16.6.1",
-    "drizzle-orm": "^0.44.1",
+    "drizzle-orm": "^0.44.2",
     "embla-carousel": "^8.3.0",
     "embla-carousel-react": "^8.3.0",
     "embla-carousel-wheel-gestures": "^8.0.1",
     "framer-motion": "^11.2.3",
     "geist": "^1.3.0",
     "hono": "^4.7.11",
-    "hono-openapi": "^0.4.8",
     "lucide-react": "^0.511.0",
     "minimatch": "^3.1.2",
     "monaco-editor": "^0.52.2",
@@ -80,6 +75,7 @@
     "react-dom": "^19.1.2",
     "react-hook-form": "^7.54.2",
     "react-merge-refs": "^3.0.2",
+    "react-resizable-panels": "^3.0.6",
     "react-query-kit": "^3.3.1",
     "shiki": "^3.11.0",
     "socket.io-client": "^4.7.5",
@@ -91,10 +87,11 @@
     "use-stick-to-bottom": "^1.1.1",
     "vscode-icons-js": "^11.6.1",
     "yjs": "^13.6.15",
-    "zod": "^3.25.49",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@gitwit/eslint-config": "*",
+    "@gitwit/typescript-config": "*",
     "@types/minimatch": "^5.1.2",
     "@types/node": "^20.17.19",
     "@types/react": "^18.3.3",
@@ -104,6 +101,6 @@
     "postcss-import": "^16.1.0",
     "postcss-nesting": "^12.1.2",
     "tailwindcss": "^3.3.0",
-    "typescript": "^5"
+    "typescript": "^5.8.3"
   }
 }

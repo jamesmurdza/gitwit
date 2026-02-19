@@ -29,7 +29,7 @@ export default forwardRef(function PreviewWindow(
   },
   ref: React.Ref<{
     refreshIframe: () => void
-  }>
+  }>,
 ) {
   const [iframeKey, setIframeKey] = useState(0)
   const refreshIframe = () => {

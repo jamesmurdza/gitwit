@@ -1,6 +1,6 @@
 import { useSocket } from "@/context/SocketContext"
 import { useChangedFilesOptimistic } from "@/hooks/useChangedFilesOptimistic"
-import { fileRouter, FileTree } from "@/lib/api"
+import { fileRouter } from "@/lib/api"
 import { TFile, TFolder } from "@/lib/types"
 import { sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useParams } from "next/navigation"
 import * as React from "react"
 import { toast } from "sonner"
+import { insertNode, rebaseNodeIds, removeNode } from "./lib/file-tree-utils"
 
 export function useFileTree() {
   const { id: projectId } = useParams<{ id: string }>()
@@ -44,7 +45,7 @@ export function useFileTree() {
           return activeTab
         })
       },
-      onSuccess({ message }, { folderId }) {
+      onSuccess({ message }) {
         return queryClient
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
@@ -89,7 +90,7 @@ export function useFileTree() {
 
   const { mutate: renameFile, isPending: isRenamingFile } =
     fileRouter.rename.useMutation({
-      onSuccess({ message }, { newName }) {
+      onSuccess({ message }) {
         return queryClient
           .invalidateQueries(
             fileRouter.fileTree.getOptions({
@@ -247,75 +248,4 @@ export function useFileContent(
     isLoadingFileContent,
     prefetchFileContent,
   }
-}
-
-// Helper: remove a node by path, returning the removed node
-function removeNode(
-  nodes: FileTree,
-  targetPath: string,
-): FileTree[number] | null {
-  for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i]
-    if (node.id === targetPath) {
-      return nodes.splice(i, 1)[0]
-    }
-    if (node.type === "folder") {
-      const removed = removeNode(node.children, targetPath)
-      if (removed) return removed
-    }
-  }
-  return null
-}
-// Recursively update a node’s id (and its subtree) to live under `newParentPath`
-function rebaseNodeIds<
-  N extends {
-    id: string
-    name: string
-    type: "file" | "folder"
-    children?: any
-  },
->(node: N, newParentPath: string): N {
-  const parent = newParentPath === "/" ? "" : newParentPath.replace(/\/$/, "")
-
-  const newId = `${parent}/${node.name}`
-
-  if (node.type === "folder" && Array.isArray(node.children)) {
-    return {
-      ...node,
-      id: newId,
-      children: node.children.map((child) => rebaseNodeIds(child, newId)),
-    } as N
-  }
-
-  return {
-    ...node,
-    id: newId,
-  } as N
-}
-
-// Helper: insert a node into a folder (or root if folderPath is empty)
-function insertNode(
-  nodes: FileTree,
-  folderPath: string,
-  nodeToInsert: FileTree[number],
-): boolean {
-  if (folderPath === "/") {
-    nodes.push(nodeToInsert)
-    return true
-  }
-
-  for (const node of nodes) {
-    if (node.type === "folder") {
-      if (node.id === folderPath) {
-        node.children.push(nodeToInsert)
-        return true
-      }
-      // Recurse into subfolders
-      if (insertNode(node.children, folderPath, nodeToInsert)) {
-        return true
-      }
-    }
-  }
-
-  return false
 }

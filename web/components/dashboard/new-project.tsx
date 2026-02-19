@@ -48,15 +48,15 @@ const formSchema = z.object({
     .transform((val) => val.trim())
     .refine(
       (value) => value.length > 0,
-      "Project name cannot be empty or only spaces"
+      "Project name cannot be empty or only spaces",
     )
     .refine(
       (value) => /^[a-zA-Z0-9_ ]+$/.test(value),
-      "Project name can only contain letters, numbers, underscores, and spaces"
+      "Project name can only contain letters, numbers, underscores, and spaces",
     )
     .refine(
       (value) => !/  /.test(value),
-      "Name must be alphanumeric and can contain underscores"
+      "Name must be alphanumeric and can contain underscores",
     ),
   visibility: z.enum(["public", "private"]),
 })
@@ -96,20 +96,20 @@ export default function NewProjectModal({
       setSelected(id)
       emblaApi?.scrollTo(index)
     },
-    [emblaApi]
+    [emblaApi],
   )
   const filteredTemplates = useMemo(
     () =>
       projectTemplates.filter(
         (item) =>
           item.name.toLowerCase().includes(search.toLowerCase()) ||
-          item.description.toLowerCase().includes(search.toLowerCase())
+          item.description.toLowerCase().includes(search.toLowerCase()),
       ),
-    [search, projectTemplates]
+    [search, projectTemplates],
   )
   const emptyTemplates = useMemo(
     () => filteredTemplates.length === 0,
-    [filteredTemplates]
+    [filteredTemplates],
   )
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user.isSignedIn) return
@@ -144,7 +144,7 @@ export default function NewProjectModal({
             <div
               className={cn(
                 "grid grid-flow-col gap-x-2  min-h-[97px]",
-                emptyTemplates ? "auto-cols-[100%]" : "auto-cols-[200px]"
+                emptyTemplates ? "auto-cols-[100%]" : "auto-cols-[200px]",
               )}
             >
               {filteredTemplates.map((item, i) => (
@@ -159,7 +159,7 @@ export default function NewProjectModal({
                     selected === item.id
                       ? "shadow-foreground"
                       : "shadow-border",
-                    "shadow-[0_0_0_1px_inset] rounded-md border bg-card text-card-foreground text-left p-4 flex flex-col transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                    "shadow-[0_0_0_1px_inset] rounded-md border bg-card text-card-foreground text-left p-4 flex flex-col transition-all focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed",
                   )}
                 >
                   <div className="space-x-2 flex items-center justify-start w-full">
@@ -188,7 +188,7 @@ export default function NewProjectModal({
             <div
               className={cn(
                 "absolute transition-all opacity-100 duration-400 bg-gradient-to-r from-background via-background to-transparent w-14 pl-1 left-0 top-0 -translate-x-1 bottom-0 h-full flex items-center",
-                prevBtnDisabled && "opacity-0 pointer-events-none"
+                prevBtnDisabled && "opacity-0 pointer-events-none",
               )}
             >
               <Button
@@ -202,7 +202,7 @@ export default function NewProjectModal({
             <div
               className={cn(
                 "absolute transition-all opacity-100 duration-400 bg-gradient-to-l from-background via-background to-transparent w-14 pl-1 right-0 top-0 translate-x-1 bottom-0 h-full flex items-center",
-                nextBtnDisabled && "opacity-0 pointer-events-none"
+                nextBtnDisabled && "opacity-0 pointer-events-none",
               )}
             >
               <Button

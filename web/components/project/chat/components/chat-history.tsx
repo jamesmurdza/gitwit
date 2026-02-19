@@ -44,7 +44,7 @@ function HistoryItem({
     <div
       className={cn(
         "group relative rounded-lg px-2 py-1 mb-2 cursor-pointer transition-colors",
-        isActive ? "bg-accent/50 border border-border" : "hover:bg-accent/20"
+        isActive ? "bg-accent/50 border border-border" : "hover:bg-accent/20",
       )}
       onClick={() => onSwitch(thread.id)}
     >
@@ -91,7 +91,7 @@ export function ChatHistory() {
       .filter((t: ChatThread) => t.projectId === projectId)
       .sort(
         (a: ChatThread, b: ChatThread) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
       )
   }, [threads, projectId])
   const handleNewThread = () => {

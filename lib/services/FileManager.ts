@@ -86,7 +86,7 @@ export class FileManager {
     // Run the command to retrieve paths
     // Ignore node_modules until we make this faster
     const result = await this.container.commands.run(
-      `cd /home/user/project && find * \\( -path 'node_modules' -prune \\) -o \\( -type d -exec echo {}/ \\; -o -type f -exec echo {} \\; \\)`
+      `cd /home/user/project && find * \\( -path 'node_modules' -prune \\) -o \\( -type d -exec echo {}/ \\; -o -type f -exec echo {} \\; \\)`,
     )
 
     // Process the stdout into an array of paths
@@ -125,7 +125,7 @@ export class FileManager {
             console.error(`[FileManager] Error handling event:`, error)
           }
         },
-        { timeoutMs: 0 }
+        { timeoutMs: 0 },
       )
       this.fileWatchers.push(handle)
       return handle
@@ -142,7 +142,7 @@ export class FileManager {
         if (item.type === "dir") {
           await this.watchDirectory(item.path)
         }
-      })
+      }),
     )
   }
 
@@ -156,7 +156,7 @@ export class FileManager {
   // Get folder content
   async getFolder(folderId: string): Promise<string[]> {
     return (await this.container.files.list(folderId)).map((entry) =>
-      path.posix.join(folderId, entry.name)
+      path.posix.join(folderId, entry.name),
     )
   }
 
@@ -181,7 +181,7 @@ export class FileManager {
   // Move a file to a different folder
   async moveFile(
     fileId: string,
-    folderId: string
+    folderId: string,
   ): Promise<(TFolder | TFile)[]> {
     const newFileId = path.posix.join(folderId, path.posix.basename(fileId))
     await this.moveFileInContainer(fileId, newFileId)
@@ -192,11 +192,11 @@ export class FileManager {
   // Move a file within the container
   private async moveFileInContainer(oldPath: string, newPath: string) {
     const fileContents = await this.container.files.read(
-      path.posix.join(this.dirName, oldPath)
+      path.posix.join(this.dirName, oldPath),
     )
     await this.container.files.write(
       path.posix.join(this.dirName, newPath),
-      fileContents
+      fileContents,
     )
     await this.container.files.remove(path.posix.join(this.dirName, oldPath))
   }
@@ -218,12 +218,12 @@ export class FileManager {
       `cd ${this.dirName} && tar --exclude="node_modules" --exclude="venv" -czvf ${tempTarPath} .`,
       {
         timeoutMs: 5000,
-      }
+      },
     )
 
     // Read the archive contents in base64 format
     const base64Result = await this.container.commands.run(
-      `cat ${tempTarPath} | base64 -w 0`
+      `cat ${tempTarPath} | base64 -w 0`,
     )
 
     // Delete the archive
@@ -263,7 +263,7 @@ export class FileManager {
     await Promise.all(
       this.fileWatchers.map(async (handle: WatchHandle) => {
         await handle.stop()
-      })
+      }),
     )
   }
 

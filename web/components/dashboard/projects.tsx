@@ -6,17 +6,6 @@ import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import ProjectCard from "./projectCard"
 
-const colors: { [key: string]: number[][] } = {
-  react: [
-    [71, 207, 237],
-    [30, 126, 148],
-  ],
-  node: [
-    [86, 184, 72],
-    [59, 112, 52],
-  ],
-}
-
 export default function DashboardProjects({
   sandboxes,
   q,
@@ -36,7 +25,7 @@ export default function DashboardProjects({
         visibility: newVisibility,
       })
     },
-    []
+    [],
   )
 
   const onDelete = useMemo(
@@ -45,7 +34,7 @@ export default function DashboardProjects({
       toast(`Project ${sandbox.name} deleted.`)
       await deleteSandbox(sandbox.id)
     },
-    []
+    [],
   )
 
   useEffect(() => {

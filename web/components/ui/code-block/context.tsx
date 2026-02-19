@@ -1,11 +1,11 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext } from "react"
 
 interface CodeBlockContextType {
-  code: string;
+  code: string
 }
 
 export const CodeBlockContext = createContext<CodeBlockContextType>({
   code: "",
-});
+})
 
-export const useCodeBlockContext = () => useContext(CodeBlockContext);
+export const useCodeBlockContext = () => useContext(CodeBlockContext)

@@ -77,8 +77,8 @@ export default function Terminals() {
                   prev.map((term) =>
                     term.id === activeTerminalId
                       ? { ...term, terminal: t }
-                      : term
-                  )
+                      : term,
+                  ),
                 )
               }}
               visible={activeTerminalId === term.id}

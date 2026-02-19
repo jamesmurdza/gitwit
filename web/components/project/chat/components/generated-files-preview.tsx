@@ -11,7 +11,7 @@ import type {
   PrecomputeMergeArgs,
 } from "../lib/types"
 import { normalizePath } from "../lib/utils"
-import { useChat } from "../providers/chat-provider"
+import { type MergeState, useChat } from "../providers/chat-provider"
 
 type GeneratedFilesPreviewProps = {
   files?: GeneratedFile[]
@@ -110,14 +110,6 @@ export function GeneratedFilesPreview({
     return fileFingerprints
   }, [generatedFiles, sourceKey, shouldUseDerived])
 
-  // Create a stable key from file paths to track when new files arrive
-  const filesKey = React.useMemo(() => {
-    return generatedFiles
-      .map((file) => file.path)
-      .sort()
-      .join("|")
-  }, [generatedFiles])
-
   const mergeStatusRef = React.useRef(mergeStatuses)
   React.useEffect(() => {
     mergeStatusRef.current = mergeStatuses
@@ -164,10 +156,10 @@ export function GeneratedFilesPreview({
 
   React.useEffect(() => {
     setMergeStatuses((prev) => {
-      const next: Record<string, any> = {}
+      const next: Record<string, MergeState> = {}
       generatedFiles.forEach((file) => {
         // Only set to idle if it doesn't exist, preserve existing statuses
-        next[file.path] = prev[file.path] ?? { status: "idle" }
+        next[file.path] = prev[file.path] ?? { status: "idle" as const }
       })
       return next
     })
@@ -182,8 +174,6 @@ export function GeneratedFilesPreview({
   React.useEffect(() => {
     if (!precomputeMergeRef.current || !batchKey) return
 
-    // Store current batch to check against during async operations
-    const currentBatch = batchKey
     const currentPrecomputeMerge = precomputeMergeRef.current
 
     // Collect all files to process first, then start ALL merges in parallel
@@ -296,194 +286,109 @@ export function GeneratedFilesPreview({
     })
   }, [generatedFiles, mergeStatuses, activeFileId, onApplyCode, onOpenFile])
 
-  const handleKeepFile = React.useCallback(
-    (file: GeneratedFile) => {
-      if (!applyPrecomputedMerge) {
-        return
-      }
-      const key = file.path
-      const currentStatus = mergeStatusRef.current[key]
-      const startLoading = () =>
-        setApplyingMap((prev) => ({ ...prev, [key]: true }))
-      const stopLoading = () =>
-        setApplyingMap((prev) => {
-          const next = { ...prev }
-          delete next[key]
-          return next
-        })
+  const createFileAction = React.useCallback(
+    (
+      actionFn: ((args: ApplyMergedFileArgs) => Promise<void>) | undefined,
+      setLoadingMap: React.Dispatch<
+        React.SetStateAction<Record<string, boolean>>
+      >,
+      resolvedStatus: "applied" | "rejected",
+    ) => {
+      return (file: GeneratedFile) => {
+        if (!actionFn) return
+        const key = file.path
+        const currentStatus = mergeStatusRef.current[key]
 
-      const applyWithResult = (result: FileMergeResult) =>
-        applyPrecomputedMerge({
-          filePath: key,
-          mergedCode: result.mergedCode,
-          originalCode: result.originalCode,
-          displayName: file.name,
-        })
-          .then(() => {
-            setResolvedFiles((prev) => ({ ...prev, [key]: "applied" }))
-            if (latestAssistantId) {
-              markFileActionStatus(latestAssistantId, key, "applied")
-            }
+        const startLoading = () =>
+          setLoadingMap((prev) => ({ ...prev, [key]: true }))
+        const stopLoading = () =>
+          setLoadingMap((prev) => {
+            const next = { ...prev }
+            delete next[key]
+            return next
           })
-          .catch((error) => {
-            console.error("Failed to apply file changes:", error)
-            // Don't mark as applied if it failed
-          })
-          .finally(stopLoading)
 
-      const waitForJob = (promise: Promise<FileMergeResult>) => {
-        promise
-          .then((result) => {
-            if (batchRef.current !== batchKey) {
+        const executeWithResult = (result: FileMergeResult) =>
+          actionFn({
+            filePath: key,
+            mergedCode: result.mergedCode,
+            originalCode: result.originalCode,
+            displayName: file.name,
+          })
+            .then(() => {
+              setResolvedFiles((prev) => ({ ...prev, [key]: resolvedStatus }))
+              if (latestAssistantId) {
+                markFileActionStatus(latestAssistantId, key, resolvedStatus)
+              }
+            })
+            .catch((error) => {
+              console.error(`Failed to ${resolvedStatus} file:`, error)
+            })
+            .finally(stopLoading)
+
+        const waitForJob = (promise: Promise<FileMergeResult>) => {
+          promise
+            .then((result) => {
+              if (batchRef.current !== batchKey) {
+                stopLoading()
+                return
+              }
+              setMergeStatuses((prev) => ({
+                ...prev,
+                [key]: { status: "ready", result },
+              }))
+              return executeWithResult(result)
+            })
+            .catch((error) => {
+              setMergeStatuses((prev) => ({
+                ...prev,
+                [key]: {
+                  status: "error",
+                  error: error?.message ?? `Failed to ${resolvedStatus}`,
+                },
+              }))
               stopLoading()
-              return
-            }
-            setMergeStatuses((prev) => ({
-              ...prev,
-              [key]: { status: "ready", result },
-            }))
-            return applyWithResult(result)
-          })
-          .catch((error) => {
-            setMergeStatuses((prev) => ({
-              ...prev,
-              [key]: {
-                status: "error",
-                error: error?.message ?? "Failed to apply",
-              },
-            }))
-            stopLoading()
-          })
+            })
+        }
+
+        startLoading()
+
+        if (currentStatus?.status === "ready") {
+          executeWithResult(currentStatus.result)
+          return
+        }
+
+        let job = mergeJobsRef.current.get(key)
+        if (!job && file.code && precomputeMerge) {
+          job = precomputeMerge({ filePath: key, code: file.code })
+          mergeJobsRef.current.set(key, job)
+          setMergeStatuses((prev) => ({
+            ...prev,
+            [key]: { status: "pending" },
+          }))
+        }
+
+        if (job) {
+          waitForJob(job)
+          return
+        }
+
+        stopLoading()
       }
-
-      startLoading()
-
-      // If we have a ready merge, use it directly (skip file content check to avoid delay)
-      if (currentStatus?.status === "ready") {
-        // Use precomputed merge directly - no need to check file content again
-        applyWithResult(currentStatus.result)
-        return
-      }
-
-      let job = mergeJobsRef.current.get(key)
-      if (!job && file.code && precomputeMerge) {
-        job = precomputeMerge({ filePath: key, code: file.code })
-        mergeJobsRef.current.set(key, job)
-        setMergeStatuses((prev) => ({
-          ...prev,
-          [key]: { status: "pending" },
-        }))
-      }
-
-      if (job) {
-        waitForJob(job)
-        return
-      }
-
-      stopLoading()
     },
-    [
-      applyPrecomputedMerge,
-      precomputeMerge,
-      batchKey,
-      latestAssistantId,
-      markFileActionStatus,
-      getCurrentFileContent,
-    ],
+    [precomputeMerge, batchKey, latestAssistantId, markFileActionStatus],
+  )
+
+  const handleKeepFile = React.useCallback(
+    (file: GeneratedFile) =>
+      createFileAction(applyPrecomputedMerge, setApplyingMap, "applied")(file),
+    [createFileAction, applyPrecomputedMerge],
   )
 
   const handleRejectFile = React.useCallback(
-    (file: GeneratedFile) => {
-      if (!restoreOriginalFile) {
-        return
-      }
-      const key = file.path
-      const currentStatus = mergeStatusRef.current[key]
-      const startLoading = () =>
-        setRejectingMap((prev) => ({ ...prev, [key]: true }))
-      const stopLoading = () =>
-        setRejectingMap((prev) => {
-          const next = { ...prev }
-          delete next[key]
-          return next
-        })
-
-      const revertWithResult = (result: FileMergeResult) =>
-        restoreOriginalFile({
-          filePath: key,
-          mergedCode: result.mergedCode,
-          originalCode: result.originalCode,
-          displayName: file.name,
-        })
-          .then(() => {
-            setResolvedFiles((prev) => ({ ...prev, [key]: "rejected" }))
-            if (latestAssistantId) {
-              markFileActionStatus(latestAssistantId, key, "rejected")
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to restore file:", error)
-            // Don't mark as rejected if it failed
-          })
-          .finally(stopLoading)
-
-      const waitForJob = (promise: Promise<FileMergeResult>) => {
-        promise
-          .then((result) => {
-            if (batchRef.current !== batchKey) {
-              stopLoading()
-              return
-            }
-            setMergeStatuses((prev) => ({
-              ...prev,
-              [key]: { status: "ready", result },
-            }))
-            return revertWithResult(result)
-          })
-          .catch((error) => {
-            console.error("Reject failed:", error)
-            setMergeStatuses((prev) => ({
-              ...prev,
-              [key]: {
-                status: "error",
-                error: error?.message ?? "Failed to reject",
-              },
-            }))
-            stopLoading()
-          })
-      }
-
-      startLoading()
-
-      if (currentStatus?.status === "ready") {
-        revertWithResult(currentStatus.result)
-        return
-      }
-
-      let job = mergeJobsRef.current.get(key)
-      if (!job && file.code && precomputeMerge) {
-        job = precomputeMerge({ filePath: key, code: file.code })
-        mergeJobsRef.current.set(key, job)
-        setMergeStatuses((prev) => ({
-          ...prev,
-          [key]: { status: "pending" },
-        }))
-      }
-
-      if (job) {
-        waitForJob(job)
-        return
-      }
-
-      stopLoading()
-    },
-    [
-      restoreOriginalFile,
-      precomputeMerge,
-      batchKey,
-      markFileActionStatus,
-      latestAssistantId,
-    ],
+    (file: GeneratedFile) =>
+      createFileAction(restoreOriginalFile, setRejectingMap, "rejected")(file),
+    [createFileAction, restoreOriginalFile],
   )
 
   if (!generatedFiles.length) {
@@ -574,9 +479,6 @@ export function GeneratedFilesPreview({
           const isRejecting = rejectingMap[file.path]
           const isProcessing = isApplying || isRejecting
           const isPreparing = status === "pending"
-
-          // Double check resolved status here to prevent flicker
-          const messageId = sourceKey || latestAssistantId
 
           if (resolvedFiles[file.path]) return null
 

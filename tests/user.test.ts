@@ -182,7 +182,7 @@ describe("DELETE /api/user", () => {
 describe("GET /api/user/check-username", () => {
   test("Should return true if username exists", async () => {
     const res = await apiClient.get(
-      `/user/check-username?username=${testUser.username}`
+      `/user/check-username?username=${testUser.username}`,
     )
     const body = res.data
 
@@ -192,7 +192,7 @@ describe("GET /api/user/check-username", () => {
 
   test("Should return false if username doesn't exist", async () => {
     const res = await apiClient.get(
-      "/user/check-username?username=nonexistent_user"
+      "/user/check-username?username=nonexistent_user",
     )
     const body = res.data
 

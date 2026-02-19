@@ -2,13 +2,13 @@
 
 ![Screenshot 2025-06-26 at 7 45 45 PM](https://github.com/user-attachments/assets/dbb5f9e9-1407-4e28-bc3f-14e2db0ef03d)
 
-GitWit is an open-source cloud-based code editing environment with custom AI code generation, live preview, real-time collaboration, and AI chat.
+GitWit is an open-source cloud-based code editing environment with custom AI code generation, live preview, and AI chat.
 
 For the latest updates, join our Discord server: [discord.gitwit.dev](https://discord.gitwit.dev/).
 
 ## Minimal Setup
 
-A quick overview of the tech before we start: The deployment uses a **NextJS** app for the frontend and an **ExpressJS** server on the backend.
+A quick overview of the tech before we start: This is a **Turborepo** monorepo with a **Next.js** app for the frontend (with **Hono** API routes), and an **Express** server on the backend for WebSocket/real-time connections.
 
 **Required accounts to get started:**
 
@@ -158,11 +158,7 @@ Follow these steps to call the `qwen.qwen3-32b-v1:0` model through Amazon Bedroc
      "Statement": [
        {
          "Effect": "Allow",
-         "Action": [
-           "bedrock:*",
-           "kms:GenerateDataKey",
-           "kms:Decrypt"
-         ],
+         "Action": ["bedrock:*", "kms:GenerateDataKey", "kms:Decrypt"],
          "Resource": "*"
        }
      ]
@@ -347,14 +343,7 @@ If you've done this and it works, let us know and we'll add your template to Git
 
 To run the test suite, ensure both web app and server are running.
 
-First, install dependencies in the test directory:
-
-```bash
-cd tests
-npm install
-```
-
-Set up the following environment variables in the test directory:
+Set up the following environment variables in the `tests/` directory:
 
 ```
 GITHUB_PAT=ghp_xxxxxxxxxxxxxxxxxxxxxx
@@ -363,7 +352,7 @@ CLERK_TEST_USER_ID=user_xxxxxxxxxxxxxxxxxxxxxx
 
 **Note:** The `CLERK_TEST_USER_ID` should match the user ID that was used to sign up and is stored in your PostgreSQL database. You can find this ID in your database's users table or from your Clerk dashboard.
 
-Make sure both web app and server are running, then execute:
+Make sure both web app and server are running, then execute from the project root:
 
 ```bash
 npm run test

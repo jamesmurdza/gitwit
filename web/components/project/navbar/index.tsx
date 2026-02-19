@@ -6,7 +6,6 @@ import UserButton from "@/components/ui/userButton"
 import { Pencil } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
-// import { Avatars } from "../live/avatars"
 import { useProjectContext } from "@/context/project-context"
 import DeployButtonModal from "./deploy"
 import DownloadButton from "./downloadButton"
@@ -64,15 +63,9 @@ export default function Navbar({
           sandboxData={project}
         />
         <div className="flex items-center h-full space-x-4">
-          {/* <Avatars /> */}
-
           {isOwner ? (
             <>
               <DeployButtonModal data={project} userData={user} />
-              {/* <Button variant="outline" onClick={() => setIsShareOpen(true)}>
-                <Users className="w-4 h-4 mr-2" />
-                Share
-              </Button> */}
               <DownloadButton name={project.name} projectId={project.id} />
             </>
           ) : null}

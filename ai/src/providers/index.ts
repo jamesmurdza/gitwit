@@ -1,308 +1,139 @@
 import { bedrock } from "@ai-sdk/amazon-bedrock"
 import { anthropic, createAnthropic } from "@ai-sdk/anthropic"
 import { createOpenAI, openai } from "@ai-sdk/openai"
-import { generateText, LanguageModel, streamText, Tool, tool } from "ai"
-import { z } from "zod"
-import { AIProviderConfig, AIRequest, AITool } from "../types"
-import { logger, StreamHandler } from "../utils"
+import type { LanguageModel } from "ai"
+import { AIProviderConfig, AIProviderType } from "../types"
 
-/**
- * AI provider class that handles communication with different AI services
- * Supports Anthropic Claude and OpenAI models
- *
- * @example
- * ```typescript
- * const provider = new AIProvider({
- *   provider: "anthropic",
- *   modelId: "claude-3-5-sonnet-20241022"
- * })
- * const response = await provider.generate(request)
- * ```
- */
-export class AIProvider {
-  private model: LanguageModel
-  private logger: typeof logger
-  private tools: Record<string, Tool> = {}
+const DEFAULT_MODELS: Record<AIProviderType, string> = {
+  anthropic: "claude-sonnet-4-20250514",
+  openai: "gpt-4o",
+  openrouter: "anthropic/claude-sonnet-4-20250514",
+  bedrock: "anthropic.claude-3-sonnet-20240229-v1:0",
+}
 
-  /**
-   * Creates a new AI provider instance with the specified configuration
-   *
-   * @param config - Configuration object specifying the provider type and model settings
-   */
-  constructor(config: AIProviderConfig) {
-    this.logger = logger.child({
-      provider: config.provider,
-      model: config.modelId,
-    })
-
-    this.model = this.initializeModel(config)
-
-    this.logger.info("AI Provider initialized", {
-      toolCount: Object.keys(this.tools).length,
-    })
-  }
-
-  /**
-   * Set tools for this provider instance
-   */
-  setTools(aiTools: Record<string, AITool>): void {
-    this.tools = this.convertTools(aiTools)
-    this.logger.info("Tools updated", {
-      toolCount: Object.keys(this.tools).length,
-    })
-  }
-
-  /**
-   * Converts AITool definitions to Vercel AI SDK tool format
-   */
-  private convertTools(aiTools: Record<string, AITool>): Record<string, Tool> {
-    const convertedTools: Record<string, Tool> = {}
-
-    for (const [name, aiTool] of Object.entries(aiTools)) {
-      convertedTools[name] = tool({
-        description: aiTool.description || "",
-        parameters: aiTool.parameters || z.object({}),
-        execute: aiTool.execute,
-      })
-    }
-
-    return convertedTools
-  }
-
-  /**
-   * Initializes the appropriate AI model based on the provider configuration
-   *
-   * @param config - Provider configuration object
-   * @returns Initialized language model instance
-   * @throws {Error} When an unsupported provider is specified
-   */
-  private initializeModel(config: AIProviderConfig): LanguageModel {
-    this.logger.debug("Initializing model", {
-      provider: config.provider,
-      modelId: config.modelId,
-    })
-
-    switch (config.provider) {
-      case "anthropic":
-        if (config.apiKey) {
-          const customAnthropic = createAnthropic({
-            apiKey: config.apiKey,
-          })
-          return customAnthropic(config.modelId!)
-        }
-        return anthropic(config.modelId!)
-      case "openai":
-        if (config.apiKey) {
-          const customOpenAI = createOpenAI({
-            apiKey: config.apiKey,
-          })
-          return customOpenAI(config.modelId!)
-        }
-        return openai(config.modelId!)
-      case "openrouter": {
-        const modelId = config.modelId || process.env.OPENROUTER_MODEL_ID
-        const openrouter = createOpenAI({
-          apiKey: config.apiKey,
-          baseURL: "https://openrouter.ai/api/v1",
-        })
-        return openrouter(modelId!)
-      }
-      case "bedrock": {
-        if (!config.region) throw new Error("AWS region required for Bedrock")
-        const modelId = config.modelId || process.env.AWS_MODEL_ID
-        if (!modelId)
-          throw new Error(
-            "Bedrock model ID required (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0')"
-          )
-        return bedrock(modelId)
-      }
-      default:
-        throw new Error(`Unsupported provider: ${config.provider}`)
-    }
-  }
-
-  /**
-   * Generates a streaming AI response
-   * Returns a ReadableStream that can be consumed chunk by chunk
-   *
-   * @param request - AI request object containing messages and generation parameters
-   * @returns Promise that resolves to an HTTP Response with a streaming body
-   * @throws {Error} When stream generation fails or produces no content
-   */
-  async generateStream(request: AIRequest) {
-    const { messages, temperature, maxTokens, maxSteps = 1 } = request
-
-    this.logger.debug("Generating stream", {
-      messageCount: messages.length,
-      temperature,
-      maxTokens,
-      maxSteps,
-      toolCount: Object.keys(this.tools).length,
-    })
-
-    try {
-      const result = await streamText({
-        model: this.model,
-        messages,
-        temperature,
-        maxTokens,
-        maxSteps,
-        tools: this.tools,
-      })
-
-      const encoder = new TextEncoder()
-      let chunkCount = 0
-
-      const stream = new ReadableStream({
-        async start(controller) {
-          try {
-            for await (const chunk of result.textStream) {
-              chunkCount++
-              controller.enqueue(encoder.encode(chunk))
-            }
-
-            if (chunkCount === 0) {
-              logger.error("Stream is empty - no content generated")
-              controller.error(new Error("No content generated from AI model"))
-            } else {
-              controller.close()
-            }
-          } catch (error) {
-            logger.error("Stream processing error", error)
-            controller.error(error)
-          }
-        },
-      })
-
-      return StreamHandler.createStreamResponse(stream)
-    } catch (error) {
-      this.logger.error("Stream generation failed", error)
-      throw error
-    }
-  }
-
-  /**
-   * Generates a complete AI response
-   * Returns the full response as a JSON object with content and usage information
-   *
-   * @param request - AI request object containing messages and generation parameters
-   * @returns Promise that resolves to an HTTP Response with JSON body containing the complete response
-   */
-  async generate(request: AIRequest) {
-    const { messages, temperature, maxTokens, maxSteps = 1 } = request
-
-    const result = await generateText({
-      model: this.model,
-      messages,
-      temperature,
-      maxTokens,
-      maxSteps,
-      tools: this.tools,
-    })
-
-    // Return response with tool results if any
-    return new Response(
-      JSON.stringify({
-        content: result.text,
-        usage: result.usage,
-        steps: result.steps, // Include steps for agent behavior
-        toolCalls: result.toolCalls,
-        toolResults: result.toolResults,
-      }),
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    )
-  }
+const ENV_KEYS: Record<AIProviderType, string | undefined> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+  bedrock: undefined,
 }
 
 /**
- * Factory function to create an AI provider with tools
- * Automatically detects the appropriate provider based on available API keys
- *
- * @param overrides - Optional configuration overrides
- * @returns Configured AI provider instance
- *
- * @example
- * ```typescript
- * // For direct provider usage (not with AIClient)
- * const provider = createAIProvider({ provider: "openai", modelId: "gpt-4" })
- * const response = await provider.generate(request)
- *
- * // For use with AIClient, use providerConfig instead:
- * const client = createAIClient({
- *   userId: "123",
- *   providerConfig: { provider: "openai", modelId: "gpt-4" },
- *   tools: myTools
- * })
- * ```
+ * Auto-detect provider from environment variables.
+ * Priority: OpenRouter > Anthropic > OpenAI > Bedrock
  */
-export function createAIProvider(
-  overrides?: Partial<AIProviderConfig>
-): AIProvider {
-  const config: AIProviderConfig = {
-    provider: "anthropic",
-    modelId: "claude-sonnet-4-20250514",
-    ...overrides,
+function detectFromEnv(): AIProviderConfig | null {
+  if (process.env.OPENROUTER_API_KEY) {
+    return {
+      provider: "openrouter",
+      apiKey: process.env.OPENROUTER_API_KEY,
+      modelId: process.env.OPENROUTER_MODEL_ID || DEFAULT_MODELS.openrouter,
+    }
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    return {
+      provider: "anthropic",
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      modelId: DEFAULT_MODELS.anthropic,
+    }
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return {
+      provider: "openai",
+      apiKey: process.env.OPENAI_API_KEY,
+      modelId: DEFAULT_MODELS.openai,
+    }
+  }
+  if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+    return {
+      provider: "bedrock",
+      region: process.env.AWS_REGION || "us-east-1",
+      modelId: process.env.AWS_MODEL_ID || DEFAULT_MODELS.bedrock,
+    }
+  }
+  return null
+}
+
+/**
+ * Fill missing API key / region from environment for a known provider.
+ */
+function fillFromEnv(config: AIProviderConfig): AIProviderConfig {
+  if (config.provider === "bedrock") {
+    return {
+      ...config,
+      region: config.region || process.env.AWS_REGION || "us-east-1",
+      modelId:
+        config.modelId || process.env.AWS_MODEL_ID || DEFAULT_MODELS.bedrock,
+    }
   }
 
-  // Only auto-detect provider if not explicitly specified in overrides
+  if (config.apiKey) return config
+
+  const envKey = ENV_KEYS[config.provider]
+  const envValue = envKey ? process.env[envKey] : undefined
+  return envValue ? { ...config, apiKey: envValue } : config
+}
+
+/**
+ * Resolve provider config from overrides + environment variables.
+ * No provider → auto-detect from env, fall back to anthropic.
+ * Provider specified → fill missing apiKey/region from env.
+ */
+export function resolveProviderConfig(
+  overrides?: Partial<AIProviderConfig>,
+): AIProviderConfig {
   if (!overrides?.provider) {
-    if (process.env.OPENROUTER_API_KEY) {
-      config.provider = "openrouter"
-      config.apiKey = process.env.OPENROUTER_API_KEY
-      config.modelId = process.env.OPENROUTER_MODEL_ID
-    } else if (process.env.ANTHROPIC_API_KEY) {
-      config.provider = "anthropic"
-      config.apiKey = process.env.ANTHROPIC_API_KEY
-    } else if (process.env.OPENAI_API_KEY) {
-      config.provider = "openai"
-      config.apiKey = process.env.OPENAI_API_KEY
-    } else if (
-      process.env.AWS_ACCESS_KEY_ID &&
-      process.env.AWS_SECRET_ACCESS_KEY
-    ) {
-      config.provider = "bedrock"
-      config.region = process.env.AWS_REGION || "us-east-1"
-      config.modelId = process.env.AWS_MODEL_ID
-      if (!config.modelId) {
-        logger.warn(
-          "Bedrock selected but no model ID provided; defaulting to Claude 3 Sonnet"
-        )
-        config.modelId = "anthropic.claude-3-sonnet-20240229-v1:0"
-      }
+    const detected = detectFromEnv()
+    const base = detected || {
+      provider: "anthropic" as const,
+      modelId: DEFAULT_MODELS.anthropic,
     }
-  } else {
-    // If API key is provided in overrides, use it; otherwise fall back to env vars
-    if (!overrides.apiKey) {
-      if (overrides.provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
-        config.apiKey = process.env.ANTHROPIC_API_KEY
-      } else if (
-        overrides.provider === "openai" &&
-        process.env.OPENAI_API_KEY
-      ) {
-        config.apiKey = process.env.OPENAI_API_KEY
-      } else if (
-        overrides.provider === "openrouter" &&
-        process.env.OPENROUTER_API_KEY
-      ) {
-        config.apiKey = process.env.OPENROUTER_API_KEY
-        if (!config.modelId) {
-          config.modelId = process.env.OPENROUTER_MODEL_ID
-        }
-      } else if (overrides.provider === "bedrock") {
-        config.region =
-          overrides.region || process.env.AWS_REGION || "us-east-1"
-        if (!config.modelId) {
-          config.modelId =
-            process.env.AWS_MODEL_ID ||
-            "anthropic.claude-3-sonnet-20240229-v1:0"
-        }
-      }
-    }
+    return { ...base, ...overrides }
   }
 
-  return new AIProvider(config)
+  const base: AIProviderConfig = {
+    provider: overrides.provider,
+    modelId: overrides.modelId || DEFAULT_MODELS[overrides.provider],
+    apiKey: overrides.apiKey,
+    region: overrides.region,
+    baseURL: overrides.baseURL,
+  }
+
+  return fillFromEnv(base)
+}
+
+/**
+ * Create an AI SDK LanguageModel from provider config.
+ * Pass the result directly to `streamText()` or `generateText()` from the AI SDK.
+ */
+export function createModel(config?: Partial<AIProviderConfig>): LanguageModel {
+  const resolved = resolveProviderConfig(config)
+  const modelId = resolved.modelId || DEFAULT_MODELS[resolved.provider]
+
+  switch (resolved.provider) {
+    case "anthropic":
+      return resolved.apiKey
+        ? createAnthropic({ apiKey: resolved.apiKey })(modelId)
+        : anthropic(modelId)
+
+    case "openai":
+      return resolved.apiKey
+        ? createOpenAI({ apiKey: resolved.apiKey })(modelId)
+        : openai(modelId)
+
+    case "openrouter":
+      return createOpenAI({
+        apiKey: resolved.apiKey,
+        baseURL: "https://openrouter.ai/api/v1",
+      })(modelId)
+
+    case "bedrock":
+      if (!resolved.region) throw new Error("AWS region required for Bedrock")
+      return bedrock(modelId)
+
+    default:
+      throw new Error(
+        `Unsupported provider: ${resolved.provider satisfies never}`,
+      )
+  }
 }

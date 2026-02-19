@@ -121,7 +121,7 @@ export default function ShareSandboxModal({
             <Button
               onClick={() => {
                 navigator.clipboard.writeText(
-                  `${process.env.NEXT_PUBLIC_APP_URL}/code/${data.id}`
+                  `${process.env.NEXT_PUBLIC_APP_URL}/code/${data.id}`,
                 )
                 toast.success("Link copied to clipboard.")
               }}
