@@ -8,7 +8,7 @@ For the latest updates, join our Discord server: [discord.gitwit.dev](https://di
 
 ## Minimal Setup
 
-A quick overview of the tech before we start: The deployment uses a **NextJS** app for the frontend and an **ExpressJS** server on the backend.
+A quick overview of the tech before we start: This is a **Turborepo** monorepo with a **Next.js** app for the frontend (with **Hono** API routes), and an **Express** server on the backend for WebSocket/real-time connections.
 
 **Required accounts to get started:**
 
