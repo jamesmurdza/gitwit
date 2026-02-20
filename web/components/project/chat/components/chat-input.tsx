@@ -335,11 +335,12 @@ function ChatInputAction({
 // #region Custom Chat Actions
 function ChatInputSubmit() {
   const { disabled, isLoading, onSubmit } = useChatInput()
+  const { stopGeneration } = useChat()
   return (
     <ChatInputAction
       tooltip={isLoading ? "Stop generation" : "Send message"}
-      onClick={onSubmit}
-      disabled={disabled || isLoading}
+      onClick={isLoading ? stopGeneration : onSubmit}
+      disabled={disabled}
     >
       {isLoading ? (
         <Square className="size-5 fill-current" />
