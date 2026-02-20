@@ -140,7 +140,7 @@ export default async function CodePage({
         <AppStoreProvider>
           <TerminalProvider>
             <EditorProvider>
-              <div className="overflow-hidden overscroll-none w-screen h-screen grid [grid-template-rows:3.5rem_auto] bg-background">
+              <div className="overflow-hidden overscroll-none w-screen h-screen grid [grid-template-rows:3.5rem_1fr_1.75rem] bg-background">
                 <Navbar
                   shared={
                     shared as {
