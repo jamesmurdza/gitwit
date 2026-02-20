@@ -5,10 +5,10 @@ import type { LanguageModel } from "ai"
 import { AIProviderConfig, AIProviderType } from "../types"
 
 const DEFAULT_MODELS: Record<AIProviderType, string> = {
-  anthropic: "claude-sonnet-4-20250514",
-  openai: "gpt-4o",
-  openrouter: "anthropic/claude-sonnet-4-20250514",
-  bedrock: "anthropic.claude-3-sonnet-20240229-v1:0",
+  anthropic: "claude-sonnet-4-6",
+  openai: "gpt-4.1",
+  openrouter: "anthropic/claude-sonnet-4-6",
+  bedrock: "anthropic.claude-sonnet-4-6",
 }
 
 const ENV_KEYS: Record<AIProviderType, string | undefined> = {
