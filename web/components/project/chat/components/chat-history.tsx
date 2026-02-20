@@ -7,17 +7,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import { ChatThread } from "@/store/slices/chat"
 import { formatDistanceToNow } from "date-fns"
-import { History, MessageSquare, Plus, Trash2 } from "lucide-react"
+import { History, MessageSquare, Trash2 } from "lucide-react"
 import { useParams } from "next/navigation"
 import { useMemo, useState } from "react"
 import { ChatContainerAction } from "./chat-container"
@@ -58,21 +52,14 @@ function HistoryItem({
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
-                  onClick={(e) => onDelete(thread.id, e)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Delete thread</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
+            onClick={(e) => onDelete(thread.id, e)}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
         </div>
       </div>
     </div>
@@ -81,7 +68,6 @@ function HistoryItem({
 
 export function ChatHistory() {
   const params = useParams()
-  const createThread = useAppStore((s) => s.createThread)
   const projectId = params.id as string
   const threads = useAppStore((s) => s.threads)
   const [open, setOpen] = useState(false)
@@ -94,9 +80,6 @@ export function ChatHistory() {
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
       )
   }, [threads, projectId])
-  const handleNewThread = () => {
-    createThread(projectId)
-  }
   const activeThreadId = useAppStore((s) => s.activeThreadId)
   const setActiveThread = useAppStore((s) => s.setActiveThread)
   const deleteThread = useAppStore((s) => s.deleteThread)
@@ -124,13 +107,8 @@ export function ChatHistory() {
         sideOffset={12}
         collisionPadding={12}
       >
-        <div className="flex items-center justify-between border-b px-4 py-2">
-          <div className="grid gap-0.55">
-            <h3 className="font-medium text-sm">Chat History</h3>
-          </div>
-          <ChatContainerAction label="New chat" onClick={handleNewThread}>
-            <Plus className="h-4 w-4" />
-          </ChatContainerAction>
+        <div className="flex items-center border-b px-4 py-2">
+          <h3 className="font-medium text-sm">Chat History</h3>
         </div>
         <ScrollArea className="h-[300px]">
           {sortedThreads.length === 0 ? (

@@ -9,17 +9,11 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "framer-motion"
-import {
-  Check,
-  Copy,
-  CornerUpLeft,
-  RefreshCcw,
-  ThumbsDown,
-  ThumbsUp,
-} from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, Copy, RefreshCcw } from "lucide-react"
 import * as React from "react"
 import { CodeApplyProvider } from "../contexts/code-apply-context"
 import { stringifyContent } from "../lib/utils"
+import { useChat } from "../providers/chat-provider"
 import { ContextTab } from "./context-tab"
 
 export type MessageProps = {
@@ -28,6 +22,8 @@ export type MessageProps = {
   children: React.ReactNode
   className?: string
   context?: ContextTab[]
+  /** For assistant messages, the ID of the user message that triggered this response */
+  precedingUserMsgId?: string
   onApplyCode?: (code: string, language?: string) => Promise<void>
   onRejectCode?: () => void
   onOpenFile?: (filePath: string) => void
@@ -37,6 +33,7 @@ export type MessageContextValue = {
   role: "user" | "assistant"
   context?: ContextTab[]
   messageId?: string
+  precedingUserMsgId?: string
   onOpenFile?: (filePath: string) => void
 }
 
@@ -56,13 +53,14 @@ const Message = ({
   className,
   role,
   context,
+  precedingUserMsgId,
   onApplyCode,
   onRejectCode,
   onOpenFile,
   ...props
 }: MessageProps) => {
   return (
-    <MessageContext.Provider value={{ role, context, messageId, onOpenFile }}>
+    <MessageContext.Provider value={{ role, context, messageId, precedingUserMsgId, onOpenFile }}>
       <div
         className={cn(
           "flex gap-3",
@@ -172,27 +170,8 @@ const MessageContent = ({
           "opacity-0 transition-opacity duration-150 group-hover:opacity-100 flex-row-reverse",
         )}
       >
-        {isAssistant ? (
-          <>
-            <MessageAction label="Retry">
-              <RefreshCcw size={16} />
-            </MessageAction>
-            <CopyMessageAction content={stringifiedContent} />
-            <MessageAction label="downvote">
-              <ThumbsDown size={16} />
-            </MessageAction>
-            <MessageAction label="upvote">
-              <ThumbsUp size={16} />
-            </MessageAction>
-          </>
-        ) : (
-          <>
-            <MessageAction label="Ask about">
-              <CornerUpLeft size={16} />
-            </MessageAction>
-            <CopyMessageAction content={stringifiedContent} />
-          </>
-        )}
+        <CopyMessageAction content={stringifiedContent} />
+        {isAssistant && <RetryAction />}
       </MessageActions>
     </div>
   )
@@ -232,6 +211,51 @@ function CopyMessageAction({ content }: { content: string }) {
         )}
       </AnimatePresence>
     </MessageAction>
+  )
+}
+
+function RetryAction() {
+  const { retry, isGenerating, getVariantInfo, navigateVariant } = useChat()
+  const { precedingUserMsgId } = useMessage()
+  const variantInfo = precedingUserMsgId
+    ? getVariantInfo(precedingUserMsgId)
+    : null
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {variantInfo && (
+        <>
+          <MessageAction
+            label="Previous variant"
+            onClick={() =>
+              navigateVariant(precedingUserMsgId!, "prev")
+            }
+            disabled={variantInfo.current === 0}
+          >
+            <ChevronLeft size={14} />
+          </MessageAction>
+          <span className="text-xs text-muted-foreground tabular-nums px-0.5">
+            {variantInfo.current + 1}/{variantInfo.total}
+          </span>
+          <MessageAction
+            label="Next variant"
+            onClick={() =>
+              navigateVariant(precedingUserMsgId!, "next")
+            }
+            disabled={variantInfo.current === variantInfo.total - 1}
+          >
+            <ChevronRight size={14} />
+          </MessageAction>
+        </>
+      )}
+      <MessageAction
+        label="Regenerate"
+        onClick={retry}
+        disabled={isGenerating}
+      >
+        <RefreshCcw size={14} />
+      </MessageAction>
+    </div>
   )
 }
 

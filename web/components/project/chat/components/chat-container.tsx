@@ -200,7 +200,7 @@ function ChatContainerHeader({
   return (
     <div
       className={cn(
-        "flex justify-between items-center text-center sm:text-left p-2 sticky top-0 border-b border-border",
+        "flex justify-between items-center text-center sm:text-left px-3 py-2 sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm",
         className,
       )}
       {...props}
@@ -262,7 +262,7 @@ function ChatContainerAction({
   const Comp = asChild ? Slot : "button"
   const id = useId()
   return (
-    <Tooltip>
+    <Tooltip delayDuration={400}>
       <TooltipTrigger asChild>
         <Comp
           className={cn(
@@ -270,6 +270,7 @@ function ChatContainerAction({
             "h-6 w-6",
           )}
           style={{ viewTransitionName: `chat-action-${id}`, ...style }}
+          onFocus={(e: React.FocusEvent) => e.preventDefault()}
           {...props}
         />
       </TooltipTrigger>
@@ -291,25 +292,53 @@ function ChatContainerFooter({
 // #endregion
 
 // #region Empty
+type ChatContainerEmptyProps = {
+  onSuggestionClick?: (text: string) => void
+} & React.HTMLAttributes<HTMLDivElement>
+
+const SUGGESTIONS = [
+  "Explain how this code works",
+  "Help me fix a bug",
+  "Add a new feature",
+  "Refactor this file",
+]
+
 function ChatContainerEmpty({
   className,
+  onSuggestionClick,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+}: ChatContainerEmptyProps) {
   return (
     <div
       className={cn(
-        "flex-1 flex flex-col justify-center items-center gap-3",
+        "flex-1 flex flex-col justify-center items-center gap-5 px-4",
         className,
       )}
       {...props}
     >
-      <BrainIcon className="size-8" />
-      <div className="text-center space-y-1">
-        <h2 className="text-lg font-bold">Ask about your sandbox.</h2>
-        <p className="text-muted-foreground text-sm">
-          Get help with your coding questions.
+      <div className="flex items-center justify-center size-10 rounded-full bg-muted">
+        <BrainIcon className="size-5 text-muted-foreground" />
+      </div>
+      <div className="text-center space-y-1.5">
+        <h2 className="text-base font-semibold">How can I help?</h2>
+        <p className="text-muted-foreground text-sm max-w-[240px]">
+          Ask me anything about your project or try a suggestion below.
         </p>
       </div>
+      {onSuggestionClick && (
+        <div className="flex flex-wrap justify-center gap-2 max-w-sm">
+          {SUGGESTIONS.map((text) => (
+            <button
+              key={text}
+              type="button"
+              onClick={() => onSuggestionClick(text)}
+              className="text-xs px-3 py-1.5 rounded-full border border-border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

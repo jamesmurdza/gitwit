@@ -31,6 +31,12 @@ export type MergeState =
   | { status: "ready"; result: FileMergeResult }
   | { status: "error"; error: string }
 
+/** Variant info for a regenerated assistant response */
+export type VariantInfo = {
+  total: number
+  current: number // 0-indexed
+}
+
 type ChatContextType = {
   activeFileContent?: string
   activeFileName?: string
@@ -43,7 +49,12 @@ type ChatContextType = {
   addContextTab: (newTab: ContextTab) => void
   removeContextTab: (id: string) => void
   sendMessage: (message: string, context?: string) => Promise<void>
+  retry: () => void
   stopGeneration: () => void
+  /** Get variant info for an assistant message (keyed by preceding user msg ID) */
+  getVariantInfo: (userMsgId: string) => VariantInfo | null
+  /** Navigate between response variants */
+  navigateVariant: (userMsgId: string, direction: "prev" | "next") => void
   fileActionStatuses: Record<string, Record<string, "applied" | "rejected">>
   markFileActionStatus: (
     messageId: string,
@@ -159,8 +170,12 @@ function ChatProvider({ children }: ChatProviderProps) {
     () =>
       new DefaultChatTransport({
         api: "/api/ai/stream-chat",
-        prepareSendMessagesRequest: ({ messages: msgs }) => {
+        prepareSendMessagesRequest: ({ messages: msgs, trigger }) => {
           const ref = requestBodyRef.current
+          // Both submit and regenerate send the same shape —
+          // the backend just needs messages + context to produce a response.
+          // For regeneration, the AI SDK already removes the old assistant
+          // message from `msgs` before calling this.
           return {
             body: {
               messages: msgs.map((m) => ({
@@ -171,7 +186,10 @@ function ChatProvider({ children }: ChatProviderProps) {
                 templateType: ref.projectType,
                 activeFileContent: ref.activeFileContent,
                 fileTree: ref.fileTree,
-                contextContent: ref.contextContent,
+                contextContent:
+                  trigger === "regenerate-message"
+                    ? ""
+                    : ref.contextContent,
                 projectName: ref.projectName,
                 fileName: ref.activeFileName,
               },
@@ -186,6 +204,7 @@ function ChatProvider({ children }: ChatProviderProps) {
   const {
     messages: aiMessages,
     sendMessage: aiSendMessage,
+    regenerate: aiRegenerate,
     stop,
     setMessages: setAIMessages,
     status: aiStatus,
@@ -294,11 +313,68 @@ function ChatProvider({ children }: ChatProviderProps) {
   const isGenerating = aiStatus === "streaming" || aiStatus === "submitted"
   const isLoading = aiStatus === "submitted"
 
-  // Convert AI SDK messages to our Message type for consumers
-  const messages: Message[] = useMemo(
-    () => aiMessages.map((m) => fromUIMessage(m, contextMapRef.current)),
-    [aiMessages],
+  // Response variants — keyed by user message ID that preceded the assistant response.
+  // Stores ALL previous assistant responses for that turn (not including the current live one).
+  const [responseVariants, setResponseVariants] = useState<
+    Record<string, string[]>
+  >({})
+  // null = show the current live response; number = index into responseVariants
+  const [activeVariantIdx, setActiveVariantIdx] = useState<
+    Record<string, number | null>
+  >({})
+
+  const getVariantInfo = useCallback(
+    (userMsgId: string): VariantInfo | null => {
+      const old = responseVariants[userMsgId]
+      if (!old || old.length === 0) return null
+      const total = old.length + 1 // old variants + current live
+      const idx = activeVariantIdx[userMsgId]
+      const current = idx ?? old.length // null = latest = old.length
+      return { total, current }
+    },
+    [responseVariants, activeVariantIdx],
   )
+
+  const navigateVariant = useCallback(
+    (userMsgId: string, direction: "prev" | "next") => {
+      const old = responseVariants[userMsgId]
+      if (!old || old.length === 0) return
+      const total = old.length + 1
+      const idx = activeVariantIdx[userMsgId]
+      const current = idx ?? old.length
+
+      let next = direction === "prev" ? current - 1 : current + 1
+      if (next < 0) next = 0
+      if (next >= total) next = total - 1
+
+      // null means "show live", otherwise show the old variant at that index
+      setActiveVariantIdx((prev) => ({
+        ...prev,
+        [userMsgId]: next === old.length ? null : next,
+      }))
+    },
+    [responseVariants, activeVariantIdx],
+  )
+
+  // Convert AI SDK messages to our Message type for consumers,
+  // applying variant overrides for regenerated responses.
+  const messages: Message[] = useMemo(() => {
+    return aiMessages.map((m, i) => {
+      const msg = fromUIMessage(m, contextMapRef.current)
+
+      // Check if this assistant message has an active old variant
+      if (m.role === "assistant" && i > 0 && aiMessages[i - 1].role === "user") {
+        const userMsgId = aiMessages[i - 1].id
+        const variantIdx = activeVariantIdx[userMsgId]
+        const variants = responseVariants[userMsgId]
+        if (variantIdx != null && variants && variants[variantIdx] !== undefined) {
+          return { ...msg, content: variants[variantIdx] }
+        }
+      }
+
+      return msg
+    })
+  }, [aiMessages, activeVariantIdx, responseVariants])
 
   const latestAssistantId = useMemo(() => {
     for (let i = aiMessages.length - 1; i >= 0; i--) {
@@ -355,6 +431,36 @@ function ChatProvider({ children }: ChatProviderProps) {
     ],
   )
 
+  const retry = useCallback(() => {
+    if (isGenerating) return
+
+    // Find the last assistant message and the user message before it
+    let lastAssistantIdx = -1
+    let userMsgId: string | undefined
+    for (let i = aiMessages.length - 1; i >= 0; i--) {
+      if (aiMessages[i].role === "assistant") {
+        lastAssistantIdx = i
+        if (i > 0 && aiMessages[i - 1].role === "user") {
+          userMsgId = aiMessages[i - 1].id
+        }
+        break
+      }
+    }
+    if (lastAssistantIdx === -1 || !userMsgId) return
+
+    const oldContent = getTextContent(aiMessages[lastAssistantIdx])
+
+    // Save old response as a variant, reset navigation to latest
+    setResponseVariants((prev) => ({
+      ...prev,
+      [userMsgId]: [...(prev[userMsgId] ?? []), oldContent],
+    }))
+    setActiveVariantIdx((prev) => ({ ...prev, [userMsgId]: null }))
+
+    // AI SDK's regenerate removes the assistant message and re-sends
+    aiRegenerate({ messageId: aiMessages[lastAssistantIdx].id })
+  }, [isGenerating, aiMessages, aiRegenerate])
+
   const stopGeneration = useCallback(() => {
     stop()
   }, [stop])
@@ -387,7 +493,10 @@ function ChatProvider({ children }: ChatProviderProps) {
       addContextTab,
       removeContextTab,
       sendMessage,
+      retry,
       stopGeneration,
+      getVariantInfo,
+      navigateVariant,
       fileActionStatuses,
       markFileActionStatus,
       latestAssistantId,
@@ -406,7 +515,10 @@ function ChatProvider({ children }: ChatProviderProps) {
       addContextTab,
       removeContextTab,
       sendMessage,
+      retry,
       stopGeneration,
+      getVariantInfo,
+      navigateVariant,
       fileActionStatuses,
       markFileActionStatus,
       latestAssistantId,
