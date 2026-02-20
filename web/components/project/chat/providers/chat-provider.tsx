@@ -195,6 +195,7 @@ function ChatProvider({ children }: ChatProviderProps) {
     experimental_throttle: 50,
     onError: (error) => {
       console.error("Stream error:", error)
+      toast.error("Failed to get AI response. Please try again.")
     },
   })
 
