@@ -1,15 +1,13 @@
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
-import { useEditor } from "@/context/editor-context"
 import { useTerminal } from "@/context/TerminalContext"
 import type { IWatermarkPanelProps } from "dockview"
 import { Loader2, TerminalSquare } from "lucide-react"
+import { useToggleChat, useToggleTerminal } from "../hooks/usePanelToggles"
 
 export function MainWatermark(_props: IWatermarkPanelProps) {
-  const { gridRef } = useEditor()
-  function toggleAIChat() {
-    const panel = gridRef.current?.getPanel("chat")
-    panel?.api.setVisible(!panel.api.isVisible)
-  }
+  const toggleAIChat = useToggleChat()
+  const toggleTerminal = useToggleTerminal()
+
   return (
     <div className="watermark space-y-4">
       <div className="letterpress" />
@@ -21,7 +19,7 @@ export function MainWatermark(_props: IWatermarkPanelProps) {
           style={{ opacity: 1 }}
         >
           <span className="text-xs text-muted-foreground">
-            Toggle AI Assistance
+            AI Edit
           </span>
           <KbdGroup>
             <Kbd>⌘</Kbd>
@@ -30,7 +28,6 @@ export function MainWatermark(_props: IWatermarkPanelProps) {
         </button>
         <button
           onClick={toggleAIChat}
-          aria-disabled="true"
           className="flex justify-between w-full items-center"
           style={{ opacity: 1 }}
         >
@@ -41,8 +38,7 @@ export function MainWatermark(_props: IWatermarkPanelProps) {
           </KbdGroup>
         </button>
         <button
-          disabled
-          aria-disabled="true"
+          onClick={toggleTerminal}
           className="flex justify-between w-full items-center"
           style={{ opacity: 1 }}
         >
