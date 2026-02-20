@@ -3,9 +3,9 @@ import { useProjectContext } from "@/context/project-context"
 import { fileRouter } from "@/lib/api"
 import { sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
-import { useQueryClient } from "@tanstack/react-query"
-import { useChat as useAIChat } from "ai/react"
-import type { Message as AIMessage } from "ai/react"
+import { useChat as useAIChat } from "@ai-sdk/react"
+import { TextStreamChatTransport } from "ai"
+import type { UIMessage } from "ai"
 import { nanoid } from "nanoid"
 import React, {
   createContext,
@@ -16,6 +16,7 @@ import React, {
   useRef,
   useState,
 } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import type { ContextTab, FileMergeResult, Message } from "../lib/types"
 import { getCombinedContext, normalizePath } from "../lib/utils"
@@ -58,24 +59,35 @@ type ChatContextType = {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
-/** Convert our Message type to AI SDK Message format */
-function toAIMessages(messages: Message[]): AIMessage[] {
+/** Extract text content from a UIMessage's parts array */
+function getTextContent(msg: UIMessage): string {
+  let text = ""
+  for (const part of msg.parts) {
+    if (part.type === "text") {
+      text += part.text
+    }
+  }
+  return text
+}
+
+/** Convert our Message type to AI SDK UIMessage format */
+function toUIMessages(messages: Message[]): UIMessage[] {
   return messages.map((m, i) => ({
     id: m.id ?? `${m.role}-${i}`,
     role: m.role,
-    content: m.content,
+    parts: [{ type: "text" as const, text: m.content }],
   }))
 }
 
-/** Convert AI SDK Message back to our Message type, restoring context from map */
-function fromAIMessage(
-  aiMsg: AIMessage,
+/** Convert AI SDK UIMessage back to our Message type, restoring context from map */
+function fromUIMessage(
+  aiMsg: UIMessage,
   contextMap: Map<string, ContextTab[]>,
 ): Message {
   return {
     id: aiMsg.id,
     role: aiMsg.role as "user" | "assistant",
-    content: aiMsg.content,
+    content: getTextContent(aiMsg),
     context: contextMap.get(aiMsg.id),
   }
 }
@@ -119,7 +131,7 @@ function ChatProvider({ children }: ChatProviderProps) {
   const contextMapRef = useRef(new Map<string, ContextTab[]>())
 
   // Ref to hold request-scoped data (context content + reactive values)
-  // so experimental_prepareRequestBody always reads fresh values
+  // so prepareSendMessagesRequest always reads fresh values
   const requestBodyRef = useRef({
     contextContent: "",
     projectType,
@@ -142,44 +154,58 @@ function ChatProvider({ children }: ChatProviderProps) {
     ? (threads[activeThreadId]?.messages ?? [])
     : []
 
-  // AI SDK useChat hook
+  // Stable transport — reads fresh values from requestBodyRef
+  const transport = useMemo(
+    () =>
+      new TextStreamChatTransport({
+        api: "/api/ai/stream-chat",
+        prepareSendMessagesRequest: ({ messages: msgs }) => {
+          const ref = requestBodyRef.current
+          return {
+            body: {
+              messages: msgs.map((m) => ({
+                role: m.role,
+                content: getTextContent(m),
+              })),
+              context: {
+                templateType: ref.projectType,
+                activeFileContent: ref.activeFileContent,
+                fileTree: ref.fileTree,
+                contextContent: ref.contextContent,
+                projectName: ref.projectName,
+                fileName: ref.activeFileName,
+              },
+            },
+          }
+        },
+      }),
+    [],
+  )
+
+  // AI SDK useChat hook (v6)
   const {
     messages: aiMessages,
-    append,
+    sendMessage: aiSendMessage,
     stop,
     setMessages: setAIMessages,
     status: aiStatus,
-    input: aiInput,
-    setInput: aiSetInput,
   } = useAIChat({
-    api: "/api/ai/stream-chat",
-    streamProtocol: "text",
+    transport,
+    messages: toUIMessages(threadMessages),
     experimental_throttle: 50,
-    initialMessages: toAIMessages(threadMessages),
-    experimental_prepareRequestBody: ({ messages: msgs }) => {
-      const ref = requestBodyRef.current
-      return {
-        messages: msgs.map((m) => ({ role: m.role, content: m.content })),
-        context: {
-          templateType: ref.projectType,
-          activeFileContent: ref.activeFileContent,
-          fileTree: ref.fileTree,
-          contextContent: ref.contextContent,
-          projectName: ref.projectName,
-          fileName: ref.activeFileName,
-        },
-      }
-    },
     onError: (error) => {
       console.error("Stream error:", error)
     },
   })
 
+  // Local input state (v6 useChat no longer manages input)
+  const [input, setInput] = useState("")
+
   // Sync AI SDK messages back to zustand thread store
   useEffect(() => {
     if (!activeThreadId) return
     const converted = aiMessages.map((m) =>
-      fromAIMessage(m, contextMapRef.current),
+      fromUIMessage(m, contextMapRef.current),
     )
     setThreadMessages(activeThreadId, converted)
   }, [aiMessages, activeThreadId, setThreadMessages])
@@ -211,7 +237,7 @@ function ChatProvider({ children }: ChatProviderProps) {
             contextMapRef.current.set(msg.id, msg.context)
           }
         }
-        setAIMessages(toAIMessages(threads[activeThreadId].messages))
+        setAIMessages(toUIMessages(threads[activeThreadId].messages))
       } else {
         setAIMessages([])
       }
@@ -269,7 +295,7 @@ function ChatProvider({ children }: ChatProviderProps) {
 
   // Convert AI SDK messages to our Message type for consumers
   const messages: Message[] = useMemo(
-    () => aiMessages.map((m) => fromAIMessage(m, contextMapRef.current)),
+    () => aiMessages.map((m) => fromUIMessage(m, contextMapRef.current)),
     [aiMessages],
   )
 
@@ -296,23 +322,22 @@ function ChatProvider({ children }: ChatProviderProps) {
         drafts,
       })
 
-      // Store context content in ref so experimental_prepareRequestBody reads it
+      // Store context content in ref so prepareSendMessagesRequest reads it
       requestBodyRef.current.contextContent = contextContent
 
-      // Generate user message ID and store context tabs before append
+      // Generate user message ID and store context tabs before sending
       const userMessageId = nanoid()
       if (capturedContextTabs.length > 0) {
         contextMapRef.current.set(userMessageId, capturedContextTabs)
       }
 
       setContextTabs([])
-      aiSetInput("")
+      setInput("")
 
-      // Append user message — AI SDK handles the streaming automatically
-      await append({
-        id: userMessageId,
-        role: "user",
-        content: message,
+      // Send user message — AI SDK handles the streaming automatically
+      await aiSendMessage({
+        text: message,
+        messageId: userMessageId,
       })
 
       requestBodyRef.current.contextContent = ""
@@ -324,8 +349,7 @@ function ChatProvider({ children }: ChatProviderProps) {
       queryClient,
       projectId,
       drafts,
-      append,
-      aiSetInput,
+      aiSendMessage,
     ],
   )
 
@@ -353,8 +377,8 @@ function ChatProvider({ children }: ChatProviderProps) {
       activeFileContent,
       activeFileName,
       messages,
-      input: aiInput,
-      setInput: aiSetInput,
+      input,
+      setInput,
       isGenerating,
       isLoading,
       contextTabs,
@@ -372,8 +396,8 @@ function ChatProvider({ children }: ChatProviderProps) {
       activeFileContent,
       activeFileName,
       messages,
-      aiInput,
-      aiSetInput,
+      input,
+      setInput,
       isGenerating,
       isLoading,
       contextTabs,
