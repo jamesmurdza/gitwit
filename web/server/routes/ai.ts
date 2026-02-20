@@ -60,7 +60,7 @@ export const aiRouter = createRouter()
         tools: defaultTools,
       })
 
-      return result.toTextStreamResponse()
+      return result.toUIMessageStreamResponse()
     },
   )
 
@@ -87,7 +87,6 @@ export const aiRouter = createRouter()
         model,
         system,
         messages,
-        maxSteps: 1,
       })
 
       return c.json({ content: result.text })

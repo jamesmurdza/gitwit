@@ -32,6 +32,7 @@ interface ChatSlice {
     messageId: string,
     content: string,
   ) => void
+  setThreadMessages: (threadId: string, messages: Message[]) => void
   updateThreadTitle: (threadId: string, title: string) => void
 
   // Hydration for persistence
@@ -156,6 +157,30 @@ const createChatSlice: StateCreator<ChatSlice> = (set) => ({
             ...thread,
             messages: updatedMessages,
             updatedAt: Date.now(),
+          },
+        },
+      }
+    })
+  },
+
+  setThreadMessages: (threadId, messages) => {
+    set((state) => {
+      const thread = state.threads[threadId]
+      if (!thread) return state
+
+      const firstUserMsg = messages.find((m) => m.role === "user")
+      return {
+        threads: {
+          ...state.threads,
+          [threadId]: {
+            ...thread,
+            messages,
+            updatedAt: Date.now(),
+            title:
+              thread.title === "New Chat" && firstUserMsg
+                ? firstUserMsg.content.slice(0, 50) +
+                  (firstUserMsg.content.length > 50 ? "..." : "")
+                : thread.title,
           },
         },
       }

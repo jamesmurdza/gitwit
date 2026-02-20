@@ -24,21 +24,15 @@ const LINE_NUMBER_CLASSES = cn(
 
 export const CodeBlockBody = memo(
   ({ children, result, language, className, ...rest }: CodeBlockBodyProps) => {
-    // Memoize the pre style object
-    const preStyle = useMemo(
-      () => ({
-        backgroundColor: result.bg,
-        color: result.fg,
-      }),
-      [result.bg, result.fg],
-    )
-
     return (
       <pre
-        className={cn(className, "p-2 text-sm dark:bg-(--shiki-dark-bg)!")}
+        className={cn(className, "p-2 text-sm shiki")}
         data-language={language}
         data-streamdown="code-block-body"
-        style={preStyle}
+        style={{
+          backgroundColor: result.bg,
+          color: result.fg,
+        }}
         {...rest}
       >
         <code className="[counter-increment:line_0] [counter-reset:line]">
@@ -50,7 +44,6 @@ export const CodeBlockBody = memo(
             >
               {row.map((token, tokenIndex) => (
                 <span
-                  className="dark:bg-(--shiki-dark-bg)! dark:text-(--shiki-dark)!"
                   // biome-ignore lint/suspicious/noArrayIndexKey: "This is a stable key."
                   key={tokenIndex}
                   style={{

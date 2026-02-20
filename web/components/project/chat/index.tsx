@@ -1,10 +1,13 @@
 import { TTab } from "@/lib/types"
-import { cn, debounce } from "@/lib/utils"
+import { debounce } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
-import { Brain } from "lucide-react"
+import { motion } from "framer-motion"
+import { Plus } from "lucide-react"
 import * as monaco from "monaco-editor"
+import { useParams } from "next/navigation"
 import React, { useCallback, useEffect, useRef } from "react"
 import {
+  ChatContainerAction,
   ChatContainerActions,
   ChatContainerCollapse,
   ChatContainerContent,
@@ -78,11 +81,21 @@ function AIChatBase({
   getCurrentFileContent,
   onOpenFile,
 }: AIChatProps) {
+  const params = useParams()
+  const projectId = params.id as string
+  const createThread = useAppStore((s) => s.createThread)
+
   return (
     <ChatContainerRoot>
       <ChatContainerHeader>
         <ChatContainerTitle>Chat</ChatContainerTitle>
         <ChatContainerActions>
+          <ChatContainerAction
+            label="New chat"
+            onClick={() => createThread(projectId)}
+          >
+            <Plus className="h-4 w-4" />
+          </ChatContainerAction>
           <ChatHistory />
           <ChatContainerMaximizeToggle />
           <ChatContainerCollapse />
@@ -144,7 +157,7 @@ function MainChatContent({
   getCurrentFileContent?: GetCurrentFileContentFn
   onOpenFile?: (filePath: string) => void
 }) {
-  const { messages, isLoading, mergeStatuses } = useChat()
+  const { messages, isLoading, mergeStatuses, sendMessage } = useChat()
   const isEmpty = messages.length === 0
   const mergeStatusesRef = React.useRef(mergeStatuses)
   React.useEffect(() => {
@@ -166,17 +179,25 @@ function MainChatContent({
   )
 
   if (isEmpty) {
-    return <ChatContainerEmpty />
+    return <ChatContainerEmpty onSuggestionClick={sendMessage} />
   }
   return (
     <ChatScrollContainer className="flex-1 relative w-full max-w-5xl mx-auto">
-      <ChatContainerContent className="px-2 py-4  overflow-x-hidden">
+      <ChatContainerContent className="px-2 py-4 overflow-x-hidden">
         {messages.map((message, i) => {
+          // For assistant messages, find the preceding user message ID
+          const precedingUserMsgId =
+            message.role === "assistant" &&
+            i > 0 &&
+            messages[i - 1].role === "user"
+              ? messages[i - 1].id
+              : undefined
           return (
             <Message
               messageId={message.id ?? `${message.role}-${i}`}
               role={message.role}
               context={message.context}
+              precedingUserMsgId={precedingUserMsgId}
               key={i}
               onApplyCode={wrappedOnApplyCode}
               onRejectCode={onRejectCode}
@@ -197,17 +218,23 @@ function MainChatContent({
 
 function ChatLoading() {
   return (
-    <div className="flex gap-2 items-center">
-      <Brain className="size-[1.125rem] text-foreground" />
-      <div
-        className={cn(
-          "bg-[linear-gradient(to_right,hsl(var(--muted-foreground))_40%,hsl(var(--foreground))_60%,hsl(var(--muted-foreground))_80%)]",
-          "bg-[length:200%_auto] bg-clip-text font-medium text-transparent",
-          "animate-[shimmer_4s_infinite_linear] text-sm",
-        )}
+    <div className="px-1 py-3">
+      <motion.span
+        className="text-sm font-medium bg-clip-text text-transparent"
+        style={{
+          backgroundImage:
+            "linear-gradient(90deg, hsl(var(--muted-foreground)) 40%, hsl(var(--foreground)) 50%, hsl(var(--muted-foreground)) 60%)",
+          backgroundSize: "300% 100%",
+        }}
+        animate={{ backgroundPosition: ["100% 0%", "-100% 0%"] }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          ease: "linear",
+        }}
       >
-        Gitwit is thinking...
-      </div>
+        Thinking...
+      </motion.span>
     </div>
   )
 }

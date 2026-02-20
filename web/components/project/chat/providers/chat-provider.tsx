@@ -3,7 +3,9 @@ import { useProjectContext } from "@/context/project-context"
 import { fileRouter } from "@/lib/api"
 import { sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
-import { useQueryClient } from "@tanstack/react-query"
+import { useChat as useAIChat } from "@ai-sdk/react"
+import { DefaultChatTransport } from "ai"
+import type { UIMessage } from "ai"
 import { nanoid } from "nanoid"
 import React, {
   createContext,
@@ -14,10 +16,14 @@ import React, {
   useRef,
   useState,
 } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import {
+  useResponseVariants,
+  type VariantInfo,
+} from "../hooks/use-response-variants"
 import type { ContextTab, FileMergeResult, Message } from "../lib/types"
 import { getCombinedContext, normalizePath } from "../lib/utils"
-import { useStreamChat } from "../hooks/use-stream-chat"
 
 type ChatProviderProps = {
   children: ReactNode
@@ -28,6 +34,8 @@ export type MergeState =
   | { status: "pending" }
   | { status: "ready"; result: FileMergeResult }
   | { status: "error"; error: string }
+
+export type { VariantInfo } from "../hooks/use-response-variants"
 
 type ChatContextType = {
   activeFileContent?: string
@@ -41,7 +49,12 @@ type ChatContextType = {
   addContextTab: (newTab: ContextTab) => void
   removeContextTab: (id: string) => void
   sendMessage: (message: string, context?: string) => Promise<void>
+  retry: () => void
   stopGeneration: () => void
+  /** Get variant info for an assistant message (keyed by preceding user msg ID) */
+  getVariantInfo: (userMsgId: string) => VariantInfo | null
+  /** Navigate between response variants */
+  navigateVariant: (userMsgId: string, direction: "prev" | "next") => void
   fileActionStatuses: Record<string, Record<string, "applied" | "rejected">>
   markFileActionStatus: (
     messageId: string,
@@ -57,6 +70,39 @@ type ChatContextType = {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
+/** Extract text content from a UIMessage's parts array */
+function getTextContent(msg: UIMessage): string {
+  let text = ""
+  for (const part of msg.parts) {
+    if (part.type === "text") {
+      text += part.text
+    }
+  }
+  return text
+}
+
+/** Convert our Message type to AI SDK UIMessage format */
+function toUIMessages(messages: Message[]): UIMessage[] {
+  return messages.map((m, i) => ({
+    id: m.id ?? `${m.role}-${i}`,
+    role: m.role,
+    parts: [{ type: "text" as const, text: m.content }],
+  }))
+}
+
+/** Convert AI SDK UIMessage back to our Message type, restoring context from map */
+function fromUIMessage(
+  aiMsg: UIMessage,
+  contextMap: Map<string, ContextTab[]>,
+): Message {
+  return {
+    id: aiMsg.id,
+    role: aiMsg.role as "user" | "assistant",
+    content: getTextContent(aiMsg),
+    context: contextMap.get(aiMsg.id),
+  }
+}
+
 function ChatProvider({ children }: ChatProviderProps) {
   const {
     project: { id: projectId, name: projectName, type: projectType },
@@ -71,18 +117,7 @@ function ChatProvider({ children }: ChatProviderProps) {
   const threads = useAppStore((s) => s.threads)
   const activeThreadId = useAppStore((s) => s.activeThreadId)
   const createThread = useAppStore((s) => s.createThread)
-  const addMessage = useAppStore((s) => s.addMessage)
-  const updateMessageById = useAppStore((s) => s.updateMessageById)
-
-  // Get messages from active thread
-  const messages = useAppStore((s) =>
-    activeThreadId && s.threads[activeThreadId]
-      ? s.threads[activeThreadId].messages
-      : [],
-  )
-
-  // Streaming hook (handles abort + concurrent guard)
-  const { streamChat, abort: abortStream, isStreamingRef } = useStreamChat()
+  const setThreadMessages = useAppStore((s) => s.setThreadMessages)
 
   const { data: fileTree = [] } = fileRouter.fileTree.useQuery({
     variables: { projectId },
@@ -103,6 +138,96 @@ function ChatProvider({ children }: ChatProviderProps) {
     activeDraft === undefined ? serverActiveFile : activeDraft
   const activeFileName = activeTab?.name || "untitled"
 
+  // Map of messageId → ContextTab[] to preserve context across AI SDK round-trips
+  const contextMapRef = useRef(new Map<string, ContextTab[]>())
+
+  // Ref to hold request-scoped data (context content + reactive values)
+  // so prepareSendMessagesRequest always reads fresh values
+  const requestBodyRef = useRef({
+    contextContent: "",
+    projectType,
+    activeFileContent,
+    fileTree,
+    projectName,
+    activeFileName,
+  })
+  requestBodyRef.current = {
+    contextContent: requestBodyRef.current.contextContent,
+    projectType,
+    activeFileContent,
+    fileTree,
+    projectName,
+    activeFileName,
+  }
+
+  // Get thread messages for initializing useChat
+  const threadMessages = activeThreadId
+    ? (threads[activeThreadId]?.messages ?? [])
+    : []
+
+  // Stable transport — reads fresh values from requestBodyRef
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/ai/stream-chat",
+        prepareSendMessagesRequest: ({ messages: msgs, trigger }) => {
+          const ref = requestBodyRef.current
+          // Both submit and regenerate send the same shape —
+          // the backend just needs messages + context to produce a response.
+          // For regeneration, the AI SDK already removes the old assistant
+          // message from `msgs` before calling this.
+          return {
+            body: {
+              messages: msgs.map((m) => ({
+                role: m.role,
+                content: getTextContent(m),
+              })),
+              context: {
+                templateType: ref.projectType,
+                activeFileContent: ref.activeFileContent,
+                fileTree: ref.fileTree,
+                contextContent:
+                  trigger === "regenerate-message" ? "" : ref.contextContent,
+                projectName: ref.projectName,
+                fileName: ref.activeFileName,
+              },
+            },
+          }
+        },
+      }),
+    [],
+  )
+
+  // AI SDK useChat hook (v6)
+  const {
+    messages: aiMessages,
+    sendMessage: aiSendMessage,
+    regenerate: aiRegenerate,
+    stop,
+    setMessages: setAIMessages,
+    status: aiStatus,
+  } = useAIChat({
+    transport,
+    messages: toUIMessages(threadMessages),
+    experimental_throttle: 50,
+    onError: (error) => {
+      console.error("Stream error:", error)
+      toast.error("Failed to get AI response. Please try again.")
+    },
+  })
+
+  // Local input state (v6 useChat no longer manages input)
+  const [input, setInput] = useState("")
+
+  // Sync AI SDK messages back to zustand thread store
+  useEffect(() => {
+    if (!activeThreadId) return
+    const converted = aiMessages.map((m) =>
+      fromUIMessage(m, contextMapRef.current),
+    )
+    setThreadMessages(activeThreadId, converted)
+  }, [aiMessages, activeThreadId, setThreadMessages])
+
   // Initialize thread on mount after hydration
   useEffect(() => {
     if (!hasHydrated) return
@@ -116,41 +241,35 @@ function ChatProvider({ children }: ChatProviderProps) {
     }
   }, [hasHydrated, projectId, threads, activeThreadId, createThread])
 
-  // Abort stream on thread switch (race condition #3)
+  // Sync messages from zustand to useChat on thread switch
   const prevThreadIdRef = useRef(activeThreadId)
   useEffect(() => {
     if (prevThreadIdRef.current !== activeThreadId) {
-      abortStream()
+      stop() // abort any in-flight stream
+
+      // Rebuild context map from thread messages
+      contextMapRef.current.clear()
+      if (activeThreadId && threads[activeThreadId]) {
+        for (const msg of threads[activeThreadId].messages) {
+          if (msg.id && msg.context?.length) {
+            contextMapRef.current.set(msg.id, msg.context)
+          }
+        }
+        setAIMessages(toUIMessages(threads[activeThreadId].messages))
+      } else {
+        setAIMessages([])
+      }
       prevThreadIdRef.current = activeThreadId
     }
-  }, [activeThreadId, abortStream])
+  }, [activeThreadId, threads, stop, setAIMessages])
 
-  const [input, setInput] = useState("")
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [contextTabs, setContextTabs] = useState<ContextTab[]>([])
   const [fileActionStatuses, setFileActionStatuses] = useState<
     Record<string, Record<string, "applied" | "rejected">>
   >({})
-  const [latestAssistantId, setLatestAssistantId] = useState<string | null>(
-    null,
-  )
   const [mergeStatuses, setMergeStatuses] = useState<
     Record<string, MergeState>
   >({})
-
-  // Throttle ref for streaming updates (race condition #4: cleared in finally + unmount)
-  const throttleRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Cleanup throttle on unmount (race condition #4)
-  useEffect(() => {
-    return () => {
-      if (throttleRef.current) {
-        clearTimeout(throttleRef.current)
-        throttleRef.current = null
-      }
-    }
-  }, [])
 
   const addContextTab = useCallback((newTab: ContextTab) => {
     setContextTabs((prev) => {
@@ -188,139 +307,111 @@ function ChatProvider({ children }: ChatProviderProps) {
     setContextTabs((prev) => prev.filter((tab) => tab.id !== id))
   }, [])
 
+  // Derive status from AI SDK status
+  const isGenerating = aiStatus === "streaming" || aiStatus === "submitted"
+  const isLoading = aiStatus === "submitted"
+
+  const { pushVariant, getVariantInfo, navigateVariant, resolveContent } =
+    useResponseVariants()
+
+  // Convert AI SDK messages to our Message type for consumers,
+  // applying variant overrides for regenerated responses.
+  const messages: Message[] = useMemo(() => {
+    return aiMessages.map((m, i) => {
+      const msg = fromUIMessage(m, contextMapRef.current)
+
+      if (
+        m.role === "assistant" &&
+        i > 0 &&
+        aiMessages[i - 1].role === "user"
+      ) {
+        const userMsgId = aiMessages[i - 1].id
+        return { ...msg, content: resolveContent(userMsgId, msg.content) }
+      }
+
+      return msg
+    })
+  }, [aiMessages, resolveContent])
+
+  const latestAssistantId = useMemo(() => {
+    for (let i = aiMessages.length - 1; i >= 0; i--) {
+      if (aiMessages[i].role === "assistant") return aiMessages[i].id
+    }
+    return undefined
+  }, [aiMessages])
+
   const sendMessage = useCallback(
     async (message: string) => {
       if (!message.trim() || !activeThreadId) return
-      // Concurrent guard is in useStreamChat, but also guard UI state
-      if (isStreamingRef.current) return
+      if (isGenerating) return
 
-      setIsGenerating(true)
-      setIsLoading(true)
-
-      // Capture context tabs before clearing (race condition #5)
+      // Capture context tabs before clearing
       const capturedContextTabs = [...contextTabs]
 
-      addMessage(activeThreadId, {
-        role: "user",
-        content: message,
-        context: capturedContextTabs,
-      })
-      setInput("")
-
+      // Prepare context content for the request
       const contextContent = await getCombinedContext({
         contextTabs: capturedContextTabs,
         queryClient,
         projectId,
         drafts,
       })
+
+      // Store context content in ref so prepareSendMessagesRequest reads it
+      requestBodyRef.current.contextContent = contextContent
+
+      // Generate user message ID and store context tabs before sending
+      const userMessageId = nanoid()
+      if (capturedContextTabs.length > 0) {
+        contextMapRef.current.set(userMessageId, capturedContextTabs)
+      }
+
       setContextTabs([])
+      setInput("")
 
-      const assistantMessageId = nanoid()
-      setLatestAssistantId(assistantMessageId)
-
-      addMessage(activeThreadId, {
-        id: assistantMessageId,
-        role: "assistant",
-        content: "",
+      // Send user message — AI SDK handles the streaming automatically
+      await aiSendMessage({
+        id: userMessageId,
+        role: "user",
+        parts: [{ type: "text" as const, text: message }],
       })
 
-      // Capture threadId for this stream — if user switches threads, writes go nowhere
-      const streamThreadId = activeThreadId
-
-      let buffer = ""
-      let firstChunk = true
-
-      await streamChat(
-        {
-          messages: [
-            ...messages,
-            { role: "user", content: message, context: capturedContextTabs },
-          ],
-          context: {
-            templateType: projectType,
-            activeFileContent,
-            fileTree,
-            contextContent,
-            projectName,
-            fileName: activeFileName,
-          },
-        },
-        // onChunk — leading-edge throttle for instant first chunk
-        (chunk) => {
-          buffer += chunk
-          if (firstChunk) {
-            setIsLoading(false)
-            firstChunk = false
-            // Immediately update on first chunk (leading-edge)
-            updateMessageById(streamThreadId, assistantMessageId, buffer)
-            return
-          }
-          // Throttle subsequent updates to every 50ms
-          if (!throttleRef.current) {
-            throttleRef.current = setTimeout(() => {
-              updateMessageById(streamThreadId, assistantMessageId, buffer)
-              throttleRef.current = null
-            }, 50)
-          }
-        },
-        // onDone
-        () => {
-          // Clear any pending throttle (race condition #4)
-          if (throttleRef.current) {
-            clearTimeout(throttleRef.current)
-            throttleRef.current = null
-          }
-          // Final update with complete buffer (race condition #1: ID-based)
-          updateMessageById(streamThreadId, assistantMessageId, buffer)
-          setIsGenerating(false)
-          setIsLoading(false)
-        },
-        // onError
-        (error) => {
-          if (throttleRef.current) {
-            clearTimeout(throttleRef.current)
-            throttleRef.current = null
-          }
-          console.error("Stream error:", error)
-          updateMessageById(
-            streamThreadId,
-            assistantMessageId,
-            error.message || "Sorry, an error occurred.",
-          )
-          setIsGenerating(false)
-          setIsLoading(false)
-        },
-      )
+      requestBodyRef.current.contextContent = ""
     },
     [
       activeThreadId,
+      isGenerating,
       contextTabs,
       queryClient,
       projectId,
       drafts,
-      projectType,
-      activeFileContent,
-      fileTree,
-      projectName,
-      activeFileName,
-      messages,
-      addMessage,
-      updateMessageById,
-      streamChat,
-      isStreamingRef,
+      aiSendMessage,
     ],
   )
 
-  const stopGeneration = useCallback(() => {
-    abortStream()
-    setIsGenerating(false)
-    setIsLoading(false)
-    // Clear pending throttle (race condition #4)
-    if (throttleRef.current) {
-      clearTimeout(throttleRef.current)
-      throttleRef.current = null
+  const retry = useCallback(() => {
+    if (isGenerating) return
+
+    // Find the last assistant message and the user message before it
+    let lastAssistantIdx = -1
+    let userMsgId: string | undefined
+    for (let i = aiMessages.length - 1; i >= 0; i--) {
+      if (aiMessages[i].role === "assistant") {
+        lastAssistantIdx = i
+        if (i > 0 && aiMessages[i - 1].role === "user") {
+          userMsgId = aiMessages[i - 1].id
+        }
+        break
+      }
     }
-  }, [abortStream])
+    if (lastAssistantIdx === -1 || !userMsgId) return
+
+    pushVariant(userMsgId, getTextContent(aiMessages[lastAssistantIdx]))
+    aiRegenerate({ messageId: aiMessages[lastAssistantIdx].id })
+  }, [isGenerating, aiMessages, aiRegenerate, pushVariant])
+
+  const stopGeneration = useCallback(() => {
+    stop()
+  }, [stop])
 
   const markFileActionStatus = useCallback(
     (messageId: string, filePath: string, status: "applied" | "rejected") => {
@@ -350,10 +441,13 @@ function ChatProvider({ children }: ChatProviderProps) {
       addContextTab,
       removeContextTab,
       sendMessage,
+      retry,
       stopGeneration,
+      getVariantInfo,
+      navigateVariant,
       fileActionStatuses,
       markFileActionStatus,
-      latestAssistantId: latestAssistantId ?? undefined,
+      latestAssistantId,
       mergeStatuses,
       setMergeStatuses,
     }),
@@ -362,13 +456,17 @@ function ChatProvider({ children }: ChatProviderProps) {
       activeFileName,
       messages,
       input,
+      setInput,
       isGenerating,
       isLoading,
       contextTabs,
       addContextTab,
       removeContextTab,
       sendMessage,
+      retry,
       stopGeneration,
+      getVariantInfo,
+      navigateVariant,
       fileActionStatuses,
       markFileActionStatus,
       latestAssistantId,
