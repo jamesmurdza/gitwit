@@ -1,9 +1,13 @@
 import { useEditor } from "@/context/editor-context"
-import { useSocket } from "@/context/SocketContext"
 import { useTerminal } from "@/context/TerminalContext"
 import { DockviewApi, GridviewApi } from "dockview"
 import { editor, KeyCode, KeyMod } from "monaco-editor"
 import { MutableRefObject, useEffect } from "react"
+import {
+  useToggleChat,
+  useToggleSidebar,
+  useToggleTerminal,
+} from "../hooks/usePanelToggles"
 
 /**
  * Hook to manage global keyboard shortcuts for the editor layout
@@ -11,61 +15,37 @@ import { MutableRefObject, useEffect } from "react"
 export function useGlobalShortcut() {
   const { gridRef, terminalRef, dockRef } = useEditor()
   const { creatingTerminal, createNewTerminal } = useTerminal()
-  const { isReady: isSocketReady } = useSocket()
+
+  const toggleChat = useToggleChat()
+  const toggleTerminal = useToggleTerminal()
+  const toggleSidebar = useToggleSidebar()
 
   useEffect(() => {
     const controller = new AbortController()
-    // listen for cmd L to toggle chat panel visibility
     const handleKeyDown = (e: KeyboardEvent) => {
+      // cmd/ctrl L to toggle chat panel visibility
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "l") {
         e.preventDefault()
-        const chatPanel = gridRef.current?.getPanel("chat")
-        if (chatPanel) {
-          const isVisible = chatPanel.api.isVisible
-          chatPanel.api.setVisible(!isVisible)
-        }
+        toggleChat()
       }
-      // listen for ctrl ` to toggle terminal
+      // ctrl ` to toggle terminal
       if (e.ctrlKey && e.key === "`") {
         e.preventDefault()
-        const terminalPanel = gridRef.current?.getPanel("terminal")
-        const existingTerminals = Boolean(terminalRef.current?.panels.length)
-
-        if (terminalPanel) {
-          const isVisible = terminalPanel.api.isVisible
-          terminalPanel.api.setVisible(!isVisible)
-          if (!existingTerminals && isSocketReady) {
-            createNewTerminal().then((id) => {
-              if (!id) return
-              // add terminal panel
-              terminalRef.current?.addPanel({
-                id: `terminal-${id}`,
-                component: "terminal",
-                title: "Shell",
-                tabComponent: "terminal",
-              })
-            })
-          }
-        }
+        toggleTerminal()
       }
-      // listen for cmd B to toggle sidebar
+      // cmd/ctrl B to toggle sidebar
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
         e.preventDefault()
-        const sidebarPanel = gridRef.current?.getPanel("sidebar")
-        if (sidebarPanel) {
-          const isVisible = sidebarPanel.api.isVisible
-          sidebarPanel.api.setVisible(!isVisible)
-        }
+        toggleSidebar()
       }
 
-      //   listen for Ctrl Shift ` for new terminal
+      // Ctrl Shift ` for new terminal
       if (e.ctrlKey && e.shiftKey && e.key === "`") {
         e.preventDefault()
         gridRef.current?.getPanel("terminal")?.api.setVisible(true)
         if (!creatingTerminal) {
           createNewTerminal().then((id) => {
             if (!id) return
-            // add terminal panel
             terminalRef.current?.addPanel({
               id: `terminal-${id}`,
               component: "terminal",
@@ -82,7 +62,15 @@ export function useGlobalShortcut() {
     return () => {
       controller.abort()
     }
-  }, [gridRef, terminalRef, creatingTerminal, createNewTerminal, isSocketReady])
+  }, [
+    gridRef,
+    terminalRef,
+    creatingTerminal,
+    createNewTerminal,
+    toggleChat,
+    toggleTerminal,
+    toggleSidebar,
+  ])
   // Handle browser beforeunload event for unsaved changes
   useEffect(() => {
     const controller = new AbortController()

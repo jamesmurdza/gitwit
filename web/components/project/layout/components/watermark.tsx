@@ -1,40 +1,12 @@
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
-import { useEditor } from "@/context/editor-context"
-import { useSocket } from "@/context/SocketContext"
 import { useTerminal } from "@/context/TerminalContext"
 import type { IWatermarkPanelProps } from "dockview"
 import { Loader2, TerminalSquare } from "lucide-react"
+import { useToggleChat, useToggleTerminal } from "../hooks/usePanelToggles"
 
 export function MainWatermark(_props: IWatermarkPanelProps) {
-  const { gridRef, terminalRef } = useEditor()
-  const { creatingTerminal, createNewTerminal } = useTerminal()
-  const { isReady: isSocketReady } = useSocket()
-
-  function toggleAIChat() {
-    const panel = gridRef.current?.getPanel("chat")
-    panel?.api.setVisible(!panel.api.isVisible)
-  }
-
-  function toggleTerminal() {
-    const panel = gridRef.current?.getPanel("terminal")
-    if (!panel) return
-    const isVisible = panel.api.isVisible
-    panel.api.setVisible(!isVisible)
-    if (!isVisible && isSocketReady) {
-      const existingTerminals = Boolean(terminalRef.current?.panels.length)
-      if (!existingTerminals && !creatingTerminal) {
-        createNewTerminal().then((id) => {
-          if (!id) return
-          terminalRef.current?.addPanel({
-            id: `terminal-${id}`,
-            component: "terminal",
-            title: "Shell",
-            tabComponent: "terminal",
-          })
-        })
-      }
-    }
-  }
+  const toggleAIChat = useToggleChat()
+  const toggleTerminal = useToggleTerminal()
 
   return (
     <div className="watermark space-y-4">

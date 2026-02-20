@@ -7,10 +7,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useEditor } from "@/context/editor-context"
-import { useSocket } from "@/context/SocketContext"
-import { useTerminal } from "@/context/TerminalContext"
 import { cn } from "@/lib/utils"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import {
+  useToggleChat,
+  useToggleSidebar,
+  useToggleTerminal,
+} from "../hooks/usePanelToggles"
 
 function useIsMac() {
   return useMemo(() => {
@@ -58,13 +61,15 @@ function StatusBarButton({
 }
 
 export function StatusBar() {
-  const { gridRef, terminalRef, setIsAIChatOpen } = useEditor()
-  const { creatingTerminal, createNewTerminal } = useTerminal()
-  const { isReady: isSocketReady } = useSocket()
+  const { gridRef, setIsAIChatOpen } = useEditor()
   const isMac = useIsMac()
 
   const mod = isMac ? "⌘" : "Ctrl+"
   const ctrl = isMac ? "⌃" : "Ctrl+"
+
+  const toggleSidebar = useToggleSidebar()
+  const toggleTerminal = useToggleTerminal()
+  const toggleChat = useToggleChat()
 
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [terminalVisible, setTerminalVisible] = useState(true)
@@ -110,44 +115,6 @@ export function StatusBar() {
 
     return () => disposables.forEach((d) => d.dispose())
   }, [gridRef.current, setIsAIChatOpen])
-
-  const toggleSidebar = useCallback(() => {
-    const panel = gridRef.current?.getPanel("sidebar")
-    if (panel) {
-      panel.api.setVisible(!panel.api.isVisible)
-    }
-  }, [gridRef])
-
-  const toggleTerminal = useCallback(() => {
-    const panel = gridRef.current?.getPanel("terminal")
-    if (!panel) return
-
-    const isVisible = panel.api.isVisible
-    panel.api.setVisible(!isVisible)
-
-    // If showing terminal and no terminals exist, create one
-    if (!isVisible && isSocketReady) {
-      const existingTerminals = Boolean(terminalRef.current?.panels.length)
-      if (!existingTerminals && !creatingTerminal) {
-        createNewTerminal().then((id) => {
-          if (!id) return
-          terminalRef.current?.addPanel({
-            id: `terminal-${id}`,
-            component: "terminal",
-            title: "Shell",
-            tabComponent: "terminal",
-          })
-        })
-      }
-    }
-  }, [gridRef, terminalRef, isSocketReady, creatingTerminal, createNewTerminal])
-
-  const toggleChat = useCallback(() => {
-    const panel = gridRef.current?.getPanel("chat")
-    if (panel) {
-      panel.api.setVisible(!panel.api.isVisible)
-    }
-  }, [gridRef])
 
   return (
     <div className="h-7 px-2 flex items-center justify-between border-t bg-background text-xs select-none">
