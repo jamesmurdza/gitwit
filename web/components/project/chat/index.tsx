@@ -203,7 +203,9 @@ function MainChatContent({
               onRejectCode={onRejectCode}
               onOpenFile={onOpenFile}
             >
-              <MessageContent>{message.content}</MessageContent>
+              <MessageContent parts={message.parts}>
+                {message.content}
+              </MessageContent>
             </Message>
           )
         })}

@@ -1,10 +1,11 @@
 import { createRouter } from "@/lib/api/create-app"
 import { getUserProviderConfig } from "@/lib/ai/helpers"
-import { defaultTools } from "@/lib/ai/tools"
+import { defaultTools, createFileTools } from "@/lib/ai/tools"
 import { createModel, buildPrompt, mergeAiderDiff } from "@gitwit/ai"
 import type { FileTree } from "@gitwit/ai"
+import { Project } from "@gitwit/lib/services/Project"
 import { templateConfigs } from "@gitwit/templates"
-import { generateText, streamText } from "ai"
+import { generateText, streamText, stepCountIs } from "ai"
 import { zValidator } from "@hono/zod-validator"
 import z from "zod"
 
@@ -53,11 +54,25 @@ export const aiRouter = createRouter()
         contextContent: context?.contextContent,
       })
 
+      // Initialize project for file tools when projectId is available
+      let project: Project | null = null
+      let fileTools = {}
+      if (context?.projectId) {
+        try {
+          project = new Project(context.projectId)
+          await project.initialize()
+          fileTools = createFileTools(project)
+        } catch (error) {
+          console.error("Failed to initialize project for file tools:", error)
+        }
+      }
+
       const result = streamText({
         model,
         system,
         messages,
-        tools: defaultTools,
+        tools: { ...defaultTools, ...fileTools },
+        stopWhen: stepCountIs(5),
       })
 
       return result.toUIMessageStreamResponse()
