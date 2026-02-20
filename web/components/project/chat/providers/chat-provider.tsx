@@ -187,9 +187,7 @@ function ChatProvider({ children }: ChatProviderProps) {
                 activeFileContent: ref.activeFileContent,
                 fileTree: ref.fileTree,
                 contextContent:
-                  trigger === "regenerate-message"
-                    ? ""
-                    : ref.contextContent,
+                  trigger === "regenerate-message" ? "" : ref.contextContent,
                 projectName: ref.projectName,
                 fileName: ref.activeFileName,
               },
@@ -322,7 +320,11 @@ function ChatProvider({ children }: ChatProviderProps) {
     return aiMessages.map((m, i) => {
       const msg = fromUIMessage(m, contextMapRef.current)
 
-      if (m.role === "assistant" && i > 0 && aiMessages[i - 1].role === "user") {
+      if (
+        m.role === "assistant" &&
+        i > 0 &&
+        aiMessages[i - 1].role === "user"
+      ) {
         const userMsgId = aiMessages[i - 1].id
         return { ...msg, content: resolveContent(userMsgId, msg.content) }
       }

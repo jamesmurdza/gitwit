@@ -187,7 +187,9 @@ function MainChatContent({
         {messages.map((message, i) => {
           // For assistant messages, find the preceding user message ID
           const precedingUserMsgId =
-            message.role === "assistant" && i > 0 && messages[i - 1].role === "user"
+            message.role === "assistant" &&
+            i > 0 &&
+            messages[i - 1].role === "user"
               ? messages[i - 1].id
               : undefined
           return (

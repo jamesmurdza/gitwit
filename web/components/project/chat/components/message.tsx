@@ -9,7 +9,13 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "framer-motion"
-import { Check, ChevronLeft, ChevronRight, Copy, RefreshCcw } from "lucide-react"
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  RefreshCcw,
+} from "lucide-react"
 import * as React from "react"
 import { CodeApplyProvider } from "../contexts/code-apply-context"
 import { stringifyContent } from "../lib/utils"
@@ -60,7 +66,9 @@ const Message = ({
   ...props
 }: MessageProps) => {
   return (
-    <MessageContext.Provider value={{ role, context, messageId, precedingUserMsgId, onOpenFile }}>
+    <MessageContext.Provider
+      value={{ role, context, messageId, precedingUserMsgId, onOpenFile }}
+    >
       <div
         className={cn(
           "flex gap-3",
@@ -227,9 +235,7 @@ function RetryAction() {
         <>
           <MessageAction
             label="Previous variant"
-            onClick={() =>
-              navigateVariant(precedingUserMsgId!, "prev")
-            }
+            onClick={() => navigateVariant(precedingUserMsgId!, "prev")}
             disabled={variantInfo.current === 0}
           >
             <ChevronLeft size={14} />
@@ -239,20 +245,14 @@ function RetryAction() {
           </span>
           <MessageAction
             label="Next variant"
-            onClick={() =>
-              navigateVariant(precedingUserMsgId!, "next")
-            }
+            onClick={() => navigateVariant(precedingUserMsgId!, "next")}
             disabled={variantInfo.current === variantInfo.total - 1}
           >
             <ChevronRight size={14} />
           </MessageAction>
         </>
       )}
-      <MessageAction
-        label="Regenerate"
-        onClick={retry}
-        disabled={isGenerating}
-      >
+      <MessageAction label="Regenerate" onClick={retry} disabled={isGenerating}>
         <RefreshCcw size={14} />
       </MessageAction>
     </div>
