@@ -10,7 +10,6 @@ import { useEditor } from "@/context/editor-context"
 import { useSocket } from "@/context/SocketContext"
 import { useTerminal } from "@/context/TerminalContext"
 import { cn } from "@/lib/utils"
-import { LucideIcon, MessageSquare, PanelLeft, TerminalSquare } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 function useIsMac() {
@@ -21,13 +20,11 @@ function useIsMac() {
 }
 
 function StatusBarButton({
-  icon: Icon,
   label,
   shortcut,
   active,
   onClick,
 }: {
-  icon: LucideIcon
   label: string
   shortcut: string
   active: boolean
@@ -46,11 +43,10 @@ function StatusBarButton({
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Icon className="size-3.5" />
-            <span>{label}</span>
-            <kbd className="text-[10px] opacity-60 border border-current/20 rounded px-1 py-px">
+            <kbd className="text-[10px] border border-muted-foreground/40 rounded px-1 leading-4">
               {shortcut}
             </kbd>
+            <span>{label}</span>
           </button>
         </TooltipTrigger>
         <TooltipContent side="top">
@@ -157,14 +153,12 @@ export function StatusBar() {
     <div className="h-7 px-2 flex items-center justify-between border-t bg-background text-xs select-none">
       <div className="flex items-center gap-0.5">
         <StatusBarButton
-          icon={PanelLeft}
           label="Sidebar"
           shortcut={`${mod}B`}
           active={sidebarVisible}
           onClick={toggleSidebar}
         />
         <StatusBarButton
-          icon={TerminalSquare}
           label="Terminal"
           shortcut={`${ctrl}\``}
           active={terminalVisible}
@@ -176,10 +170,10 @@ export function StatusBar() {
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="flex items-center gap-1 px-1.5 py-0.5 text-muted-foreground">
-                <span>AI Edit</span>
-                <kbd className="text-[10px] opacity-60 border border-current/20 rounded px-1 py-px">
+                <kbd className="text-[10px] border border-muted-foreground/40 rounded px-1 leading-4">
                   {mod}G
                 </kbd>
+                <span>AI Edit</span>
               </span>
             </TooltipTrigger>
             <TooltipContent side="top">
@@ -188,7 +182,6 @@ export function StatusBar() {
           </Tooltip>
         </TooltipProvider>
         <StatusBarButton
-          icon={MessageSquare}
           label="AI Chat"
           shortcut={`${mod}L`}
           active={chatVisible}
