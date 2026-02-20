@@ -6,6 +6,7 @@ import { useAppStore } from "@/store/context"
 import { useQueryClient } from "@tanstack/react-query"
 import { useChat as useAIChat } from "ai/react"
 import type { Message as AIMessage } from "ai/react"
+import { nanoid } from "nanoid"
 import React, {
   createContext,
   ReactNode,
@@ -66,14 +67,16 @@ function toAIMessages(messages: Message[]): AIMessage[] {
   }))
 }
 
-/** Convert AI SDK Message back to our Message type, preserving context from original */
-function fromAIMessage(aiMsg: AIMessage, originalMessages: Message[]): Message {
-  const original = originalMessages.find((m) => m.id === aiMsg.id)
+/** Convert AI SDK Message back to our Message type, restoring context from map */
+function fromAIMessage(
+  aiMsg: AIMessage,
+  contextMap: Map<string, ContextTab[]>,
+): Message {
   return {
     id: aiMsg.id,
     role: aiMsg.role as "user" | "assistant",
     content: aiMsg.content,
-    context: original?.context,
+    context: contextMap.get(aiMsg.id),
   }
 }
 
@@ -112,11 +115,27 @@ function ChatProvider({ children }: ChatProviderProps) {
     activeDraft === undefined ? serverActiveFile : activeDraft
   const activeFileName = activeTab?.name || "untitled"
 
-  // Ref to hold captured context tabs for the current request
-  const pendingContextRef = useRef<{
-    contextContent: string
-    contextTabs: ContextTab[]
-  } | null>(null)
+  // Map of messageId → ContextTab[] to preserve context across AI SDK round-trips
+  const contextMapRef = useRef(new Map<string, ContextTab[]>())
+
+  // Ref to hold request-scoped data (context content + reactive values)
+  // so experimental_prepareRequestBody always reads fresh values
+  const requestBodyRef = useRef({
+    contextContent: "",
+    projectType,
+    activeFileContent,
+    fileTree,
+    projectName,
+    activeFileName,
+  })
+  requestBodyRef.current = {
+    contextContent: requestBodyRef.current.contextContent,
+    projectType,
+    activeFileContent,
+    fileTree,
+    projectName,
+    activeFileName,
+  }
 
   // Get thread messages for initializing useChat
   const threadMessages = activeThreadId
@@ -138,22 +157,18 @@ function ChatProvider({ children }: ChatProviderProps) {
     experimental_throttle: 50,
     initialMessages: toAIMessages(threadMessages),
     experimental_prepareRequestBody: ({ messages: msgs }) => {
-      const context = pendingContextRef.current
+      const ref = requestBodyRef.current
       return {
         messages: msgs.map((m) => ({ role: m.role, content: m.content })),
         context: {
-          templateType: projectType,
-          activeFileContent,
-          fileTree,
-          contextContent: context?.contextContent ?? "",
-          projectName,
-          fileName: activeFileName,
+          templateType: ref.projectType,
+          activeFileContent: ref.activeFileContent,
+          fileTree: ref.fileTree,
+          contextContent: ref.contextContent,
+          projectName: ref.projectName,
+          fileName: ref.activeFileName,
         },
       }
-    },
-    onFinish: () => {
-      // Persist to zustand when stream completes
-      // We read aiMessages in the next effect cycle
     },
     onError: (error) => {
       console.error("Stream error:", error)
@@ -161,16 +176,13 @@ function ChatProvider({ children }: ChatProviderProps) {
   })
 
   // Sync AI SDK messages back to zustand thread store
-  const prevAiMessagesLenRef = useRef(aiMessages.length)
   useEffect(() => {
     if (!activeThreadId) return
-    // Only sync when messages actually changed (not on thread switch)
-    if (aiMessages.length !== prevAiMessagesLenRef.current) {
-      const converted = aiMessages.map((m) => fromAIMessage(m, threadMessages))
-      setThreadMessages(activeThreadId, converted)
-    }
-    prevAiMessagesLenRef.current = aiMessages.length
-  }, [aiMessages, activeThreadId, setThreadMessages, threadMessages])
+    const converted = aiMessages.map((m) =>
+      fromAIMessage(m, contextMapRef.current),
+    )
+    setThreadMessages(activeThreadId, converted)
+  }, [aiMessages, activeThreadId, setThreadMessages])
 
   // Initialize thread on mount after hydration
   useEffect(() => {
@@ -190,7 +202,15 @@ function ChatProvider({ children }: ChatProviderProps) {
   useEffect(() => {
     if (prevThreadIdRef.current !== activeThreadId) {
       stop() // abort any in-flight stream
+
+      // Rebuild context map from thread messages
+      contextMapRef.current.clear()
       if (activeThreadId && threads[activeThreadId]) {
+        for (const msg of threads[activeThreadId].messages) {
+          if (msg.id && msg.context?.length) {
+            contextMapRef.current.set(msg.id, msg.context)
+          }
+        }
         setAIMessages(toAIMessages(threads[activeThreadId].messages))
       } else {
         setAIMessages([])
@@ -249,8 +269,8 @@ function ChatProvider({ children }: ChatProviderProps) {
 
   // Convert AI SDK messages to our Message type for consumers
   const messages: Message[] = useMemo(
-    () => aiMessages.map((m) => fromAIMessage(m, threadMessages)),
-    [aiMessages, threadMessages],
+    () => aiMessages.map((m) => fromAIMessage(m, contextMapRef.current)),
+    [aiMessages],
   )
 
   const latestAssistantId = useMemo(() => {
@@ -276,10 +296,13 @@ function ChatProvider({ children }: ChatProviderProps) {
         drafts,
       })
 
-      // Store in ref so experimental_prepareRequestBody can access it
-      pendingContextRef.current = {
-        contextContent,
-        contextTabs: capturedContextTabs,
+      // Store context content in ref so experimental_prepareRequestBody reads it
+      requestBodyRef.current.contextContent = contextContent
+
+      // Generate user message ID and store context tabs before append
+      const userMessageId = nanoid()
+      if (capturedContextTabs.length > 0) {
+        contextMapRef.current.set(userMessageId, capturedContextTabs)
       }
 
       setContextTabs([])
@@ -287,11 +310,12 @@ function ChatProvider({ children }: ChatProviderProps) {
 
       // Append user message — AI SDK handles the streaming automatically
       await append({
+        id: userMessageId,
         role: "user",
         content: message,
       })
 
-      pendingContextRef.current = null
+      requestBodyRef.current.contextContent = ""
     },
     [
       activeThreadId,
