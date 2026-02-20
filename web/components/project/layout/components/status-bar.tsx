@@ -11,7 +11,14 @@ import { useSocket } from "@/context/SocketContext"
 import { useTerminal } from "@/context/TerminalContext"
 import { cn } from "@/lib/utils"
 import { LucideIcon, MessageSquare, PanelLeft, TerminalSquare } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+
+function useIsMac() {
+  return useMemo(() => {
+    if (typeof navigator === "undefined") return true
+    return navigator.platform?.startsWith("Mac") || navigator.platform === "iPhone"
+  }, [])
+}
 
 function StatusBarButton({
   icon: Icon,
@@ -55,6 +62,10 @@ export function StatusBar() {
   const { gridRef, terminalRef, setIsAIChatOpen } = useEditor()
   const { creatingTerminal, createNewTerminal } = useTerminal()
   const { isReady: isSocketReady } = useSocket()
+  const isMac = useIsMac()
+
+  const mod = isMac ? "⌘" : "Ctrl+"
+  const ctrl = isMac ? "⌃" : "Ctrl+"
 
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [terminalVisible, setTerminalVisible] = useState(true)
@@ -145,23 +156,38 @@ export function StatusBar() {
         <StatusBarButton
           icon={PanelLeft}
           label="Sidebar"
-          shortcut="⌘B"
+          shortcut={`${mod}B`}
           active={sidebarVisible}
           onClick={toggleSidebar}
         />
         <StatusBarButton
           icon={TerminalSquare}
           label="Terminal"
-          shortcut="⌃`"
+          shortcut={`${ctrl}\``}
           active={terminalVisible}
           onClick={toggleTerminal}
         />
       </div>
-      <div className="flex items-center">
+      <div className="flex items-center gap-0.5">
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex items-center gap-1 px-1.5 py-0.5 text-muted-foreground">
+                <span>AI Edit</span>
+                <kbd className="text-[10px] text-muted-foreground/70 border border-muted-foreground/20 rounded px-1 py-px">
+                  {mod}G
+                </kbd>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              AI Edit ({mod}G) — select code in editor
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <StatusBarButton
           icon={MessageSquare}
-          label="Chat"
-          shortcut="⌘L"
+          label="AI Chat"
+          shortcut={`${mod}L`}
           active={chatVisible}
           onClick={toggleChat}
         />

@@ -41,6 +41,20 @@ export function MainWatermark(_props: IWatermarkPanelProps) {
       <div className="letterpress" />
       <div className="flex flex-col gap-1 w-full">
         <button
+          disabled
+          aria-disabled="true"
+          className="flex justify-between w-full items-center"
+          style={{ opacity: 1 }}
+        >
+          <span className="text-xs text-muted-foreground">
+            AI Edit
+          </span>
+          <KbdGroup>
+            <Kbd>⌘</Kbd>
+            <Kbd>G</Kbd>
+          </KbdGroup>
+        </button>
+        <button
           onClick={toggleAIChat}
           className="flex justify-between w-full items-center"
           style={{ opacity: 1 }}
