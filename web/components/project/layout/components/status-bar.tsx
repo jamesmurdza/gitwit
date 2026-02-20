@@ -48,6 +48,9 @@ function StatusBarButton({
           >
             <Icon className="size-3.5" />
             <span>{label}</span>
+            <kbd className="text-[10px] opacity-60 border border-current/20 rounded px-1 py-px">
+              {shortcut}
+            </kbd>
           </button>
         </TooltipTrigger>
         <TooltipContent side="top">
@@ -174,7 +177,7 @@ export function StatusBar() {
             <TooltipTrigger asChild>
               <span className="flex items-center gap-1 px-1.5 py-0.5 text-muted-foreground">
                 <span>AI Edit</span>
-                <kbd className="text-[10px] text-muted-foreground/70 border border-muted-foreground/20 rounded px-1 py-px">
+                <kbd className="text-[10px] opacity-60 border border-current/20 rounded px-1 py-px">
                   {mod}G
                 </kbd>
               </span>
