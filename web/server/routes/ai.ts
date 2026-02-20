@@ -60,7 +60,7 @@ export const aiRouter = createRouter()
         tools: defaultTools,
       })
 
-      return result.toTextStreamResponse()
+      return result.toUIMessageStreamResponse()
     },
   )
 

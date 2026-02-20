@@ -4,7 +4,7 @@ import { fileRouter } from "@/lib/api"
 import { sortFileExplorer } from "@/lib/utils"
 import { useAppStore } from "@/store/context"
 import { useChat as useAIChat } from "@ai-sdk/react"
-import { TextStreamChatTransport } from "ai"
+import { DefaultChatTransport } from "ai"
 import type { UIMessage } from "ai"
 import { nanoid } from "nanoid"
 import React, {
@@ -157,7 +157,7 @@ function ChatProvider({ children }: ChatProviderProps) {
   // Stable transport — reads fresh values from requestBodyRef
   const transport = useMemo(
     () =>
-      new TextStreamChatTransport({
+      new DefaultChatTransport({
         api: "/api/ai/stream-chat",
         prepareSendMessagesRequest: ({ messages: msgs }) => {
           const ref = requestBodyRef.current
