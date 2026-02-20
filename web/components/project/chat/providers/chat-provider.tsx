@@ -18,6 +18,10 @@ import React, {
 } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import {
+  useResponseVariants,
+  type VariantInfo,
+} from "../hooks/use-response-variants"
 import type { ContextTab, FileMergeResult, Message } from "../lib/types"
 import { getCombinedContext, normalizePath } from "../lib/utils"
 
@@ -31,11 +35,7 @@ export type MergeState =
   | { status: "ready"; result: FileMergeResult }
   | { status: "error"; error: string }
 
-/** Variant info for a regenerated assistant response */
-export type VariantInfo = {
-  total: number
-  current: number // 0-indexed
-}
+export type { VariantInfo } from "../hooks/use-response-variants"
 
 type ChatContextType = {
   activeFileContent?: string
@@ -313,48 +313,8 @@ function ChatProvider({ children }: ChatProviderProps) {
   const isGenerating = aiStatus === "streaming" || aiStatus === "submitted"
   const isLoading = aiStatus === "submitted"
 
-  // Response variants — keyed by user message ID that preceded the assistant response.
-  // Stores ALL previous assistant responses for that turn (not including the current live one).
-  const [responseVariants, setResponseVariants] = useState<
-    Record<string, string[]>
-  >({})
-  // null = show the current live response; number = index into responseVariants
-  const [activeVariantIdx, setActiveVariantIdx] = useState<
-    Record<string, number | null>
-  >({})
-
-  const getVariantInfo = useCallback(
-    (userMsgId: string): VariantInfo | null => {
-      const old = responseVariants[userMsgId]
-      if (!old || old.length === 0) return null
-      const total = old.length + 1 // old variants + current live
-      const idx = activeVariantIdx[userMsgId]
-      const current = idx ?? old.length // null = latest = old.length
-      return { total, current }
-    },
-    [responseVariants, activeVariantIdx],
-  )
-
-  const navigateVariant = useCallback(
-    (userMsgId: string, direction: "prev" | "next") => {
-      const old = responseVariants[userMsgId]
-      if (!old || old.length === 0) return
-      const total = old.length + 1
-      const idx = activeVariantIdx[userMsgId]
-      const current = idx ?? old.length
-
-      let next = direction === "prev" ? current - 1 : current + 1
-      if (next < 0) next = 0
-      if (next >= total) next = total - 1
-
-      // null means "show live", otherwise show the old variant at that index
-      setActiveVariantIdx((prev) => ({
-        ...prev,
-        [userMsgId]: next === old.length ? null : next,
-      }))
-    },
-    [responseVariants, activeVariantIdx],
-  )
+  const { pushVariant, getVariantInfo, navigateVariant, resolveContent } =
+    useResponseVariants()
 
   // Convert AI SDK messages to our Message type for consumers,
   // applying variant overrides for regenerated responses.
@@ -362,19 +322,14 @@ function ChatProvider({ children }: ChatProviderProps) {
     return aiMessages.map((m, i) => {
       const msg = fromUIMessage(m, contextMapRef.current)
 
-      // Check if this assistant message has an active old variant
       if (m.role === "assistant" && i > 0 && aiMessages[i - 1].role === "user") {
         const userMsgId = aiMessages[i - 1].id
-        const variantIdx = activeVariantIdx[userMsgId]
-        const variants = responseVariants[userMsgId]
-        if (variantIdx != null && variants && variants[variantIdx] !== undefined) {
-          return { ...msg, content: variants[variantIdx] }
-        }
+        return { ...msg, content: resolveContent(userMsgId, msg.content) }
       }
 
       return msg
     })
-  }, [aiMessages, activeVariantIdx, responseVariants])
+  }, [aiMessages, resolveContent])
 
   const latestAssistantId = useMemo(() => {
     for (let i = aiMessages.length - 1; i >= 0; i--) {
@@ -448,18 +403,9 @@ function ChatProvider({ children }: ChatProviderProps) {
     }
     if (lastAssistantIdx === -1 || !userMsgId) return
 
-    const oldContent = getTextContent(aiMessages[lastAssistantIdx])
-
-    // Save old response as a variant, reset navigation to latest
-    setResponseVariants((prev) => ({
-      ...prev,
-      [userMsgId]: [...(prev[userMsgId] ?? []), oldContent],
-    }))
-    setActiveVariantIdx((prev) => ({ ...prev, [userMsgId]: null }))
-
-    // AI SDK's regenerate removes the assistant message and re-sends
+    pushVariant(userMsgId, getTextContent(aiMessages[lastAssistantIdx]))
     aiRegenerate({ messageId: aiMessages[lastAssistantIdx].id })
-  }, [isGenerating, aiMessages, aiRegenerate])
+  }, [isGenerating, aiMessages, aiRegenerate, pushVariant])
 
   const stopGeneration = useCallback(() => {
     stop()
