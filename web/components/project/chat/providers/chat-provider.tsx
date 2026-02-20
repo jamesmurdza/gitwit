@@ -337,8 +337,9 @@ function ChatProvider({ children }: ChatProviderProps) {
 
       // Send user message — AI SDK handles the streaming automatically
       await aiSendMessage({
-        text: message,
-        messageId: userMessageId,
+        id: userMessageId,
+        role: "user",
+        parts: [{ type: "text" as const, text: message }],
       })
 
       requestBodyRef.current.contextContent = ""
