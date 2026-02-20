@@ -177,6 +177,7 @@ const MessageContent = ({
               key={i}
               className={classNames}
               onOpenFile={onOpenFile}
+              collapsibleCodeBlocks
               {...props}
             >
               {part.text}
@@ -210,7 +211,7 @@ const MessageContent = ({
 
     if (isAssistant) {
       return (
-        <Markdown className={classNames} onOpenFile={onOpenFile} {...props}>
+        <Markdown className={classNames} onOpenFile={onOpenFile} collapsibleCodeBlocks {...props}>
           {children as string}
         </Markdown>
       )

@@ -10,9 +10,6 @@ type CodeBlockBodyProps = ComponentProps<"pre"> & {
 }
 
 
-// For diff blocks: no CSS counter line numbers, just block display
-const DIFF_LINE_CLASSES_BLOCK = "block"
-
 // Memoize line numbers class string since it's constant
 const LINE_NUMBER_CLASSES = cn(
   "block",
@@ -28,16 +25,20 @@ const LINE_NUMBER_CLASSES = cn(
   "before:select-none",
 )
 
+// Match the editor's diff decoration styles
 const DIFF_LINE_STYLES: Record<DiffLineType, React.CSSProperties> = {
   context: {},
-  added: { backgroundColor: "rgba(34, 197, 94, 0.15)" },
-  removed: { backgroundColor: "rgba(239, 68, 68, 0.15)", textDecoration: "line-through", textDecorationColor: "rgba(239, 68, 68, 0.4)" },
-}
-
-const DIFF_GUTTER_STYLES: Record<DiffLineType, React.CSSProperties> = {
-  context: { color: "inherit" },
-  added: { color: "rgba(34, 197, 94, 0.8)" },
-  removed: { color: "rgba(239, 68, 68, 0.8)" },
+  added: {
+    backgroundColor: "rgba(0, 255, 0, 0.1)",
+    borderLeft: "3px solid #28a745",
+    paddingLeft: "8px",
+  },
+  removed: {
+    backgroundColor: "rgba(255, 0, 0, 0.1)",
+    borderLeft: "3px solid #dc3545",
+    paddingLeft: "8px",
+    opacity: 0.7,
+  },
 }
 
 export const CodeBlockBody = memo(
@@ -59,21 +60,12 @@ export const CodeBlockBody = memo(
             const lineType = diffLineTypes?.[index] ?? "context"
             return (
               <span
-                className={isDiff ? DIFF_LINE_CLASSES_BLOCK : LINE_NUMBER_CLASSES}
+                className={isDiff ? "block" : LINE_NUMBER_CLASSES}
                 style={isDiff ? DIFF_LINE_STYLES[lineType] : undefined}
                 {...(isDiff ? { "data-diff-line": lineType } : {})}
                 // biome-ignore lint/suspicious/noArrayIndexKey: "This is a stable key."
                 key={index}
               >
-                {isDiff && (
-                  <span
-                    key="gutter"
-                    className="inline-block w-4 mr-2 text-[13px] text-right select-none font-bold"
-                    style={DIFF_GUTTER_STYLES[lineType]}
-                  >
-                    {lineType === "added" ? "+" : lineType === "removed" ? "-" : " "}
-                  </span>
-                )}
                 {row.map((token, tokenIndex) => (
                   <span
                     // biome-ignore lint/suspicious/noArrayIndexKey: "This is a stable key."

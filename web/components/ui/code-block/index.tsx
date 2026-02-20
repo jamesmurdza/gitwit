@@ -1,21 +1,12 @@
 // Acknowledgment: This code is adapted from the Streamdown project(stremadown.ai).
-import type { HighlightResult } from "@streamdown/code"
-import {} from "@streamdown/code"
-import {
-  type HTMLAttributes,
-  use,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react"
-import type { BundledLanguage } from "shiki"
-import { StreamdownContext } from "streamdown"
-import { CodePluginContext } from "../markdown"
+import { type HTMLAttributes, useMemo } from "react"
 import { CodeBlockBody } from "./body"
+import { CollapsibleCode } from "./collapsible-code"
 import { CodeBlockContainer } from "./container"
-import { CodeBlockContext, type DiffLineType } from "./context"
+import { CodeBlockContext } from "./context"
+import { parseAiderDiff } from "./diff"
 import { CodeBlockHeader } from "./header"
+import { useSyntaxHighlighting } from "./use-syntax-highlighting"
 
 type CodeBlockProps = HTMLAttributes<HTMLPreElement> & {
   code: string
@@ -24,32 +15,7 @@ type CodeBlockProps = HTMLAttributes<HTMLPreElement> & {
   filePath?: string | null
   isNewFile?: boolean
   onOpenFile?: (filePath: string) => void
-}
-
-/**
- * Parse aider diff markers into displayable code with per-line diff annotations.
- * SEARCH lines become "removed", REPLACE lines become "added", rest is "context".
- * Returns null if no markers found (not a diff block).
- */
-function parseAiderDiff(code: string): { displayCode: string; lineTypes: DiffLineType[] } | null {
-  if (!code.includes("<<<<<<< SEARCH")) return null
-
-  const lines = code.split("\n")
-  const output: string[] = []
-  const lineTypes: DiffLineType[] = []
-  let section: "outside" | "search" | "replace" = "outside"
-
-  for (const line of lines) {
-    const trimmed = line.trimEnd()
-    if (trimmed === "<<<<<<< SEARCH") { section = "search"; continue }
-    if (trimmed === "=======" && section === "search") { section = "replace"; continue }
-    if (trimmed === ">>>>>>> REPLACE") { section = "outside"; continue }
-
-    output.push(line)
-    lineTypes.push(section === "search" ? "removed" : section === "replace" ? "added" : "context")
-  }
-
-  return { displayCode: output.join("\n"), lineTypes }
+  collapsible?: boolean
 }
 
 export const CodeBlock = ({
@@ -59,69 +25,23 @@ export const CodeBlock = ({
   filePath,
   isNewFile,
   onOpenFile,
+  collapsible,
   className,
   children,
   ...rest
 }: CodeBlockProps) => {
-  const { shikiTheme } = useContext(StreamdownContext)
-  const { codePlugin } = use(CodePluginContext)!
-
-  // Parse diff markers for display — raw code stays in context for apply/copy
+  // ── Diff parsing ─────────────────────────────────────────────────────────
+  // Parse aider SEARCH/REPLACE markers into per-line diff annotations.
+  // The raw `code` is kept in context for apply/copy actions.
   const diffParsed = useMemo(() => parseAiderDiff(code), [code])
   const displayCode = diffParsed?.displayCode ?? code
   const diffLineTypes = diffParsed?.lineTypes
 
-  // Memoize the raw fallback tokens to avoid recomputing on every render
-  const raw: HighlightResult = useMemo(
-    () => ({
-      bg: "transparent",
-      fg: "inherit",
-      tokens: displayCode.split("\n").map((line) => [
-        {
-          content: line,
-          color: "inherit",
-          bgColor: "transparent",
-          htmlStyle: {},
-          offset: 0,
-        },
-      ]),
-    }),
-    [displayCode],
-  )
+  // ── Syntax highlighting ──────────────────────────────────────────────────
+  // Returns Shiki-highlighted tokens when ready, plain-text tokens while loading.
+  const result = useSyntaxHighlighting(displayCode, language)
 
-  // Use raw as initial state
-  const [result, setResult] = useState<HighlightResult>(raw)
-
-  // Try to get cached result or subscribe to highlighting
-  useEffect(() => {
-    // If no code plugin, just use raw tokens (plain text)
-    if (!codePlugin) {
-      setResult(raw)
-      return
-    }
-
-    const cachedResult = codePlugin.highlight(
-      {
-        code: displayCode,
-        language: language as BundledLanguage,
-        themes: shikiTheme,
-      },
-      (highlightedResult) => {
-        setResult(highlightedResult)
-      },
-    )
-
-    if (cachedResult) {
-      // Already cached, use it immediately
-      setResult(cachedResult)
-      return
-    }
-
-    // Not cached - reset to raw tokens while waiting for highlighting
-    // This is critical for streaming: ensures we show current code, not stale tokens
-    setResult(raw)
-  }, [displayCode, language, shikiTheme, codePlugin, raw])
-
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <CodeBlockContext.Provider value={{ code }}>
       <CodeBlockContainer language={language}>
@@ -134,13 +54,20 @@ export const CodeBlock = ({
         >
           {children}
         </CodeBlockHeader>
-        <CodeBlockBody
-          className={className}
-          language={language}
+        <CollapsibleCode
+          enabled={collapsible}
+          code={code}
+          displayCode={displayCode}
           result={result}
-          diffLineTypes={diffLineTypes}
-          {...rest}
-        />
+        >
+          <CodeBlockBody
+            className={className}
+            language={language}
+            result={result}
+            diffLineTypes={diffLineTypes}
+            {...rest}
+          />
+        </CollapsibleCode>
       </CodeBlockContainer>
     </CodeBlockContext.Provider>
   )

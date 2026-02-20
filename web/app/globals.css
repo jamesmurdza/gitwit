@@ -433,3 +433,12 @@ html.dark .shiki span:not([data-diff-line]) {
   opacity: 0 !important;
   transition: opacity 0.15s ease-out;
 }
+
+/* Shimmer animation for streaming code blocks */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.animate-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
