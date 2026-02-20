@@ -160,7 +160,7 @@ export function StatusBar() {
       <div className="flex items-center">
         <StatusBarButton
           icon={MessageSquare}
-          label="AI Chat"
+          label="Chat"
           shortcut="⌘L"
           active={chatVisible}
           onClick={toggleChat}
