@@ -6,7 +6,7 @@ import { AIProviderConfig, AIProviderType } from "../types"
 
 const DEFAULT_MODELS: Record<AIProviderType, string> = {
   anthropic: "claude-sonnet-4-6",
-  openai: "gpt-4.1",
+  openai: "gpt-5.2-2025-12-11",
   openrouter: "anthropic/claude-sonnet-4-6",
   bedrock: "anthropic.claude-sonnet-4-6",
 }
