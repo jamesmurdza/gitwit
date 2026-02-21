@@ -1,8 +1,11 @@
+import type { UIMessage } from "ai"
+
 export interface Message {
   id?: string
   role: "user" | "assistant"
   content: string
   context?: ContextTab[]
+  parts?: UIMessage["parts"]
 }
 
 export type ContextTab =

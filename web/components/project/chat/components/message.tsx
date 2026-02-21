@@ -17,10 +17,12 @@ import {
   RefreshCcw,
 } from "lucide-react"
 import * as React from "react"
+import type { UIMessage } from "ai"
 import { CodeApplyProvider } from "../contexts/code-apply-context"
 import { stringifyContent } from "../lib/utils"
 import { useChat } from "../providers/chat-provider"
 import { ContextTab } from "./context-tab"
+import { ToolInvocation } from "./tool-invocation"
 
 export type MessageProps = {
   messageId?: string
@@ -114,12 +116,14 @@ const MessageAvatar = ({ src, alt, className }: MessageAvatarProps) => {
 export type MessageContentProps = {
   children: React.ReactNode
   className?: string
+  parts?: UIMessage["parts"]
 } & React.ComponentProps<typeof Markdown> &
   React.HTMLProps<HTMLDivElement>
 
 const MessageContent = ({
   children,
   className,
+  parts,
   ...props
 }: MessageContentProps) => {
   const { role, context, onOpenFile } = useMessage()
@@ -128,19 +132,92 @@ const MessageContent = ({
   const stringifiedContent = React.useMemo(() => {
     return stringifyContent(children)
   }, [children])
+
+  const classNames = cn(
+    "text-sm rounded-lg p-2 break-words whitespace-normal w-full rounded-lg p-2",
+    isAssistant
+      ? "bg-background text-foreground"
+      : "bg-secondary text-secondary-foreground",
+    className,
+  )
+
+  // For assistant messages with parts, render each part individually
+  const isToolPart = (type: string) =>
+    type === "dynamic-tool" || type.startsWith("tool-")
+  const hasToolParts =
+    isAssistant &&
+    parts &&
+    parts.some((p) => isToolPart(p.type))
+
+
   const renderedContent = React.useMemo(() => {
-    const classNames = cn(
-      "text-sm rounded-lg p-2 break-words whitespace-normal w-full rounded-lg p-2",
-      isAssistant
-        ? "bg-background text-foreground"
-        : "bg-secondary text-secondary-foreground",
-      className,
-    )
-    return isAssistant ? (
-      <Markdown className={classNames} onOpenFile={onOpenFile} {...props}>
-        {children as string}
-      </Markdown>
-    ) : (
+    if (hasToolParts && parts) {
+      // Separate tool parts from text parts so we can render them distinctly
+      const elements: React.ReactNode[] = []
+      let toolGroup: React.ReactNode[] = []
+
+      const flushToolGroup = () => {
+        if (toolGroup.length > 0) {
+          elements.push(
+            <div key={`tools-${elements.length}`} className="flex flex-col gap-0.5 py-1.5 px-2">
+              {toolGroup}
+            </div>,
+          )
+          toolGroup = []
+        }
+      }
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i]
+        if (part.type === "text") {
+          flushToolGroup()
+          if (!part.text) continue
+          elements.push(
+            <Markdown
+              key={i}
+              className={classNames}
+              onOpenFile={onOpenFile}
+              collapsibleCodeBlocks
+              {...props}
+            >
+              {part.text}
+            </Markdown>,
+          )
+        } else if (isToolPart(part.type)) {
+          const toolPart = part as unknown as {
+            type: string
+            toolName: string
+            toolCallId: string
+            state: string
+            input?: Record<string, unknown>
+            output?: unknown
+            errorText?: string
+          }
+          const toolName =
+            toolPart.toolName ?? part.type.replace(/^tool-/, "")
+          toolGroup.push(
+            <ToolInvocation
+              key={toolPart.toolCallId}
+              part={{ ...toolPart, toolName }}
+            />,
+          )
+        }
+        // skip step-start and other non-renderable parts
+      }
+      flushToolGroup()
+
+      return <div className="flex flex-col w-full">{elements}</div>
+    }
+
+    if (isAssistant) {
+      return (
+        <Markdown className={classNames} onOpenFile={onOpenFile} collapsibleCodeBlocks {...props}>
+          {children as string}
+        </Markdown>
+      )
+    }
+
+    return (
       <div className="relative">
         <svg
           width="16"
@@ -155,7 +232,7 @@ const MessageContent = ({
         </div>
       </div>
     )
-  }, [role, className, children, onOpenFile, props])
+  }, [hasToolParts, parts, classNames, isAssistant, onOpenFile, props, children])
 
   return (
     <div

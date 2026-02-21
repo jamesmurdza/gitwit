@@ -217,13 +217,22 @@ const pathMatchesTab = (
 }
 
 function shouldTreatAsContext(text: string) {
-  const long = text.length > 400
-  const paragraphs = text.split("\n").length > 2
-  const markdown = /[#>*`]|-{2,}|```/.test(text)
-  const code = /(function|\{|}|\(|\)|=>|class )/.test(text)
-  const lists = /^[0-9]+\./m.test(text) || /^[-*•]\s/m.test(text)
+  // Very long text is always context
+  if (text.length > 1500) return true
 
-  return long || paragraphs || markdown || code || lists
+  // Fenced code blocks are a strong signal
+  if (/```[\s\S]*```/.test(text)) return true
+
+  // Count weak signals — require multiple to trigger
+  let signals = 0
+  if (text.length > 500) signals++
+  if (text.split("\n").length > 8) signals++
+  if (/^#{1,3}\s/m.test(text)) signals++ // markdown headings (not bare #)
+  if (/^[-*•]\s.+\n[-*•]\s/m.test(text)) signals++ // actual list with 2+ items
+  if (/\b(function|const|let|var|class|import|export)\b.*[{(]/.test(text)) signals++ // code patterns
+  if (/=>\s*[{(]/.test(text)) signals++ // arrow functions
+
+  return signals >= 2
 }
 
 export {

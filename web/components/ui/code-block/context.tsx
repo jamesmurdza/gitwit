@@ -1,5 +1,7 @@
 import { createContext, useContext } from "react"
 
+export type DiffLineType = "context" | "added" | "removed"
+
 interface CodeBlockContextType {
   code: string
 }

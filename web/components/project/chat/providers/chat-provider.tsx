@@ -100,6 +100,7 @@ function fromUIMessage(
     role: aiMsg.role as "user" | "assistant",
     content: getTextContent(aiMsg),
     context: contextMap.get(aiMsg.id),
+    parts: aiMsg.parts,
   }
 }
 
@@ -145,6 +146,7 @@ function ChatProvider({ children }: ChatProviderProps) {
   // so prepareSendMessagesRequest always reads fresh values
   const requestBodyRef = useRef({
     contextContent: "",
+    projectId,
     projectType,
     activeFileContent,
     fileTree,
@@ -153,6 +155,7 @@ function ChatProvider({ children }: ChatProviderProps) {
   })
   requestBodyRef.current = {
     contextContent: requestBodyRef.current.contextContent,
+    projectId,
     projectType,
     activeFileContent,
     fileTree,
@@ -178,11 +181,14 @@ function ChatProvider({ children }: ChatProviderProps) {
           // message from `msgs` before calling this.
           return {
             body: {
-              messages: msgs.map((m) => ({
-                role: m.role,
-                content: getTextContent(m),
-              })),
+              messages: msgs
+                .map((m) => ({
+                  role: m.role,
+                  content: getTextContent(m),
+                }))
+                .filter((m) => m.content.length > 0),
               context: {
+                projectId: ref.projectId,
                 templateType: ref.projectType,
                 activeFileContent: ref.activeFileContent,
                 fileTree: ref.fileTree,

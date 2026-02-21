@@ -31,6 +31,7 @@ const CodeBlock = lazy(() =>
       filePath?: string | null
       isNewFile?: boolean
       onOpenFile?: (filePath: string) => void
+      collapsible?: boolean
     }
   >
 >
@@ -38,6 +39,7 @@ const CodeBlock = lazy(() =>
 // Types
 type MarkdownProps = ComponentProps<typeof Streamdown> & {
   onOpenFile?: (filePath: string) => void
+  collapsibleCodeBlocks?: boolean
 }
 
 interface ExtractedFileInfo {
@@ -49,6 +51,7 @@ interface ExtractedFileInfo {
 interface MarkdownContextType {
   fileInfoMap: Map<string, ExtractedFileInfo>
   onOpenFile?: (filePath: string) => void
+  collapsibleCodeBlocks?: boolean
 }
 
 // Constants
@@ -187,6 +190,7 @@ const CodeComponent = ({
         filePath={fileInfo?.filePath ?? null}
         isNewFile={fileInfo?.isNewFile}
         onOpenFile={onOpenFile}
+        collapsible={markdownCtx?.collapsibleCodeBlocks}
       >
         {showCodeControls && (
           <>
@@ -211,7 +215,7 @@ const MemoCode = memo(
 MemoCode.displayName = "MarkdownCode"
 
 export const Markdown = memo(
-  ({ className, children, onOpenFile, ...props }: MarkdownProps) => {
+  ({ className, children, onOpenFile, collapsibleCodeBlocks, ...props }: MarkdownProps) => {
     const rawMarkdown = typeof children === "string" ? children : ""
 
     const { fileInfoMap, strippedMarkdown } = useMemo(
@@ -220,7 +224,7 @@ export const Markdown = memo(
     )
 
     return (
-      <MarkdownContext.Provider value={{ fileInfoMap, onOpenFile }}>
+      <MarkdownContext.Provider value={{ fileInfoMap, onOpenFile, collapsibleCodeBlocks }}>
         <CodePluginContext.Provider value={{ codePlugin }}>
           <Streamdown
             className={cn(
@@ -238,7 +242,7 @@ export const Markdown = memo(
     )
   },
   (prev, next) =>
-    prev.children === next.children && prev.onOpenFile === next.onOpenFile,
+    prev.children === next.children && prev.onOpenFile === next.onOpenFile && prev.collapsibleCodeBlocks === next.collapsibleCodeBlocks,
 )
 
 Markdown.displayName = "Markdown"
