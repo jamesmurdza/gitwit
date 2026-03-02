@@ -624,7 +624,7 @@ function ChatInputContextMenu() {
                     {files.map((file) => {
                       const imgSrc = `/icons/${getIconForFile(file.name)}`
                       const isSelected = codeContextTabs.some(
-                        (tab) => tab.name === file.name,
+                        (tab) => (tab.path ?? tab.name) === file.id,
                       )
                       return (
                         <CommandItem
@@ -634,6 +634,7 @@ function ChatInputContextMenu() {
                             id: file.id,
                             type: "code",
                             name: file.name,
+                            path: file.id,
                           })}
                         >
                           <Image

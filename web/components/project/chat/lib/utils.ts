@@ -62,14 +62,15 @@ const processCodeContext = async ({
   drafts: EditorSlice["drafts"]
 }): Promise<string> => {
   const lineInfo = formatLineInfo(tab.lineRange)
+  const displayPath = tab.path ?? tab.name
   const language = processFileType(tab.name)
   if (tab.content) {
-    return `Code from ${tab.name}${lineInfo}:\n\`\`\`${language}\n${tab.content}\n\`\`\``
+    return `Code from ${displayPath}${lineInfo}:\n\`\`\`${language}\n${tab.content}\n\`\`\``
   }
 
   const draftContent = drafts[tab.id]
   if (draftContent !== undefined) {
-    return `Code from ${tab.name}${lineInfo}:\n\`\`\`${language}\n${draftContent}\n\`\`\``
+    return `Code from ${displayPath}${lineInfo}:\n\`\`\`${language}\n${draftContent}\n\`\`\``
   }
 
   try {
@@ -79,10 +80,10 @@ const processCodeContext = async ({
         projectId: projectId,
       }),
     )
-    return `Code from ${tab.name}${lineInfo}:\n\`\`\`${language}\n${data.data}\n\`\`\``
+    return `Code from ${displayPath}${lineInfo}:\n\`\`\`${language}\n${data.data}\n\`\`\``
   } catch (error) {
-    console.error(`Failed to fetch content for ${tab.name}:`, error)
-    return `Code from ${tab.name}${lineInfo}: [Failed to load content]`
+    console.error(`Failed to fetch content for ${displayPath}:`, error)
+    return `Code from ${displayPath}${lineInfo}: [Failed to load content]`
   }
 }
 
@@ -133,9 +134,11 @@ const getCombinedContext = async ({
     const cleanContent = tab.content
       .replace(/^```[\w-]*\n/, "")
       .replace(/\n```$/, "")
-    const fileExt = tab.name.split(".").pop() || "txt"
+    const displayPath = tab.path ?? tab.name
+    const fileNameForExt = displayPath.split("/").pop() || displayPath
+    const fileExt = fileNameForExt.split(".").pop() || "txt"
     contextMessages.push(
-      `File ${tab.name}:\n\`\`\`${fileExt}\n${cleanContent}\n\`\`\``,
+      `File ${displayPath}:\n\`\`\`${fileExt}\n${cleanContent}\n\`\`\``,
     )
   })
 

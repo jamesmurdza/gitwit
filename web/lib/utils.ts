@@ -27,8 +27,8 @@ export function extractFilePathFromCode(
   const matchInCode = code.match(filePatternInCode)
   if (matchInCode) {
     const rawPath = matchInCode[1].trim()
-    // Strip "(new file)" marker from the path
-    return rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
+    console.log("cleanPath", rawPath)
+    return rawPath
   }
 
   // Second, try to find file path pattern in the code block
@@ -36,7 +36,9 @@ export function extractFilePathFromCode(
     /(?:^|\n)([a-zA-Z0-9._\/-]+\.(?:html|js|ts|tsx|jsx|css|scss|sass|less|json|md|txt|py|java|cpp|c|h|php|rb|go|rs|swift|kt|dart|vue|svelte))(?:\s|$|\n)/i
   const matchInCodePath = code.match(filePathPattern)
   if (matchInCodePath) {
-    return matchInCodePath[1].trim()
+    const cleanPath = matchInCodePath[1].trim()
+    console.log("cleanPath", cleanPath)
+    return cleanPath
   }
   // Third, use current markdown text to find the most recent "File: /path" before this code block
   if (!markdownText) {
@@ -65,11 +67,9 @@ export function extractFilePathFromCode(
   let match
   while ((match = filePattern.exec(markdownText)) !== null) {
     const rawPath = match[1].trim()
-    // Strip "(new file)" marker from the path
-    const cleanPath = rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
     positions.push({
       position: match.index,
-      filePath: cleanPath,
+      filePath: rawPath,
     })
   }
 
@@ -97,6 +97,7 @@ export function extractFilePathFromCode(
         if (codeBlockIndex === undefined) {
           codeBlockFileMap.set(codeHash, intendedFile)
         }
+        console.log("intendedFile", intendedFile)
         return intendedFile
       }
     }

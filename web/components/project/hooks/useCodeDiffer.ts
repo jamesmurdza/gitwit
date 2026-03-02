@@ -147,9 +147,15 @@ export function useCodeDiffer({
       originalCode: string,
     ): monaco.editor.IEditorDecorationsCollection | null => {
       const currentEditorRef = editorRefRef.current
-      if (!currentEditorRef) return null
+      if (!currentEditorRef) {
+        console.log("no editorRef")
+        return null
+      }
       const model = currentEditorRef.getModel()
-      if (!model) return null
+      if (!model) {
+        console.log("no model")
+        return null
+      }
 
       setModelMeta(model, {
         originalContent: originalCode,
@@ -164,6 +170,8 @@ export function useCodeDiffer({
       const diffResult = calculateDiff(originalCode, mergedCode, {
         ignoreWhitespace: false,
       })
+
+      console.log("diffResult", diffResult)
 
       model.setValue(diffResult.combinedLines.join("\n"))
       model.setEOL(eolSequence)

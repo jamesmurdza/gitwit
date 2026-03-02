@@ -51,7 +51,7 @@ MANDATORY Rules for code changes:
 - Format using triple backticks with the appropriate language identifier
 - CRITICAL: Always specify the complete file path relative to the project root
 - For new files, add "(new file)" after the path
-- Before any code block, include a line like "File: /path/to/file.ext" to indicate which file the code belongs to
+- Before every code block, include a line that shows FULL Path to the file like "File: /path/to/file.ext" to indicate which file the code belongs to
 - Keep responses brief and to the point
 - Use aider diff format: \`<<<<<<< SEARCH\` / \`=======\` / \`>>>>>>> REPLACE\` blocks inside code blocks
 - If multiple search/replace blocks are for the same file, group them in the same code block

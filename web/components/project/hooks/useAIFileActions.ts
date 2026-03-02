@@ -1,6 +1,6 @@
-import { apiClient } from "@/server/client"
 import { fileRouter } from "@/lib/api"
 import { DiffSession, TTab } from "@/lib/types"
+import { apiClient } from "@/server/client"
 import { useAppStore } from "@/store/context"
 import * as monaco from "monaco-editor"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -131,6 +131,8 @@ export function useAIFileActions({
 
       // First, check if there's a draft (unsaved changes)
       const draftContent = getDraft(normalizedPath)
+      console.log("normalizedPath", normalizedPath)
+      console.log("draftContent", draftContent)
       if (draftContent !== undefined) {
         return draftContent
       }
@@ -142,6 +144,7 @@ export function useAIFileActions({
             fileId: normalizedPath,
             projectId,
           })
+          console.log("response", response)
           return response?.data ?? ""
         } catch (error) {
           console.warn("Failed to fetch current file content:", error)
@@ -159,10 +162,19 @@ export function useAIFileActions({
     async ({
       filePath,
       code,
+      isNew,
     }: PrecomputeMergeArgs): Promise<FileMergeResult> => {
       const normalizedPath = normalizePath(filePath)
 
-      const originalCode = await getCurrentFileContent(normalizedPath)
+      const originalCode = isNew
+        ? ""
+        : await getCurrentFileContent(normalizedPath)
+
+      if (!isNew && originalCode === "") {
+        throw new Error(
+          `Failed to load original content for ${normalizedPath}. The file may not exist or the path may be incorrect.`,
+        )
+      }
 
       try {
         const res = await apiClient.ai["merge-code"].$post({
@@ -262,6 +274,7 @@ export function useAIFileActions({
       // Use target path if provided, otherwise use target tab
       const targetPath = normalizedTargetPath || normalizePath(targetTab.id)
       try {
+        console.log("code", code)
         const mergeResult = await resolveMergeResult(
           targetPath,
           code,
@@ -270,6 +283,9 @@ export function useAIFileActions({
           getCurrentFileContent,
           options,
         )
+
+        console.log("mergeResult", mergeResult)
+        console.log("targetTab", targetTab)
 
         // Apply to Editor
         if (mergeResult) {
@@ -338,6 +354,7 @@ export function useAIFileActions({
     const pending = pendingDiffsQueueRef.current.get(normalizedPath)
     if (pending) {
       pendingDiffsQueueRef.current.delete(normalizedPath)
+      console.log("pending", pending)
       handleApplyCodeFromChat(pending.code, pending.language, pending.options)
     }
   }, [

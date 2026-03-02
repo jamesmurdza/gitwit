@@ -14,6 +14,7 @@ export type ContextTab =
       type: "file" | "image"
       name: string
       content: string
+      path?: string
     }
   | {
       id: string
@@ -21,12 +22,14 @@ export type ContextTab =
       name: string
       content?: string
       lineRange?: { start: number; end: number }
+      path?: string
     }
   | {
       id: string
       type: "text"
       name: string
       content: string
+      path?: string
     }
 
 export type FileMergeResult = {
@@ -37,6 +40,7 @@ export type FileMergeResult = {
 export type PrecomputeMergeArgs = {
   filePath: string
   code: string
+  isNew?: boolean
 }
 
 export type ApplyMergedFileArgs = FileMergeResult & {

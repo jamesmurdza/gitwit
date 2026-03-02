@@ -80,8 +80,15 @@ export function useChatPanelHandlers() {
       if (!fileIdToUse) {
         return null
       }
+      console.log("fileIdToUse", fileIdToUse)
 
       const handlers = getHandlers(fileIdToUse)
+      if (handlers) {
+        console.log("handlers", handlers)
+      }
+      else {
+        console.log("no handlers")
+      }
       if (handlers?.handleApplyCode) {
         return handlers.handleApplyCode(mergedCode, originalCode)
       }
@@ -212,6 +219,7 @@ export function useChatPanelHandlers() {
       language?: string,
       options?: Parameters<typeof handleApplyCodeFromChat>[2],
     ) => {
+      console.log("onApplyCode", code, language, options)
       return handleApplyCodeFromChat(code, language, options)
     },
     [handleApplyCodeFromChat, activeFileId, activeTab, activeHandlers],

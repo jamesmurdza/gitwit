@@ -1,5 +1,5 @@
-import { apiClient } from "@/server/client"
-import { FileMergeResult } from "../../chat/lib/types"
+import { apiClient } from "@/server/client";
+import { FileMergeResult } from "../../chat/lib/types";
 
 interface MergeStatusAccessor {
   getMergeStatus?: (
@@ -47,6 +47,7 @@ export async function resolveMergeResult(
 
   // 3. Compute fresh merge
   const originalCode = await getCurrentFileContent(normalizedPath)
+  console.log("originalCode", originalCode)
   const res = await apiClient.ai["merge-code"].$post({
     json: {
       partialCode: code,

@@ -166,6 +166,7 @@ function MainChatContent({
 
   const wrappedOnApplyCode = React.useCallback(
     async (code: string, language?: string): Promise<void> => {
+      console.log("wrappedOnApplyCode", code, language)
       if (onApplyCode) {
         await onApplyCode(code, language, {
           mergeStatuses,
@@ -323,6 +324,7 @@ function ChatContexts() {
             start: selection.startLineNumber,
             end: selection.endLineNumber,
           },
+          path: activeTab.id,
         })
       }
     },

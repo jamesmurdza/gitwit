@@ -86,7 +86,25 @@ export function GeneratedFilesPreview({
   }>({ files: [], sourceKey: null })
 
   React.useEffect(() => {
-    setExtracted(extractFilesFromMessages(messages))
+    const next = extractFilesFromMessages(messages)
+    setExtracted((prev) => {
+      if (prev.sourceKey !== next.sourceKey) return next
+      if (prev.files.length !== next.files.length) return next
+
+      for (let i = 0; i < prev.files.length; i++) {
+        const a = prev.files[i]
+        const b = next.files[i]
+        if (
+          a.path !== b.path ||
+          (a.code ?? "") !== (b.code ?? "") ||
+          !!a.isNew !== !!b.isNew
+        ) {
+          return next
+        }
+      }
+
+      return prev
+    })
   }, [messages])
 
   const providedFiles = files ?? []
@@ -156,12 +174,15 @@ export function GeneratedFilesPreview({
 
   React.useEffect(() => {
     setMergeStatuses((prev) => {
-      const next: Record<string, MergeState> = {}
+      let changed = false
+      const next: Record<string, MergeState> = { ...prev }
       generatedFiles.forEach((file) => {
-        // Only set to idle if it doesn't exist, preserve existing statuses
-        next[file.path] = prev[file.path] ?? { status: "idle" as const }
+        if (!next[file.path]) {
+          next[file.path] = { status: "idle" as const }
+          changed = true
+        }
       })
-      return next
+      return changed ? next : prev
     })
   }, [generatedFiles])
 
@@ -177,7 +198,8 @@ export function GeneratedFilesPreview({
     const currentPrecomputeMerge = precomputeMergeRef.current
 
     // Collect all files to process first, then start ALL merges in parallel
-    const filesToProcess: Array<{ key: string; code: string }> = []
+    const filesToProcess: Array<{ key: string; code: string; isNew?: boolean }> =
+      []
 
     generatedFilesRef.current.forEach((file) => {
       if (!file.code) return
@@ -213,14 +235,14 @@ export function GeneratedFilesPreview({
 
       // Mark as processed immediately to prevent duplicates
       processedFilesRef.current.add(key)
-      filesToProcess.push({ key, code: file.code })
+      filesToProcess.push({ key, code: file.code, isNew: file.isNew })
     })
 
     // Only proceed if there are files to process
     if (filesToProcess.length === 0) return
 
     // Start ALL merges in parallel (not sequential)
-    filesToProcess.forEach(({ key, code }) => {
+    filesToProcess.forEach(({ key, code, isNew }) => {
       // Set pending status immediately
       setMergeStatuses((prev) => ({
         ...prev,
@@ -230,6 +252,7 @@ export function GeneratedFilesPreview({
       const mergePromise = currentPrecomputeMerge({
         filePath: key,
         code: code,
+        isNew,
       })
       mergeJobsRef.current.set(key, mergePromise)
 
@@ -278,6 +301,10 @@ export function GeneratedFilesPreview({
       if (status?.status === "ready" && status.result && file.code) {
         // Always pass targetFilePath to onApplyCode so it can open/activate if needed
         autoPreviewedRef.current.add(key)
+        console.log("onApplyCode", file.code, undefined, {
+          targetFilePath: key,
+          getMergeStatus: (path: string) => mergeStatusRef.current[path],
+        })
         onApplyCode(file.code, undefined, {
           targetFilePath: key,
           getMergeStatus: (path) => mergeStatusRef.current[path],
@@ -360,7 +387,11 @@ export function GeneratedFilesPreview({
 
         let job = mergeJobsRef.current.get(key)
         if (!job && file.code && precomputeMerge) {
-          job = precomputeMerge({ filePath: key, code: file.code })
+          job = precomputeMerge({
+            filePath: key,
+            code: file.code,
+            isNew: file.isNew,
+          })
           mergeJobsRef.current.set(key, job)
           setMergeStatuses((prev) => ({
             ...prev,

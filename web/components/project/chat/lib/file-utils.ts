@@ -8,6 +8,7 @@ export type GeneratedFile = {
   path: string
   additions: number
   code?: string
+  isNew?: boolean
 }
 
 const HARDCODED_ADDITIONS = 3
@@ -25,10 +26,11 @@ export function stripCodeFence(codeBlock: string) {
 export function extractFilesFromMarkdown(markdown: string): {
   path: string
   code?: string
+  isNew?: boolean
 }[] {
   if (!markdown) return []
 
-  const files: Array<{ path: string; code?: string }> = []
+  const files: Array<{ path: string; code?: string; isNew?: boolean }> = []
   const codeBlockFileMap = new Map<string, string>()
   const codeBlockRegex = /```[\s\S]*?```/g
   let match
@@ -41,16 +43,20 @@ export function extractFilesFromMarkdown(markdown: string): {
 
     // Pass the index of where this code block starts in the markdown
     const codeBlockIndex = match.index
-    const filePath = extractFilePathFromCode(
+    const rawFilePath = extractFilePathFromCode(
       code,
       markdown,
       codeBlockFileMap,
       codeBlockIndex,
       previousCodeBlockEnd,
     )
-    if (filePath) {
-      const normalized = normalizePath(filePath)
-      files.push({ path: normalized, code })
+    console.log("filePath", rawFilePath)
+    if (rawFilePath) {
+      const isNew = /\(new file\)/i.test(rawFilePath)
+      const cleanPath = rawFilePath.replace(/\s*\(new file\)\s*$/i, "").trim()
+      const normalized = normalizePath(cleanPath)
+      console.log("normalized file path", normalized)
+      files.push({ path: normalized, code, isNew })
     }
 
     // Update previous code block end position
@@ -62,14 +68,14 @@ export function extractFilesFromMarkdown(markdown: string): {
     const seenPaths = new Set<string>()
     let fallbackMatch
     while ((fallbackMatch = filePattern.exec(markdown)) !== null) {
-      const cleanPath = fallbackMatch[1]
-        .replace(/\s*\(new file\)\s*$/i, "")
-        .trim()
+      const rawPath = fallbackMatch[1]
+      const isNew = /\(new file\)/i.test(rawPath)
+      const cleanPath = rawPath.replace(/\s*\(new file\)\s*$/i, "").trim()
       if (cleanPath) {
         const normalized = normalizePath(cleanPath)
         if (!seenPaths.has(normalized)) {
           seenPaths.add(normalized)
-          files.push({ path: normalized })
+          files.push({ path: normalized, isNew })
         }
       }
     }
@@ -93,12 +99,13 @@ export function extractFilesFromMessages(messages: Message[]): {
   if (!latestAssistant?.content) return { files: [], sourceKey: null }
 
   const files = extractFilesFromMarkdown(latestAssistant.content).map(
-    ({ path, code }) => ({
+    ({ path, code, isNew }) => ({
       id: path,
       path,
       name: getDisplayName(path),
       code,
       additions: HARDCODED_ADDITIONS,
+      isNew,
     }),
   )
 
