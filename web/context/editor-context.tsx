@@ -52,6 +52,7 @@ interface EditorContextType {
   registerHandlers: (fileId: string, handlers: EditorHandlers) => void
   unregisterHandlers: (fileId: string) => void
   getHandlers: (fileId: string) => EditorHandlers | undefined
+  handlersVersion: number
 }
 
 const EditorContext = createContext<EditorContextType | null>(null)
@@ -110,10 +111,15 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 
   // Handler registry
   const handlersMap = useRef<Map<string, EditorHandlers>>(new Map())
+  const [handlersVersion, setHandlersVersion] = useState(0)
 
   const registerHandlers = useCallback(
     (fileId: string, handlers: EditorHandlers) => {
+      const prev = handlersMap.current.get(fileId)
       handlersMap.current.set(fileId, handlers)
+      if (handlers.editorRef !== null && (!prev || prev.editorRef === null)) {
+        setHandlersVersion((v) => v + 1)
+      }
     },
     [],
   )
@@ -146,6 +152,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         registerHandlers,
         unregisterHandlers,
         getHandlers,
+        handlersVersion,
       }}
     >
       {children}

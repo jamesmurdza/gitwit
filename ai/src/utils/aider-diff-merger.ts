@@ -356,6 +356,8 @@ export function mergeAiderDiff(
 ): string {
   const blocks = parseAiderDiff(diffSnippet, filePath)
 
+  console.log("mergeAiderDiff blocks", blocks)
+
   if (blocks.length === 0) {
     return originalCode
   }

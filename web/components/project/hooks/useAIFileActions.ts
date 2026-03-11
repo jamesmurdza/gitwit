@@ -340,9 +340,10 @@ export function useAIFileActions({
       if (applied !== null) {
         pendingApplyReadyRef.current.delete(normalizedPath)
         retryCountRef.current = 0
-      } else if (retryCountRef.current < 5) {
+      } else if (retryCountRef.current < 15) {
         retryCountRef.current += 1
-        const id = setTimeout(() => setRetryApplyTick((t) => t + 1), 150)
+        const delay = Math.min(150 * retryCountRef.current, 500)
+        const id = setTimeout(() => setRetryApplyTick((t) => t + 1), delay)
         return () => clearTimeout(id)
       } else {
         pendingApplyReadyRef.current.delete(normalizedPath)
