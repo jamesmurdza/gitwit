@@ -249,19 +249,57 @@ function parseBlocks(blockContent: string): Omit<AiderDiffBlock, "filePath">[] {
 }
 
 /**
+ * Returns true if the line uses `...` as a code wildcard (not inside a comment).
+ * e.g. `cva(...)`, `foo(...)`, `{ ... }` — but NOT `// ... existing code ...`
+ */
+function isEllipsisWildcard(line: string): boolean {
+  const trimmed = line.trim()
+  if (
+    trimmed.startsWith("//") ||
+    trimmed.startsWith("/*") ||
+    trimmed.startsWith("*") ||
+    trimmed.startsWith("#")
+  ) {
+    return false
+  }
+  return trimmed.includes("...")
+}
+
+/**
+ * Checks if a code line matches a search line that contains a `...` wildcard.
+ * Only the prefix (before `...`) is required. The suffix (after `...`) is
+ * checked when it appears on the same line but is optional for multi-line spans.
+ */
+function lineMatchesWithEllipsis(
+  codeLine: string,
+  searchLine: string,
+): boolean {
+  const trimmedCode = codeLine.trim()
+  const trimmedSearch = searchLine.trim()
+
+  const ellipsisIdx = trimmedSearch.indexOf("...")
+  const prefix = trimmedSearch.substring(0, ellipsisIdx)
+  const suffix = trimmedSearch.substring(ellipsisIdx + 3)
+
+  if (!trimmedCode.startsWith(prefix)) return false
+  if (suffix.length > 0 && !trimmedCode.endsWith(suffix)) return false
+  return true
+}
+
+/**
  * Finds the starting index of a block in the code
- * Tries exact match first (including whitespace), then normalized match (ignoring leading whitespace)
+ * Tries exact match first (including whitespace), then normalized match (ignoring leading whitespace),
+ * then ellipsis-aware match (treating `...` in non-comment lines as wildcards).
  * Returns -1 for empty search blocks (new files) instead of null
  */
 function findBlockInCode(code: string, searchLines: string[]): number | null {
-  // Empty search block means it's a new file - return -1 as a special marker
   if (searchLines.length === 0) {
     return -1
   }
 
   const codeLines = code.split("\n")
 
-  // Try to find exact match first (including whitespace)
+  // Pass 1: exact match (including whitespace)
   for (let i = 0; i <= codeLines.length - searchLines.length; i++) {
     let match = true
     for (let j = 0; j < searchLines.length; j++) {
@@ -275,8 +313,7 @@ function findBlockInCode(code: string, searchLines: string[]): number | null {
     }
   }
 
-  // If exact match fails, try normalized match (ignoring leading whitespace)
-  // This handles cases where indentation might differ slightly
+  // Pass 2: normalized match (ignoring leading/trailing whitespace)
   for (let i = 0; i <= codeLines.length - searchLines.length; i++) {
     let match = true
     for (let j = 0; j < searchLines.length; j++) {
@@ -289,6 +326,28 @@ function findBlockInCode(code: string, searchLines: string[]): number | null {
     }
     if (match) {
       return i
+    }
+  }
+
+  // Pass 3: ellipsis-aware match — `...` in non-comment lines acts as a wildcard
+  const hasEllipsis = searchLines.some((l) => isEllipsisWildcard(l))
+  if (hasEllipsis) {
+    for (let i = 0; i <= codeLines.length - searchLines.length; i++) {
+      let match = true
+      for (let j = 0; j < searchLines.length; j++) {
+        if (isEllipsisWildcard(searchLines[j])) {
+          if (!lineMatchesWithEllipsis(codeLines[i + j], searchLines[j])) {
+            match = false
+            break
+          }
+        } else {
+          if (codeLines[i + j].trim() !== searchLines[j].trim()) {
+            match = false
+            break
+          }
+        }
+      }
+      if (match) return i
     }
   }
 
@@ -392,10 +451,31 @@ export function mergeAiderDiff(
     const codeLines = result.split("\n")
     const matchedOriginalLines = codeLines.slice(searchStart, searchEnd)
 
+    // Expand `...` wildcards in replace lines with the original matched content
+    const expandedReplaceLines = block.replaceLines.map((replaceLine) => {
+      if (!isEllipsisWildcard(replaceLine)) return replaceLine
+
+      const replaceTrimmed = replaceLine.trim()
+      const replaceEllipsisIdx = replaceTrimmed.indexOf("...")
+      const replacePrefix = replaceTrimmed.substring(0, replaceEllipsisIdx)
+
+      for (let i = 0; i < block.searchLines.length; i++) {
+        if (!isEllipsisWildcard(block.searchLines[i])) continue
+        const searchTrimmed = block.searchLines[i].trim()
+        const searchEllipsisIdx = searchTrimmed.indexOf("...")
+        const searchPrefix = searchTrimmed.substring(0, searchEllipsisIdx)
+
+        if (replacePrefix === searchPrefix && i < matchedOriginalLines.length) {
+          return matchedOriginalLines[i]
+        }
+      }
+      return replaceLine
+    })
+
     // Preserve indentation from original code for unchanged lines
     const replacementLines = preserveIndentation(
       matchedOriginalLines,
-      block.replaceLines,
+      expandedReplaceLines,
       block.searchLines,
     )
     const replacement = replacementLines.join("\n")

@@ -59,6 +59,9 @@ MANDATORY Rules for code changes:
 
 🚨 NEVER show complete files for EXISTING files. ALWAYS use "// ... existing code ..." comments for unchanged sections.
 🚨 For NEW FILES: Show the complete file content in the REPLACE block with an empty SEARCH block.
+🚨 NEVER use "..." to abbreviate actual code. Every code line in SEARCH/REPLACE blocks must be COMPLETE.
+   - "..." is ONLY allowed inside comment lines like "// ... existing code ..."
+   - Do NOT write abbreviated expressions like \`cva(...)\`, \`function(...)\`, \`<Component ...>\`, \`{...}\` — write the COMPLETE line of code or skip the unchanged region entirely with a comment.
 
 Example format for additions:
 File: /src/components/Button.tsx
