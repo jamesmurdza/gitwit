@@ -1,0 +1,140 @@
+# Area labels - which part of the codebase
+- name: "area: web"
+  color: "26b5ce"
+  description: "Changes to the web app"
+
+- name: "area: server"
+  color: "26b5ce"
+  description: "Changes to the server"
+
+- name: "area: db"
+  color: "26b5ce"
+  description: "Changes to the database package"
+
+- name: "area: ai"
+  color: "26b5ce"
+  description: "Changes to the AI package"
+
+- name: "area: lib"
+  color: "26b5ce"
+  description: "Changes to the shared lib"
+
+- name: "area: packages"
+  color: "26b5ce"
+  description: "Changes to internal packages"
+
+- name: "area: templates"
+  color: "26b5ce"
+  description: "Changes to templates"
+
+- name: "area: tests"
+  color: "26b5ce"
+  description: "Changes to tests"
+
+- name: "area: config"
+  color: "26b5ce"
+  description: "Changes to repository configuration files"
+
+- name: "area: documentation"
+  color: "26b5ce"
+  description: "Improvements or additions to documentation"
+
+- name: "area: github actions"
+  color: "26b5ce"
+  description: "Changes to GitHub Actions workflows"
+
+# Change labels - conventional commit type
+- name: "change: feat"
+  color: "32e52f"
+  description: "New feature"
+
+- name: "change: fix"
+  color: "158c01"
+  description: "Bug fix"
+
+- name: "change: chore"
+  color: "ededed"
+  description: "Maintenance and chores"
+
+- name: "change: docs"
+  color: "0075ca"
+  description: "Documentation changes"
+
+- name: "change: refactor"
+  color: "fbca04"
+  description: "Code refactoring"
+
+- name: "change: test"
+  color: "bfd4f2"
+  description: "Test changes"
+
+- name: "change: ci"
+  color: "000000"
+  description: "CI/CD changes"
+
+- name: "change: perf"
+  color: "f9d0c4"
+  description: "Performance improvements"
+
+- name: "change: build"
+  color: "5319e7"
+  description: "Build system changes"
+
+- name: "change: style"
+  color: "c5def5"
+  description: "Code style changes"
+
+- name: "change: revert"
+  color: "d93f0b"
+  description: "Reverting changes"
+
+- name: "change: deps"
+  color: "0366d6"
+  description: "Dependency updates"
+
+# Status labels
+- name: "status: do not merge"
+  color: "e11d21"
+  description: "PR should not be merged"
+
+- name: "status: duplicate"
+  color: "cfd3d7"
+  description: "This issue or pull request already exists"
+
+- name: "status: in progress"
+  color: "cccccc"
+  description: "Work is currently being done"
+
+- name: "status: triage"
+  color: "fef2c0"
+  description: "Needs to be triaged by a maintainer"
+
+- name: "status: blocked"
+  color: "e11d21"
+  description: "This issue or pull request is blocked"
+
+- name: "status: ready"
+  color: "339E62"
+  description: "Ready for review"
+
+# Type labels
+- name: "type: bug"
+  color: "d73a4a"
+  description: "Something isn't working"
+
+- name: "type: enhancement"
+  color: "a2eeef"
+  description: "New feature or request"
+
+# Contributor labels
+- name: "contributor: bot"
+  color: "0366d6"
+  description: "Created by a bot"
+
+- name: "contributor: team"
+  color: "80ffce"
+  description: "Created by a team member"
+
+- name: "contributor: external"
+  color: "6f42c1"
+  description: "Created by an external contributor"

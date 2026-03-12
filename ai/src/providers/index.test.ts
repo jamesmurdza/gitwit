@@ -29,7 +29,7 @@ describe("resolveProviderConfig", () => {
   it("defaults to anthropic when no overrides and no env vars", () => {
     const config = resolveProviderConfig()
     expect(config.provider).toBe("anthropic")
-    expect(config.modelId).toBe("claude-sonnet-4-20250514")
+    expect(config.modelId).toBe("claude-sonnet-4-6")
   })
 
   it("detects anthropic from env", () => {

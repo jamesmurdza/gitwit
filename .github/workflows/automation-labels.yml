@@ -1,0 +1,243 @@
+name: Automation / Labels
+
+# SECURITY NOTE: This workflow uses pull_request_target to gain write permissions
+# for labeling PRs from forks. This is safe because:
+# 1. We do NOT checkout fork code
+# 2. We use GitHub API for file detection
+# 3. We only read PR metadata - never execute PR code
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+
+  issues:
+    types: [opened]
+
+  push:
+    branches:
+      - "main"
+    paths:
+      - ".github/labels.yml"
+      - ".github/workflows/automation-labels.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  meta:
+    name: "Meta"
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      areas: ${{ steps.files_changed.outputs.areas || '[]' }}
+      change_type: ${{ steps.change_type.outputs.change_type }}
+
+    steps:
+      - name: Determine Change Type
+        id: change_type
+        if: github.event_name == 'pull_request_target'
+        env:
+          PR_TITLE: "${{ github.event.pull_request.title }}"
+        run: |
+          CHANGE_TYPE=""
+          if [[ "${PR_TITLE}" =~ ^(feat|fix|chore|docs|refactor|test|ci|perf|build|style|revert|deps)(\(.+\))?!?:.*$ ]]; then
+            CHANGE_TYPE="${BASH_REMATCH[1]}"
+          fi
+          echo "change_type=${CHANGE_TYPE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Determine Areas via GitHub API
+        id: files_changed
+        if: github.event_name == 'pull_request_target' || github.event_name == 'push'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const changedPathSet = new Set();
+
+            if (context.eventName === 'push') {
+              if (context.payload.before && context.payload.after) {
+                const { data: compareData } = await github.rest.repos.compareCommits({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  base: context.payload.before,
+                  head: context.payload.after
+                });
+                for (const file of compareData.files || []) {
+                  changedPathSet.add(file.filename);
+                }
+              }
+            } else if (context.eventName === 'pull_request_target') {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                per_page: 100
+              });
+              for (const file of files) {
+                changedPathSet.add(file.filename);
+              }
+            }
+
+            const changedPaths = Array.from(changedPathSet);
+
+            const areaPatterns = {
+              web: [/^web\//],
+              server: [/^server\//],
+              db: [/^db\//],
+              ai: [/^ai\//],
+              lib: [/^lib\//],
+              packages: [/^packages\//],
+              templates: [/^templates\//],
+              tests: [/^tests\//],
+              config: [
+                /^turbo\.json$/,
+                /^\.nvmrc$/,
+                /^\.node-version$/,
+                /^\.prettier/,
+                /\.config\.(js|cjs|mjs|ts|cts|mts|json)$/
+              ],
+              documentation: [
+                /\.mdx?$/,
+                /README\./i
+              ],
+              github_actions: [
+                /^\.github\/workflows\//,
+                /^\.github\/actions\//
+              ],
+              labels: [
+                /^\.github\/labels\.yml$/,
+                /^\.github\/workflows\/automation-labels\.yml$/
+              ],
+            };
+
+            const areas = [];
+            for (const [area, patterns] of Object.entries(areaPatterns)) {
+              if (changedPaths.some(path => patterns.some(pattern => pattern.test(path)))) {
+                areas.push(area);
+              }
+            }
+
+            core.setOutput('areas', JSON.stringify(areas));
+
+  repo-labels:
+    name: "Repository Labels"
+    runs-on: ubuntu-latest
+    needs: [meta]
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request_target' }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update Labels
+        uses: crazy-max/ghaction-github-labeler@v5
+        if: ${{ contains(fromJson(needs.meta.outputs.areas || '[]'), 'labels') }}
+        with:
+          dry-run: ${{ github.event_name == 'pull_request_target' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          skip-delete: true
+          yaml-file: .github/labels.yml
+
+  do-not-merge:
+    name: "Do Not Merge"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target'
+    permissions:
+      contents: read
+    steps:
+      - name: Check
+        env:
+          DO_NOT_MERGE: "${{contains(github.event.pull_request.labels.*.name, 'status: do not merge')}}"
+        run: |
+          if [[ "${DO_NOT_MERGE}" == "true" ]]; then
+            echo "##[error]Cannot merge when 'status: do not merge' label is present. Remove the label to proceed."
+            exit 1
+          else
+            echo "No 'status: do not merge' label found. Passing check."
+          fi
+
+  sync-labels:
+    name: "Sync Labels"
+    needs: [meta, repo-labels]
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'pull_request_target' || github.event_name == 'issues') && (github.event.action != 'labeled' && github.event.action != 'unlabeled')
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Determine Labels
+        id: determine_labels
+        env:
+          EXISTING_LABELS: "${{ toJson(github.event.issue.labels || github.event.pull_request.labels || '[]') }}"
+          DATA_AREAS: "${{ needs.meta.outputs.areas }}"
+          DATA_CHANGE: "${{ needs.meta.outputs.change_type }}"
+        run: |
+          LABEL_CHANGES="{}"
+
+          remove_label() {
+            local LABEL_TO_REMOVE="$1"
+            LABEL_CHANGES=$(jq --arg key "$LABEL_TO_REMOVE" '. + {($key): false}' <<< "${LABEL_CHANGES}")
+          }
+
+          add_label() {
+            local LABEL_TO_ADD="$1"
+            LABEL_CHANGES=$(jq --arg key "$LABEL_TO_ADD" '. + {($key): true}' <<< "${LABEL_CHANGES}")
+          }
+
+          remove_all_by_prefix() {
+            local PREFIX="$1"
+            while IFS= read -r LABEL; do
+              if [[ "$LABEL" == ${PREFIX}* ]]; then
+                remove_label "$LABEL"
+              fi
+            done < <(jq -r '.[] | .name' <<< "${EXISTING_LABELS}")
+          }
+
+          # Areas
+          remove_all_by_prefix "area: "
+          for AREA in $(jq -r '.[]' <<< "${DATA_AREAS}"); do
+            if [[ "${AREA}" == "labels" ]]; then continue; fi
+            LABEL_KEY="area: $(echo "${AREA}" | sed 's/_/ /g')"
+            add_label "$LABEL_KEY"
+          done
+
+          # Change Type
+          if [[ -n "${DATA_CHANGE}" ]]; then
+            remove_all_by_prefix "change: "
+            LABEL_KEY="change: ${DATA_CHANGE}"
+            add_label "$LABEL_KEY"
+          fi
+
+          echo "added_labels=$(jq -c '.' <<< "${LABEL_CHANGES}")" >> "${GITHUB_OUTPUT}"
+
+      - name: Apply Label Changes
+        env:
+          PR_OR_ISSUE_NUMBER: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || github.event.issue.number }}
+          GH_SUBCOMMAND: ${{ github.event_name == 'pull_request_target' && 'pr' || 'issue' }}
+          GH_REPO: ${{ github.repository }}
+          LABEL_CHANGES: |-
+            ${{ steps.determine_labels.outputs.added_labels || '{}' }}
+        run: |
+          LABELS_TO_ADD=$(jq -r '[to_entries[] | select(.value == true) | .key] | join(",")' <<< "${LABEL_CHANGES}")
+          LABELS_TO_REMOVE=$(jq -r '[to_entries[] | select(.value == false) | .key] | join(",")' <<< "${LABEL_CHANGES}")
+
+          CMD_ARGS=()
+          if [[ -n "${LABELS_TO_ADD}" ]]; then
+            CMD_ARGS+=(--add-label "${LABELS_TO_ADD}")
+          fi
+          if [[ -n "${LABELS_TO_REMOVE}" ]]; then
+            CMD_ARGS+=(--remove-label "${LABELS_TO_REMOVE}")
+          fi
+
+          if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
+            gh "${GH_SUBCOMMAND}" edit "${PR_OR_ISSUE_NUMBER}" -R "${GH_REPO}" "${CMD_ARGS[@]}" 2>&1
+          else
+            echo "No label changes to apply"
+          fi
