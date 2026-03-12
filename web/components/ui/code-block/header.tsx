@@ -60,13 +60,13 @@ export const CodeBlockHeader = ({
               }
             }}
             className={cn(
-              "ml-1 truncate font-mono lowercase hover:underline hover:text-foreground",
+              "ml-1 truncate font-mono hover:underline hover:text-foreground",
             )}
           >
             {displayName}
           </button>
         ) : (
-          <span className="ml-1 font-mono lowercase">{displayName}</span>
+          <span className="ml-1 font-mono">{displayName}</span>
         )}
         {isNewFile && (
           <span

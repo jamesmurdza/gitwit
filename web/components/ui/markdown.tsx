@@ -42,23 +42,15 @@ type MarkdownProps = ComponentProps<typeof Streamdown> & {
   collapsibleCodeBlocks?: boolean
 }
 
-interface ExtractedFileInfo {
-  filePath: string
-  fileName: string | null
-  isNewFile: boolean
-}
-
 interface MarkdownContextType {
-  fileInfoMap: Map<string, ExtractedFileInfo>
   onOpenFile?: (filePath: string) => void
   collapsibleCodeBlocks?: boolean
 }
 
 // Constants
 const LANGUAGE_REGEX = /language-([^\s]+)/
-const FILE_WITH_CODE_REGEX =
-  /^File:\s*([^\s(]+)(?:\s*\(new file\))?\s*\n```\w*\n([\s\S]*?)```/gm
 const FILE_LINE_REGEX = /^File:\s*[^\n]+\n/gm
+const SDFILE_MARKER = /^__SDFILE__:([^:\n]+)(?::(\w+))?\n/
 
 const codePlugin = createCodePlugin({
   themes: ["github-light", "github-dark-default"],
@@ -73,29 +65,35 @@ const MarkdownContext = createContext<MarkdownContextType | null>(null)
 // Utility Functions
 
 /**
- * Parses markdown: extracts file info and strips "File:" lines in one pass
+ * Embeds file path info as a `__SDFILE__` marker on the first line of each
+ * code block that follows a `File:` line, then strips leftover `File:` lines.
+ *
+ * The marker lives *inside* the code content so it always travels with the
+ * HAST node — no external map or position calculation needed. The
+ * `CodeComponent` strips it before rendering.
  */
-function parseMarkdownFileInfo(markdown: string) {
-  const fileInfoMap = new Map<string, ExtractedFileInfo>()
-  let match: RegExpExecArray | null
+function prepareMarkdown(markdown: string): string {
+  const embedded = markdown.replace(
+    /^File:\s*([^\s(]+)((?:\s*\(new file\))?)[^\n]*\n(```\w*\n)/gm,
+    (_, filePath: string, newMarker: string, codeFence: string) => {
+      const flag = newMarker.trim() ? ":new" : ""
+      return `${codeFence}__SDFILE__:${filePath}${flag}\n`
+    },
+  )
+  return embedded.replace(FILE_LINE_REGEX, "")
+}
 
-  while ((match = FILE_WITH_CODE_REGEX.exec(markdown)) !== null) {
-    const filePath = match[1]
-    const codeContent = match[2].trim()
-    fileInfoMap.set(codeContent, {
-      filePath,
-      fileName: filePath.split("/").pop() || null,
-      isNewFile: match[0].includes("(new file)"),
-    })
+/** Walk a HAST node tree and collect all text content. */
+function getNodeText(node: Element): string {
+  let text = ""
+  for (const child of node.children) {
+    if (child.type === "text") {
+      text += child.value
+    } else if (child.type === "element") {
+      text += getNodeText(child)
+    }
   }
-
-  // Reset regex lastIndex for reuse
-  FILE_WITH_CODE_REGEX.lastIndex = 0
-
-  return {
-    fileInfoMap,
-    strippedMarkdown: markdown.replace(FILE_LINE_REGEX, ""),
-  }
+  return text
 }
 
 const shouldShowControls = (
@@ -162,21 +160,27 @@ const CodeComponent = ({
   const language = (className?.match(LANGUAGE_REGEX)?.[1] ??
     "") as BundledLanguage
 
-  // Extract code content from children
-  let code = ""
-  if (
-    isValidElement(children) &&
-    children.props &&
-    typeof children.props === "object" &&
-    "children" in children.props &&
-    typeof (children.props as { children?: unknown }).children === "string"
-  ) {
-    code = (children.props as { children: string }).children
-  } else if (typeof children === "string") {
-    code = children
+  let rawCode = node ? getNodeText(node) : ""
+  if (!rawCode) {
+    if (
+      isValidElement(children) &&
+      children.props &&
+      typeof children.props === "object" &&
+      "children" in children.props &&
+      typeof (children.props as { children?: unknown }).children === "string"
+    ) {
+      rawCode = (children.props as { children: string }).children
+    } else if (typeof children === "string") {
+      rawCode = children
+    }
   }
 
-  const fileInfo = markdownCtx?.fileInfoMap.get(code.trim())
+  const marker = rawCode.match(SDFILE_MARKER)
+  const code = marker ? rawCode.replace(SDFILE_MARKER, "") : rawCode
+  const filePath = marker?.[1] ?? null
+  const fileName = filePath?.split("/").pop() ?? undefined
+  const isNewFile = marker?.[2] === "new"
+
   const showCodeControls = shouldShowControls(controlsConfig, "code")
   const onOpenFile = markdownCtx?.onOpenFile
 
@@ -186,9 +190,9 @@ const CodeComponent = ({
         className={cn("overflow-x-auto border-border border-t", className)}
         code={code.trim()}
         language={language}
-        filename={fileInfo?.fileName ?? undefined}
-        filePath={fileInfo?.filePath ?? null}
-        isNewFile={fileInfo?.isNewFile}
+        filename={fileName}
+        filePath={filePath}
+        isNewFile={isNewFile}
         onOpenFile={onOpenFile}
         collapsible={markdownCtx?.collapsibleCodeBlocks}
       >
@@ -218,13 +222,13 @@ export const Markdown = memo(
   ({ className, children, onOpenFile, collapsibleCodeBlocks, ...props }: MarkdownProps) => {
     const rawMarkdown = typeof children === "string" ? children : ""
 
-    const { fileInfoMap, strippedMarkdown } = useMemo(
-      () => parseMarkdownFileInfo(rawMarkdown),
+    const strippedMarkdown = useMemo(
+      () => prepareMarkdown(rawMarkdown),
       [rawMarkdown],
     )
 
     return (
-      <MarkdownContext.Provider value={{ fileInfoMap, onOpenFile, collapsibleCodeBlocks }}>
+      <MarkdownContext.Provider value={{ onOpenFile, collapsibleCodeBlocks }}>
         <CodePluginContext.Provider value={{ codePlugin }}>
           <Streamdown
             className={cn(

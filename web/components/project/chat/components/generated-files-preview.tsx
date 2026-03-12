@@ -498,10 +498,10 @@ export function GeneratedFilesPreview({
       </div>
       <div
         className={cn(
-          "space-y-1 overflow-hidden transition-all ease-out",
+          "space-y-1 transition-all ease-out",
           isOpen
-            ? "max-h-48 opacity-100 duration-700"
-            : "max-h-0 opacity-0 duration-500",
+            ? "max-h-36 overflow-y-auto opacity-100 duration-700"
+            : "max-h-0 overflow-hidden opacity-0 duration-500",
         )}
       >
         {visibleFiles.map((file) => {
