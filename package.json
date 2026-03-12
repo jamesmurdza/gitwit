@@ -18,6 +18,7 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "test": "turbo test",
+    "test:e2e": "turbo test:e2e",
     "db:migrate": "npm run migrate -w db",
     "db:migrate:prod": "NODE_ENV=production npm run migrate -w db",
     "db:generate": "npm run generate -w db",
