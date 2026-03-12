@@ -229,7 +229,6 @@ export function useAIFileActions({
         const matchBy = (tab: TTab) => pathMatchesTab(normalizedTargetPath, tab)
         targetTab = tabs.find(matchBy)
 
-        // If tab doesn't exist, create it
         if (!targetTab) {
           const fileName =
             normalizedTargetPath.split("/").pop() || normalizedTargetPath
@@ -241,26 +240,17 @@ export function useAIFileActions({
           }
         }
 
-        // Get current activeTab from tabs array (more reliable than closure)
         const currentActiveTab =
           tabs.find((t) => t.id === activeTab?.id) || activeTab
-        // Check if target tab is currently active (compare with current activeTab)
         const isTargetActive = currentActiveTab
           ? matchBy(currentActiveTab)
           : false
 
         if (!isTargetActive) {
-          pendingDiffsQueueRef.current.set(normalizedTargetPath, {
-            code,
-            language,
-            options: {
-              ...options,
-              targetFilePath: normalizedTargetPath,
-            },
-          })
-          // Open and activate the target file (openFile handles tab creation and activation)
           openFile(normalizedTargetPath)
-          return
+          // Don't return early — proceed to merge + apply with targetFileId.
+          // The merge is async so by the time it resolves the EditorPanel
+          // should have had time to mount. If not, the retry mechanism handles it.
         }
       } else {
         // No target path specified, use active tab
@@ -268,6 +258,7 @@ export function useAIFileActions({
       }
 
       if (!targetTab) {
+        console.log("no target tab")
         return
       }
 
@@ -323,47 +314,60 @@ export function useAIFileActions({
     ],
   )
 
-  // Retry pending diffs when active tab changes; also retry ready-to-apply when editor mounts
+  // Retry all pending ready-to-apply diffs when editors mount or tick fires.
+  // Processes files one at a time: activates each file's tab to ensure
+  // Dockview renders its EditorPanel (inactive panels may not mount).
   useEffect(() => {
-    if (!activeTab?.id) return
+    if (pendingApplyReadyRef.current.size === 0) return
 
-    const normalizedPath = normalizePath(activeTab.id)
-
-    // First try ready-to-apply (editor was not ready on first attempt)
-    const ready = pendingApplyReadyRef.current.get(normalizedPath)
-    if (ready) {
+    // First pass: try applying all entries that already have handlers ready
+    for (const [filePath, ready] of Array.from(
+      pendingApplyReadyRef.current.entries(),
+    )) {
       const applied = handleApplyCodeWithDecorations(
         ready.mergedCode,
         ready.originalCode,
-        normalizedPath,
+        filePath,
       )
       if (applied !== null) {
-        pendingApplyReadyRef.current.delete(normalizedPath)
-        retryCountRef.current = 0
-      } else if (retryCountRef.current < 15) {
-        retryCountRef.current += 1
-        const delay = Math.min(150 * retryCountRef.current, 500)
-        const id = setTimeout(() => setRetryApplyTick((t) => t + 1), delay)
-        return () => clearTimeout(id)
-      } else {
-        pendingApplyReadyRef.current.delete(normalizedPath)
-        retryCountRef.current = 0
+        pendingApplyReadyRef.current.delete(filePath)
       }
     }
 
-    // Then process queue (tab switch case)
+    if (pendingApplyReadyRef.current.size === 0) {
+      retryCountRef.current = 0
+      return
+    }
+
+    // Second pass: for the first file still pending, activate its tab so
+    // Dockview renders the EditorPanel (it won't mount while inactive).
+    if (retryCountRef.current > 2) {
+      const [nextFilePath] = pendingApplyReadyRef.current.entries().next()
+        .value as [string, unknown]
+      openFile(nextFilePath)
+    }
+
+    if (retryCountRef.current < 20) {
+      retryCountRef.current += 1
+      const delay = Math.min(200 * Math.ceil(retryCountRef.current / 3), 600)
+      const id = setTimeout(() => setRetryApplyTick((t) => t + 1), delay)
+      return () => clearTimeout(id)
+    }
+
+    pendingApplyReadyRef.current.clear()
+    retryCountRef.current = 0
+  }, [handleApplyCodeWithDecorations, retryApplyTick, openFile])
+
+  // Process legacy pending diffs queue when active tab changes
+  useEffect(() => {
+    if (!activeTab?.id) return
+    const normalizedPath = normalizePath(activeTab.id)
     const pending = pendingDiffsQueueRef.current.get(normalizedPath)
     if (pending) {
       pendingDiffsQueueRef.current.delete(normalizedPath)
-      console.log("pending", pending)
       handleApplyCodeFromChat(pending.code, pending.language, pending.options)
     }
-  }, [
-    activeTab?.id,
-    handleApplyCodeFromChat,
-    handleApplyCodeWithDecorations,
-    retryApplyTick,
-  ])
+  }, [activeTab?.id, handleApplyCodeFromChat, handleApplyCodeWithDecorations])
 
   const enqueueFileContentUpdate = useCallback(
     (filePath: string, content: string) => {

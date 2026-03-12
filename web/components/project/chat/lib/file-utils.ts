@@ -50,13 +50,11 @@ export function extractFilesFromMarkdown(markdown: string): {
       codeBlockIndex,
       previousCodeBlockEnd,
     )
-    console.log("filePath", rawFilePath)
     if (rawFilePath) {
       const isNew = /\(new file\)/i.test(rawFilePath)
       const cleanPath = rawFilePath.replace(/\s*\(new file\)\s*$/i, "").trim()
       const normalized = normalizePath(cleanPath)
-      console.log("normalized file path", normalized)
-      files.push({ path: normalized, code, isNew })
+     files.push({ path: normalized, code, isNew })
     }
 
     // Update previous code block end position
