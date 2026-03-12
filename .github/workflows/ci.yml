@@ -69,6 +69,13 @@ jobs:
         run: npm run build
         env:
           SKIP_ENV_VALIDATION: "true"
+          GITHUB_CLIENT_ID: "dummy"
+          GITHUB_CLIENT_SECRET: "dummy"
+          E2B_API_KEY: "dummy"
+          CLERK_SECRET_KEY: "sk_test_dummy"
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_dGVuZGVyLWhvbmV5YmVlLTU2LmNsZXJrLmFjY291bnRzLmRldiQ"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
 
   e2e:
     runs-on: ubuntu-latest
