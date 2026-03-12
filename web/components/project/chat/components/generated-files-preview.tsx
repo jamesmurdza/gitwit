@@ -301,10 +301,6 @@ export function GeneratedFilesPreview({
       if (status?.status === "ready" && status.result && file.code) {
         // Always pass targetFilePath to onApplyCode so it can open/activate if needed
         autoPreviewedRef.current.add(key)
-        console.log("onApplyCode", file.code, undefined, {
-          targetFilePath: key,
-          getMergeStatus: (path: string) => mergeStatusRef.current[path],
-        })
         onApplyCode(file.code, undefined, {
           targetFilePath: key,
           getMergeStatus: (path) => mergeStatusRef.current[path],

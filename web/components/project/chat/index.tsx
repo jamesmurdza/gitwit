@@ -166,7 +166,7 @@ function MainChatContent({
 
   const wrappedOnApplyCode = React.useCallback(
     async (code: string, language?: string): Promise<void> => {
-      console.log("wrappedOnApplyCode", code, language)
+      
       if (onApplyCode) {
         await onApplyCode(code, language, {
           mergeStatuses,

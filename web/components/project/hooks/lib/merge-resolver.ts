@@ -47,7 +47,6 @@ export async function resolveMergeResult(
 
   // 3. Compute fresh merge
   const originalCode = await getCurrentFileContent(normalizedPath)
-  console.log("originalCode", originalCode)
   const res = await apiClient.ai["merge-code"].$post({
     json: {
       partialCode: code,

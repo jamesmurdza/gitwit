@@ -131,8 +131,6 @@ export function useAIFileActions({
 
       // First, check if there's a draft (unsaved changes)
       const draftContent = getDraft(normalizedPath)
-      console.log("normalizedPath", normalizedPath)
-      console.log("draftContent", draftContent)
       if (draftContent !== undefined) {
         return draftContent
       }
@@ -144,7 +142,6 @@ export function useAIFileActions({
             fileId: normalizedPath,
             projectId,
           })
-          console.log("response", response)
           return response?.data ?? ""
         } catch (error) {
           console.warn("Failed to fetch current file content:", error)
@@ -265,7 +262,7 @@ export function useAIFileActions({
       // Use target path if provided, otherwise use target tab
       const targetPath = normalizedTargetPath || normalizePath(targetTab.id)
       try {
-        console.log("code", code)
+
         const mergeResult = await resolveMergeResult(
           targetPath,
           code,
@@ -275,8 +272,6 @@ export function useAIFileActions({
           options,
         )
 
-        console.log("mergeResult", mergeResult)
-        console.log("targetTab", targetTab)
 
         // Apply to Editor
         if (mergeResult) {

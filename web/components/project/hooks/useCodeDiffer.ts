@@ -171,7 +171,6 @@ export function useCodeDiffer({
         ignoreWhitespace: false,
       })
 
-      console.log("diffResult", diffResult)
 
       model.setValue(diffResult.combinedLines.join("\n"))
       model.setEOL(eolSequence)
