@@ -402,7 +402,6 @@ function preserveIndentation(
 
 /**
  * Merges aider diff blocks into original code
- *
  * @param originalCode - The original file content
  * @param diffSnippet - The LLM output containing aider diff format
  * @param filePath - Optional file path for the file being edited
